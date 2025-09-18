@@ -1,0 +1,120 @@
+{% extends "_base.html" %}
+{% block title %}Login — Pneumark SGP{% endblock %}
+{% block subtitle %}Acesso ao Sistema{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ====== Estilos específicos da página de login ====== */
+  .auth-wrap{
+    min-height: calc(100vh - 76px); /* altura menos a appbar */
+    display:grid; place-items:center;
+  }
+  .auth-card{
+    width:min(420px, 92vw);
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    box-shadow: var(--shadow-2);
+    position:relative; overflow:hidden;
+  }
+  .auth-card::after{
+    content:""; position:absolute; inset:-35% -35% auto auto; height:160px; width:160px; border-radius:50%;
+    background: radial-gradient(closest-side, rgba(230,0,0,.16), transparent 70%);
+    filter: blur(6px);
+  }
+  .auth-head{
+    display:flex; align-items:center; gap:14px; margin-bottom:16px; position:relative; z-index:1;
+  }
+  .auth-logo{
+    height:44px; width:auto; border-radius:10px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .auth-title{ margin:0; font-size:20px; color:var(--text); font-weight:800; letter-spacing:.3px }
+  .auth-sub{ margin:0; color:var(--muted); font-size:13px }
+
+  .auth-form{ margin-top:10px; position:relative; z-index:1; }
+  .auth-field{ display:grid; gap:6px; margin:12px 0; }
+  .auth-field label{ font-size:13px; color:#30425a; font-weight:700; letter-spacing:.2px }
+  .auth-input{
+    width:100%; padding:12px 12px;
+    border:1px solid var(--border); border-radius:12px; background:#fff; color:var(--text);
+    font-size:14px; outline:0;
+    transition: box-shadow var(--speed) var(--easing), border-color var(--speed) var(--easing);
+  }
+  .auth-input::placeholder{ color:#8aa0bf }
+  .auth-input:focus{ border-color:#ffb3b3; box-shadow: 0 0 0 4px rgba(230,0,0,.10); }
+
+  .auth-btn{
+    width:100%; padding:12px 14px; border:0; border-radius:12px;
+    background: linear-gradient(180deg, #ff4545, #e60000);
+    color:#fff; font-weight:800; font-size:15px; letter-spacing:.2px; cursor:pointer;
+    box-shadow: 0 6px 18px rgba(230,0,0,.28);
+    transition: transform var(--speed) var(--easing), box-shadow var(--speed) var(--easing), filter var(--speed) var(--easing);
+  }
+  .auth-btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 28px rgba(230,0,0,.36); filter:saturate(1.05) }
+  .auth-btn:active{ transform: none }
+
+  .auth-foot{
+    margin-top:12px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:12px;
+  }
+  .auth-err{ margin-top:10px }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrap">
+  <section class="auth-card" role="form" aria-label="Formulário de Login">
+    <div class="auth-head">
+      <img class="auth-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+      <div>
+        <h1 class="auth-title">Entrar no Pneumark SGP</h1>
+        <p class="auth-sub">Use suas credenciais para continuar</p>
+      </div>
+    </div>
+
+    <form class="auth-form" method="POST">
+      <div class="auth-field">
+        <label for="usuario">Usuário</label>
+        <input class="auth-input" id="usuario" name="usuario" type="text" placeholder="Seu usuário" autocomplete="username" required>
+      </div>
+
+      <div class="auth-field">
+        <label for="senha">Senha</label>
+        <input class="auth-input" id="senha" name="senha" type="password" placeholder="Sua senha" autocomplete="current-password" required>
+      </div>
+
+      <button class="auth-btn" type="submit">
+        <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> &nbsp;Entrar
+      </button>
+
+      <!-- Mostra erro via variável simples OU via flash global -->
+      {% if erro %}
+        <div class="flash danger auth-err">{{ erro }}</div>
+      {% endif %}
+    </form>
+
+    <div class="auth-foot">
+      <span>&copy; {{ 2025 }} Pneumark</span>
+      <span>Segurança primeiro • <span aria-hidden="true">🔒</span></span>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Foco inicial no usuário
+  const u = document.getElementById('usuario');
+  if (u) { setTimeout(()=> u.focus(), 80); }
+
+  // Enter no campo senha envia o form
+  const s = document.getElementById('senha');
+  s?.addEventListener('keydown', (e)=> {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      s.form?.submit();
+    }
+  });
+</script>
+{% endblock %}

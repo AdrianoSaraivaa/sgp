@@ -1,0 +1,121 @@
+{% extends "_base.html" %}
+{% block title %}Bancada 8 — Checklist (Builder simples){% endblock %}
+{% block subtitle %}Defina o que o operador deve checar, de forma direta e rápida{% endblock %}
+
+{% block head_extra %}
+  <style>
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px; }
+    .card h3 { margin: 0 0 12px; color: #e60000; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .toolbar select, .toolbar button { height: 36px; }
+    .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; }
+    .toolbar button { padding: 0 12px; border: 1px solid #ccc; background: #fafafa; border-radius: 6px; cursor: pointer; }
+    .toolbar button.primary { background: #e60000; color: #fff; border-color: #e60000; }
+
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; }
+    .table th { text-align: left; color: #444; font-weight: 600; }
+    .table .ordem { width: 52px; text-align: center; color: #666; }
+    .table .tempo { width: 140px; }
+    .table .acoes { width: 60px; text-align: center; }
+
+    textarea.desc {
+      width: 100%;
+      min-height: 36px;
+      resize: none;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      line-height: 1.35;
+    }
+    input.tempo {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid #ccc; border-radius: 999px; padding: 4px 8px; background: #fff;
+      font-size: 12px;
+    }
+    .tag button { border: none; background: transparent; cursor: pointer; font-size: 14px; }
+    .tag-input {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    }
+    .tag-input input[type="text"] {
+      border: 1px solid #ccc; border-radius: 6px; padding: 6px 8px; min-width: 220px;
+    }
+    .hint { color: #555; font-size: 12px; }
+
+    .footer-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+
+  <!-- Cabeçalho simples -->
+  <div class="card" style="margin-bottom: 12px;">
+    <div class="toolbar">
+      <label for="modeloSel"><b>Modelo:</b></label>
+      <select id="modeloSel"></select>
+
+      <button id="btnAddItem">+ Adicionar item</button>
+      <button id="btnLimpar">Limpar</button>
+
+      <!-- Mantemos “Abrir/Salvar” com nomes simples (sem falar JSON) -->
+      <button id="btnAbrir">Abrir checklist</button>
+      <button id="btnSalvar" class="primary">Salvar checklist</button>
+    </div>
+    <div class="hint" style="margin-top: 6px;">
+      Dica: escreva frases claras para o operador (ex.: “Verificar aperto dos parafusos da tampa”).
+    </div>
+  </div>
+
+  <!-- Tabela de itens -->
+  <div class="card">
+    <h3>Itens do checklist</h3>
+    <table class="table" id="tbl">
+      <thead>
+        <tr>
+          <th class="ordem">#</th>
+          <th>Descrição da checagem</th>
+          <th class="tempo">Tempo estimado (s)</th>
+          <th>Não conformidades (tags)</th>
+          <th class="acoes">Remover</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <div class="footer-actions">
+      <button id="btnAddItem2">+ Adicionar item</button>
+      <button id="btnSalvar2" class="primary">Salvar checklist</button>
+    </div>
+  </div>
+</div>
+
+<!-- JS -->
+<script src="{{ url_for('static', filename='js/gp_checklist/builder.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const modelo = params.get('modelo');
+  const sel = document.getElementById('modeloSel');
+  if (modelo && sel) sel.value = modelo;
+});
+</script>
+
+
+
+{% endblock %}

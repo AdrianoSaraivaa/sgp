@@ -1,0 +1,92 @@
+{% extends "_base.html" %}
+{% set active_page = 'fornecedores' %}
+
+{% block title %}Editar Fornecedor — Pneumark SGP{% endblock %}
+{% block module_name %}Módulo de Estoque{% endblock %}
+
+{% block head_extra %}
+  <link rel="prefetch" href="{{ url_for('listar_fornecedor_bp.listar_fornecedor') }}">
+  <style>
+    .form-grid{ display:grid; gap:14px 22px; grid-template-columns:repeat(2,minmax(260px,1fr)) }
+    @media (max-width:760px){ .form-grid{ grid-template-columns:1fr } }
+    .form-field label{ display:block; font-weight:800; color:#334155; margin-bottom:6px }
+    .form-field input{
+      width:100%; padding:10px; border:1px solid var(--border); border-radius:10px;
+      font: inherit;
+    }
+    .actions-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
+          border:1px solid var(--border); background:#fff; text-decoration:none; color:#0e1a2b; font-weight:800 }
+    .btn:hover{ transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:#cfd5e4 }
+    .btn i{ color:var(--brand) }
+    .btn.brand{ background:linear-gradient(180deg,#ffd9d9,#ffc7c7); border-color:#ffb3b3 }
+  </style>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('estoque_bp.tela_estoque') }}">Estoque</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('listar_fornecedor_bp.listar_fornecedor') }}">Fornecedores</a> &nbsp;/&nbsp;
+      <strong>Editar</strong>
+    </div>
+    <div class="searchbar" aria-hidden="true" style="opacity:.6">
+      <i class="fa-solid fa-handshake"></i>
+      <input type="text" value="Edição: {{ fornecedor.nome_empresa }}" disabled>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <form method="POST" novalidate>
+      {# Se usar Flask-WTF/CSRF: {{ form.csrf_token }} #}
+
+      <div class="form-grid">
+        <div class="form-field" style="grid-column:1/-1">
+          <label for="nome_empresa">Empresa (Razão Social)</label>
+          <input id="nome_empresa" name="nome_empresa" type="text" required
+                 value="{{ fornecedor.nome_empresa }}">
+        </div>
+
+        <div class="form-field">
+          <label for="nome_contato">Nome do Contato</label>
+          <input id="nome_contato" name="nome_contato" type="text" required
+                 value="{{ fornecedor.nome_contato }}">
+        </div>
+
+        <div class="form-field">
+          <label for="telefone1">Telefone 1</label>
+          <input id="telefone1" name="telefone1" type="tel" placeholder="(xx) xxxxx-xxxx"
+                 pattern="[\d\(\)\s\-+]{8,20}" autocomplete="tel"
+                 value="{{ fornecedor.telefone1 }}">
+        </div>
+
+        <div class="form-field">
+          <label for="telefone2">Telefone 2</label>
+          <input id="telefone2" name="telefone2" type="tel" placeholder="(xx) xxxxx-xxxx"
+                 pattern="[\d\(\)\s\-+]{8,20}" autocomplete="tel"
+                 value="{{ fornecedor.telefone2 }}">
+        </div>
+
+        <div class="form-field">
+          <label for="email1">E-mail 1</label>
+          <input id="email1" name="email1" type="email" autocomplete="email"
+                 value="{{ fornecedor.email1 }}">
+        </div>
+
+        <div class="form-field">
+          <label for="email2">E-mail 2</label>
+          <input id="email2" name="email2" type="email" autocomplete="email"
+                 value="{{ fornecedor.email2 }}">
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button type="submit" class="btn brand"><i class="fa-solid fa-save"></i> Salvar alterações</button>
+        <a class="btn" href="{{ url_for('listar_fornecedor_bp.listar_fornecedor') }}"><i class="fa-solid fa-arrow-left"></i> Cancelar</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

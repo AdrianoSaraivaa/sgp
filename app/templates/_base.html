@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Pneumark SGP{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+  <style>
+    .topline{height:5px;background:linear-gradient(90deg,#e60000,#FF7A00,#00AEEF,#28a745,#e60000);background-size:300% 150%;animation:slide 7s linear infinite}
+    @keyframes slide{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+    .appbar{background:#2a1b0f;color:#fff}
+    .appbar-inner{max-width:1200px;margin:0 auto;padding:10px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand-logo{width:160px;height:70px;border-radius:8px;object-fit:cover}
+    .brand h1{font-size:1.1rem;margin:0;line-height:1.1}
+    .brand small{opacity:.8}
+    nav.nav{display:flex;gap:12px;justify-content:center}
+    nav.nav a{color:#cfe4ff;text-decoration:none;padding:8px 12px;border-radius:999px;border:1px solid transparent}
+    nav.nav a:hover{background:#392413;border-color:#234}
+    nav.nav a.active{background:#143055;border-color:#2c5a9a;color:#fff}
+    .widgets{display:flex;gap:14px;align-items:center}
+    .widget,.motd,.userchip{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:10px;background:#0c1624;border:1px solid #1c2b45}
+    .widget .label{opacity:.8;font-size:.8rem}
+    .widget strong{font-variant-numeric:tabular-nums}
+    .motd i{opacity:.9}
+    .motd-quote{font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px}
+    .container{max-width:1200px;margin:16px auto;padding:0 16px}
+    .footer{text-align:center;color:#7c8aa5;padding:24px 0}
+    .fadeout{position:fixed;inset:0;pointer-events:none;background:#0f1b2a;opacity:0;transition:opacity .18s ease;z-index:9999}
+    .fadeout.active{opacity:1}
+    .app{opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease}
+    .app.ready{opacity:1;transform:none}
+    @media (max-width:900px){.appbar-inner{grid-template-columns:1fr;gap:10px}nav.nav{justify-content:flex-start;overflow:auto}.widgets{flex-wrap:wrap}}
+
+    /* Mini-previsão (discreta) */
+    .weather-mini{display:flex;gap:10px;margin-left:8px;flex-wrap:nowrap}
+    .wxday{display:flex;flex-direction:column;align-items:center;font-size:.72rem;line-height:1.1;min-width:34px}
+    .wxday .icon{font-size:.9rem;line-height:1}
+    .wxday .t{font-variant-numeric:tabular-nums;white-space:nowrap}
+    .wxday .max{font-weight:600}
+    .wxday .min{opacity:.7}
+    @media (max-width:900px){.weather-mini{gap:8px}}
+  </style>
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <div class="topline"></div>
+  <div class="fadeout" id="fadeout"></div>
+
+  <div class="app" id="app">
+    <header class="appbar" role="banner">
+      <div class="appbar-inner">
+        <div class="brand">
+          <img class="brand-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+          <div>
+            <h1>Pneumark SGP</h1>
+            <small>{% block module_name %}Módulo{% endblock %}</small>
+          </div>
+        </div>
+
+        <!-- Navegação -->
+        <nav class="nav">
+          <a href="{{ url_for('modulos_bp.tela_modulos') }}"
+             class="{% if request.endpoint == 'modulos_bp.tela_modulos' %}active{% endif %}"
+             data-no-fade translate="no">Home</a>
+        </nav>
+
+        <!-- Widgets globais -->
+        <div class="widgets">
+          <div class="widget" title="Data e hora local">
+            <i class="fa-regular fa-clock"></i>
+            <div class="label">Now</div>
+            <strong id="clock">--:--</strong>
+          </div>
+
+          <div class="widget" title="Previsão do tempo">
+            <i class="fa-solid fa-cloud-sun"></i>
+            <div class="label" id="weather-label">Local</div>
+            <strong id="weather">localizando…</strong>
+            <div id="weather-mini" class="weather-mini" aria-label="Previsão para 5 dias"></div>
+          </div>
+
+          <div class="motd" title="Mensagem do dia">
+            <i class="fa-regular fa-lightbulb"></i>
+            <span class="motd-quote" id="motd-text">Carregando frase do dia…</span>
+          </div>
+
+          <div class="userchip" aria-label="Usuário atual">
+            <i class="fa-regular fa-circle-user"></i>
+            <span>
+              {{ (current_user.name if current_user.is_authenticated else 'Operador') if current_user is defined else 'Operador' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- FLASHES -->
+    <div class="flash-container container">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% if msgs %}
+          {% for cat, msg in msgs %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <main class="container" role="main">
+      {% block toolbar %}{% endblock %}
+      {% block content %}{% endblock %}
+    </main>
+
+    {% block footer %}
+      <div class="footer">© {{ now().year if now is defined else '' }} Pneumark — SGP</div>
+    {% endblock %}
+  </div>
+
+  <script>
+    // Entrada suave
+    const app = document.getElementById('app');
+    requestAnimationFrame(()=> app.classList.add('ready'));
+
+    // Saída com fade
+    const fadeout = document.getElementById('fadeout');
+    function routeTo(href){
+      if(!href) return;
+      fadeout.classList.add('active');
+      setTimeout(()=> window.location.assign(href), 180);
+    }
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest('a');
+      if(!a) return;
+      const href = a.getAttribute('href');
+      if(!href || href.startsWith('#') || a.hasAttribute('data-no-fade')) return;
+      e.preventDefault(); routeTo(href);
+    });
+
+    // Relógio (com guard)
+    const clockEl = document.getElementById('clock');
+    function tickClock(){
+      if (!clockEl) return;
+      const d = new Date();
+      clockEl.textContent = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    tickClock(); setInterval(tickClock, 15000);
+
+    // ===== CLIMA: Embu-Guaçu/SP + mini previsão 5 dias =====
+    const weatherEl = document.getElementById('weather');
+    const wlabel    = document.getElementById('weather-label');
+    const miniEl    = document.getElementById('weather-mini');
+
+    function setWeatherText(t){ if (weatherEl) weatherEl.textContent = t; }
+
+    function iconFromCode(code){
+      if (code === 0) return "☀️";
+      if ([1,2,3].includes(code)) return "🌤️";
+      if ([45,48].includes(code)) return "🌫️";
+      if ([51,53,55,56,57].includes(code)) return "🌦️";
+      if ([61,63,65,66,67,80,81,82].includes(code)) return "🌧️";
+      if ([71,73,75,77,85,86].includes(code)) return "🌨️";
+      return "⛅";
+    }
+
+    function renderMini(daily){
+
+        
+      if (!miniEl || !daily || !daily.time) { if(miniEl) miniEl.innerHTML = ""; return; }
+      const dias = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+      miniEl.innerHTML = "";
+      const maxCards = 5;
+      for (let i=0; i<Math.min(maxCards, daily.time.length); i++){
+        const dt = new Date(daily.time[i]);
+        const wd = dias[dt.getDay()];
+        const ico = iconFromCode(daily.weather_code[i]);
+        const tmax = Math.round(daily.temperature_2m_max[i]);
+        const tmin = Math.round(daily.temperature_2m_min[i]);
+        miniEl.insertAdjacentHTML('beforeend', `
+          <div class="wxday">
+            <div>${wd}</div>
+            <div class="icon">${ico}</div>
+            <div class="t"><span class="max">${tmax}°</span> <span class="min">${tmin}°</span></div>
+          </div>
+
+          
+        `);
+      }
+    }
+
+    function fetchWeatherNowAndDaily(lat, lon, labelText){
+      const url =
+  `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+  `&current=temperature_2m,weather_code`+
+  `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max`+
+  `&timezone=auto`;
+
+
+      fetch(url, {cache:'no-store'})
+        .then(r=>r.json())
+        .then(d=>{
+          const t = d?.current?.temperature_2m;
+          const code = d?.current?.weather_code;
+          if (wlabel) wlabel.textContent = labelText || "Local";
+          setWeatherText(`${Math.round(t)}°C ${iconFromCode(code)}`);
+          renderMini(d?.daily);
+        })
+        .catch(()=>{
+          setWeatherText("indisp.");
+          if (miniEl) miniEl.innerHTML = "";
+        });
+    }
+
+    // Ponto fixo: Embu-Guaçu/SP
+    fetchWeatherNowAndDaily(-23.83, -46.81, "Embu-Guaçu");
+
+    // ===== FRASE MOTIVACIONAL =====
+    const motdEl = document.getElementById('motd-text');
+    fetch('{{ url_for("utilidades_bp.frase_motivacional") }}', {cache:'no-store'})
+      .then(r=>r.json())
+      .then(d=>{
+        if (d && d.texto) motdEl.textContent = d.texto + (d.autor ? ` — ${d.autor}` : '');
+      })
+      .catch(()=> { motdEl.textContent = "Qualidade é fazer o simples, bem feito."; });
+  </script>
+
+  {% block scripts_extra %}{% endblock %}
+</body>
+</html>

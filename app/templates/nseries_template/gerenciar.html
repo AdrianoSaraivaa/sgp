@@ -1,0 +1,116 @@
+<section style="max-width:1200px;margin:40px auto;font-family:Arial, sans-serif">
+  <h1>Gestão de Números de Série</h1>
+
+  <!-- Filtros -->
+  <div style="display:flex; gap:8px; margin-bottom:20px;">
+    <input id="q" type="search" placeholder="Buscar modelo ou nº de série" style="flex:1; padding:6px;">
+    <select id="modelo">
+      <option value="">Modelo (todos)</option>
+      <option>PM700</option>
+      <option>PM2100</option>
+      <option>PM2200</option>
+    </select>
+    <select id="status">
+      <option value="">Status (todos)</option>
+      <option value="valid">Válido</option>
+      <option value="invalid">Inválido</option>
+    </select>
+    <button id="btn-filtrar" class="btn-primary">Filtrar</button>
+  </div>
+
+  <!-- Tabela -->
+  <div style="overflow-x:auto;">
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse; width:100%;">
+      <thead style="background:#eee;">
+        <tr>
+          <th>Modelo</th>
+          <th>Nº de série</th>
+          <th>Status</th>
+          <th>Impressões</th>
+          <th>Data/Hora</th>
+          <th>Usuário</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="grid-body">
+        <!-- preenchido via JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pager simples -->
+  <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px;">
+    <button id="prev">◀</button>
+    <span id="pager-info" style="font-size:12px;color:#555"></span>
+    <button id="next">▶</button>
+  </div>
+</section>
+
+<script>
+let page = 1, pages = 1;
+
+function badge(st) {
+  const color = st === 'valid' ? '#0a0' : (st === 'invalid' ? '#b00' : '#666');
+  const label = st || '';
+  return `<span style="padding:2px 6px; border:1px solid ${color}; color:${color}; border-radius:12px; font-size:12px;">${label}</span>`;
+}
+
+async function load() {
+  const q = document.getElementById('q').value.trim();
+  const modelo = document.getElementById('modelo').value;
+  const status = document.getElementById('status').value;
+
+  const url = new URL(location.origin + '/producao/series/api');
+  url.searchParams.set('page', page);
+  url.searchParams.set('per_page', 20);
+  if (q) url.searchParams.set('q', q);
+  if (modelo) url.searchParams.set('modelo', modelo);
+  if (status) url.searchParams.set('status', status);
+
+  let data;
+  try {
+    const r = await fetch(url);
+    data = await r.json();
+  } catch (e) {
+    data = { items: [], page: 1, pages: 1, total: 0, error: String(e) };
+  }
+
+  pages = data.pages || 1;
+  const tb = document.getElementById('grid-body');
+  tb.innerHTML = '';
+
+  if (!data.items || data.items.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="7" style="text-align:center; color:#777; padding:16px;">Sem registros</td>`;
+    tb.appendChild(tr);
+  } else {
+    data.items.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.modelo || ''}</td>
+        <td><code>${item.numero_serie || ''}</code></td>
+        <td>${badge(item.status)}</td>
+        <td>${item.printed_count ?? 0}</td>
+        <td>${item.created_at || ''}</td>
+        <td>${item.created_by || ''}</td>
+        <td>
+          <button data-act="detail" data-id="${item.id}">Detalhes</button>
+          <button data-act="reprint" data-id="${item.id}">Reimprimir</button>
+          <button data-act="invalidate" data-id="${item.id}">Invalidar</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  document.getElementById('pager-info').textContent =
+    `Página ${data.page || page} de ${data.pages || 1} — ${data.total ?? 0} itens`;
+}
+
+document.getElementById('btn-filtrar').addEventListener('click', () => { page = 1; load(); });
+document.getElementById('prev').addEventListener('click', () => { if (page > 1) { page--; load(); } });
+document.getElementById('next').addEventListener('click', () => { if (page < pages) { page++; load(); } });
+document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page = 1; load(); } });
+
+document.addEventListener('DOMContentLoaded', load);
+</script>

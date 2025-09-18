@@ -1,0 +1,855 @@
+#bloco1
+# Cabeçalho, imports, blueprint e constantes básicas
+
+# app/routes/estoque_routes/OMIE_routes/requisicoes_omie_routes.py
+from __future__ import annotations
+"""
+Rotas da integração OMIE – módulo de estoque (100% operacionais).
+
+O fluxo é REAL:
+- POST /estoque/omie/api/jobs/scan_pontopedido
+    -> busca itens elegíveis (stub para você trocar pela consulta do SGP)
+    -> agrupa por fornecedor
+    -> cria requisição no OMIE (IncluirReq)
+    -> envia e-mail via Outlook Desktop (COM)
+    -> grava cabeçalho + itens em SQLite
+- GET /estoque/omie/api/requisicoes/listar
+- GET /estoque/omie/api/requisicoes/<cod_int>
+- GET /estoque/omie/api/requisicoes/export.csv
+- GET /estoque/omie/api/requisicoes/export.xlsx
+- (aux) POST /estoque/omie/api/util/test_email_outlook
+"""
+
+import csv
+import io
+import json
+import logging
+import os
+import re
+import sqlite3
+import threading
+from datetime import datetime
+from typing import Dict, Any, List, Optional, Tuple
+
+from flask import request, jsonify, send_file, current_app
+
+# Usa o mesmo blueprint da home para manter prefixo /estoque/omie
+from .omie_routes import estoque_omie_bp as bp
+
+logger = logging.getLogger(__name__)
+
+# =========================== Config & Constantes ============================
+
+OMIE_ENDPOINT = "https://app.omie.com.br/api/v1/produtos/requisicaocompra/?JSON=true"
+DB_PATH = os.getenv("OMIE_DB", os.path.join("instance", "omie_reqs.sqlite3"))
+
+# Caminho do banco do SGP (estoque)
+SGP_DB = os.getenv("SGP_DB", os.path.join("instance", "pneumark.db"))
+
+def _env(name: str, default: Optional[str] = None) -> str:
+    val = os.getenv(name)
+    return val if (val is not None and val != "") else (default or "")
+
+def _omie_key() -> str:
+    # Se não setar env, usa as chaves informadas por você (útil em DEV).
+    return _env("OMIE_APP_KEY", "570200096466")
+
+def _omie_secret() -> str:
+    return _env("OMIE_APP_SECRET", "5384caadd60017e2c651b8c9321578ad")
+
+def sanitize_obs(s: str) -> str:
+    s = (s or "").replace('"', "'")
+    s = re.sub(r"[\r\n]+", " ", s).strip()
+    return s
+
+def make_cod_int_req() -> str:
+    # 20 chars máx: "REQ_" + yymmddHHMMSS (14) = 18
+    return "REQ_" + datetime.now().strftime("%y%m%d%H%M%S")
+
+
+#bloco2
+# Utilitário HTTP: POST JSON com fallback (requests → urllib)
+
+def _http_post_json(url: str, body: Dict[str, Any], extra_headers: Dict[str, str] | None = None):
+    import json as _json
+    import urllib.request as urlreq
+    import urllib.error as urlerr
+
+    headers = {
+        "Content-Type": "application/json",   # <- sem charset
+        "Accept": "application/json",
+        "User-Agent": "SGP-Pneumark/1.0"      # opcional, ajuda na telemetria
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+
+    payload_str = _json.dumps(body, ensure_ascii=False)
+    payload_bytes = payload_str.encode("utf-8")
+
+    logger.info("[OMIE] POST %s", url)
+    logger.info("[OMIE] Payload: %s", payload_str)
+
+    # >>> use requests com json=body <<<
+    try:
+        import requests  # type: ignore
+        resp = requests.post(url, json=body, headers=headers, timeout=30)  # <- aqui muda
+        logger.info("[OMIE] HTTP %s", resp.status_code)
+        logger.info("[OMIE] Resposta: %s", resp.text)
+        return int(resp.status_code), resp.text
+    except ModuleNotFoundError:
+        logger.info("[OMIE] 'requests' não instalado; usando urllib.")
+    except Exception as e:
+        try:
+            text = getattr(e.response, "text", "")
+        except Exception:
+            text = ""
+        logger.warning("[OMIE] Falha requests: %s ; resp_text=%s", e, text)
+
+    # Tenta com requests (se instalado)
+    try:
+        import requests  # type: ignore
+        resp = requests.post(url, data=payload_bytes, headers=headers, timeout=30)
+        logger.info("[OMIE] HTTP %s", resp.status_code)
+        logger.info("[OMIE] Resposta: %s", resp.text)
+        return int(resp.status_code), resp.text
+    except ModuleNotFoundError:
+        logger.info("[OMIE] 'requests' não instalado; usando urllib.")
+    except Exception as e:
+        # Mesmo com requests, logamos e seguimos para urllib como plano B
+        try:
+            text = getattr(e.response, "text", "")
+        except Exception:
+            text = ""
+        logger.warning("[OMIE] Falha requests: %s ; resp_text=%s", e, text)
+
+    # Fallback: urllib
+    req = urlreq.Request(url, data=payload_bytes, headers=headers, method="POST")
+    try:
+        with urlreq.urlopen(req, timeout=30) as resp:
+            text = resp.read().decode("utf-8", errors="replace")
+            logger.info("[OMIE] HTTP %s", getattr(resp, "status", 0))
+            logger.info("[OMIE] Resposta: %s", text)
+            return int(getattr(resp, "status", 200)), text
+    except urlerr.HTTPError as e:
+        text = ""
+        try:
+            text = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        logger.error("[OMIE] HTTPError %s: %s", e.code, text or e)
+        return int(e.code), text or str(e)
+    except urlerr.URLError as e:
+        logger.error("[OMIE] URLError: %s", e)
+        return 599, str(e)
+    except Exception as e:
+        logger.exception("[OMIE] Erro inesperado no POST: %s", e)
+        return 599, str(e)
+
+
+#bloco3
+# Envio de e-mail Outlook (COM) + rota de teste
+
+def _email_send_html(subject: str, html: str, to_addr: Optional[str] = None, preview: bool = False) -> bool:
+    """
+    Envia e-mail via Outlook Desktop (COM). Requer Windows + Outlook aberto.
+    preview=True chama .Display (confirmação). False envia automático .Send.
+    """
+    try:
+        import win32com.client  # pywin32
+        to = to_addr or _env("MAIL_TO", "adriano.saraiva@pneumark.com.br")
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        mail = outlook.CreateItem(0)
+        mail.To = to
+        mail.Subject = subject
+        mail.HTMLBody = html
+        if preview:
+            mail.Display()
+        else:
+            mail.Send()
+        logger.info("[EMAIL] Enviado para %s", to)
+        return True
+    except Exception as e:
+        logger.exception("[EMAIL] Falha ao enviar pelo Outlook: %s", e)
+        return False
+
+@bp.route("/api/util/test_email_outlook", methods=["POST"])
+def api_test_email_outlook():
+    # se chamar ...?preview=1 abre a janela do Outlook (Display); sem isso envia direto (Send)
+    preview = request.args.get("preview") in ("1", "true", "True", "yes", "sim")
+    ok = _email_send_html("Teste SGP ↔ Outlook", "<p>Funcionou ✅</p>", preview=preview)
+    return jsonify({"ok": ok, "preview": preview})
+
+
+#bloco4
+# Banco SQLite: criação/abertura e helpers
+
+_db_lock = threading.Lock()
+
+def _ensure_db():
+    """Cria o banco e tabelas se não existirem."""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    with _db_lock, sqlite3.connect(DB_PATH) as con:
+        cur = con.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS requisicao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cod_int TEXT UNIQUE,
+            fornecedor TEXT,
+            cod_fornecedor TEXT,
+            data_hora TEXT,
+            itens INTEGER,
+            qtde_total INTEGER,
+            status TEXT,              -- 'enviado' | 'erro' | 'pendente'
+            email_enviado INTEGER,    -- 0/1
+            link_omie TEXT
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS requisicao_item (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cod_int TEXT,
+            codigo_interno TEXT,
+            descricao TEXT,
+            codProd TEXT,
+            qtde INTEGER,
+            obs TEXT
+        )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_requisicao_data ON requisicao (data_hora DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_requisicao_cod ON requisicao (cod_int)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_item_codint ON requisicao_item (cod_int)")
+        con.commit()
+
+def _db() -> sqlite3.Connection:
+    _ensure_db()
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    return con
+
+
+#bloco5
+# Consulta: filtros, paginação e leitura de detalhes
+
+def _parse_date(dt_str: str) -> Optional[datetime]:
+    if not dt_str:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(dt_str, fmt)
+        except ValueError:
+            continue
+    return None
+
+def _query_reqs(q: str, status: str, de: str, ate: str) -> List[Dict[str, Any]]:
+    sql = "SELECT cod_int, fornecedor, data_hora, itens, qtde_total, status, email_enviado, link_omie FROM requisicao WHERE 1=1"
+    params: List[Any] = []
+
+    if q:
+        sql += " AND (LOWER(fornecedor) LIKE ? OR LOWER(cod_int) LIKE ?)"
+        like = f"%{q.lower()}%"
+        params.extend([like, like])
+
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+
+    de_dt = _parse_date(de)
+    if de_dt:
+        sql += " AND date(substr(data_hora,1,10)) >= date(?)"
+        params.append(de_dt.strftime("%Y-%m-%d"))
+
+    ate_dt = _parse_date(ate)
+    if ate_dt:
+        sql += " AND date(substr(data_hora,1,10)) <= date(?)"
+        params.append(ate_dt.strftime("%Y-%m-%d"))
+
+    sql += " ORDER BY data_hora DESC"
+
+    with _db() as con:
+        cur = con.cursor()
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    items = []
+    for r in rows:
+        items.append({
+            "data_hora": r["data_hora"],
+            "fornecedor": r["fornecedor"],
+            "cod_int": r["cod_int"],
+            "itens": r["itens"],
+            "qtde_total": r["qtde_total"],
+            "status": r["status"],
+            "email_enviado": bool(r["email_enviado"]),
+            "link_omie": r["link_omie"],
+        })
+    return items
+
+def _get_req(cod_int: str) -> Optional[Dict[str, Any]]:
+    with _db() as con:
+        cur = con.cursor()
+        cur.execute("SELECT * FROM requisicao WHERE cod_int = ?", (cod_int,))
+        cab = cur.fetchone()
+        if not cab:
+            return None
+        cur.execute("SELECT codigo_interno, descricao, codProd, qtde, obs FROM requisicao_item WHERE cod_int = ?",
+                    (cod_int,))
+        itens = cur.fetchall()
+
+    return {
+        "cab": {
+            "fornecedor": cab["fornecedor"],
+            "cod": cab["cod_int"],
+            "data_hora": cab["data_hora"],
+            "status": cab["status"],
+            "email_enviado": bool(cab["email_enviado"]),
+            "link_omie": cab["link_omie"],
+        },
+        "itens": [
+            {
+                "codigo_interno": it["codigo_interno"],
+                "descricao": it["descricao"],
+                "codProd": it["codProd"],
+                "qtde": it["qtde"],
+                "obs": it["obs"] or "",
+            } for it in itens
+        ]
+    }
+
+
+#bloco6
+# Rotas UI: listar e detalhar requisições (leitura do banco)
+
+@bp.route("/api/requisicoes/listar", methods=["GET"])
+def api_listar_requisicoes():
+    """
+    Lista requisições (AGORA do BANCO, sem mocks).
+    Filtros:
+      - q: texto (fornecedor, cod_int)
+      - status: enviado|erro|pendente
+      - de: YYYY-MM-DD
+      - ate: YYYY-MM-DD
+    """
+    q = request.args.get("q", "", type=str)
+    status = request.args.get("status", "", type=str)
+    de = request.args.get("de", "", type=str)
+    ate = request.args.get("ate", "", type=str)
+
+    logger.info("[OMIE] Listar requisicoes q=%s status=%s de=%s ate=%s", q, status, de, ate)
+    items = _query_reqs(q, status, de, ate)
+    resp = jsonify({"items": items, "total": len(items)})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@bp.route("/api/requisicoes/<cod_int>", methods=["GET"])
+def api_detalhes_requisicao(cod_int: str):
+    """
+    Detalhes de uma requisicao (AGORA do BANCO).
+    Retorna:
+    {
+      cab: { fornecedor, cod, data_hora, status, email_enviado, link_omie },
+      itens: [ {codigo_interno, descricao, codProd, qtde, obs}, ... ]
+    }
+    """
+    logger.info("[OMIE] Detalhes requisicao cod=%s", cod_int)
+    data = _get_req(cod_int)
+    if not data:
+        return jsonify({"error": "not_found"}), 404
+    out = jsonify(data)
+    out.headers["Cache-Control"] = "no-store"
+    return out
+
+
+#bloco7
+# Exportações: CSV e XLSX (com fallback para CSV)
+
+@bp.route("/api/requisicoes/export.csv", methods=["GET"])
+def api_export_csv():
+    q = request.args.get("q", "", type=str)
+    status = request.args.get("status", "", type=str)
+    de = request.args.get("de", "", type=str)
+    ate = request.args.get("ate", "", type=str)
+
+    items = _query_reqs(q, status, de, ate)
+
+    si = io.StringIO()
+    cw = csv.writer(si, delimiter=";")
+    cw.writerow(["Data/Hora", "Fornecedor", "codIntReqCompra", "Itens", "Qtde total", "Status", "Email"])
+    for r in items:
+        cw.writerow([
+            r["data_hora"], r["fornecedor"], r["cod_int"], r["itens"], r["qtde_total"],
+            r["status"], "SIM" if r["email_enviado"] else "NAO"
+        ])
+    mem = io.BytesIO(si.getvalue().encode("utf-8-sig"))
+    filename = f"requisicoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return send_file(mem, as_attachment=True, download_name=filename, mimetype="text/csv; charset=utf-8")
+
+@bp.route("/api/requisicoes/export.xlsx", methods=["GET"])
+def api_export_xlsx():
+    q = request.args.get("q", "", type=str)
+    status = request.args.get("status", "", type=str)
+    de = request.args.get("de", "", type=str)
+    ate = request.args.get("ate", "", type=str)
+    items = _query_reqs(q, status, de, ate)
+
+    try:
+        from openpyxl import Workbook  # type: ignore
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Requisicoes"
+        header = ["Data/Hora", "Fornecedor", "codIntReqCompra", "Itens", "Qtde total", "Status", "Email"]
+        ws.append(header)
+        for r in items:
+            ws.append([
+                r["data_hora"], r["fornecedor"], r["cod_int"], r["itens"], r["qtde_total"],
+                r["status"], "SIM" if r["email_enviado"] else "NAO"
+            ])
+        mem = io.BytesIO()
+        wb.save(mem)
+        mem.seek(0)
+        filename = f"requisicoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return send_file(mem, as_attachment=True, download_name=filename,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except Exception as e:
+        current_app.logger.warning("[EXPORT] openpyxl indisponível, CSV fallback. Erro: %s", e)
+        # fallback CSV
+        si = io.StringIO()
+        cw = csv.writer(si, delimiter=";")
+        cw.writerow(["Data/Hora", "Fornecedor", "codIntReqCompra", "Itens", "Qtde total", "Status", "Email"])
+        for r in items:
+            cw.writerow([
+                r["data_hora"], r["fornecedor"], r["cod_int"], r["itens"], r["qtde_total"],
+                r["status"], "SIM" if r["email_enviado"] else "NAO"
+            ])
+        mem = io.BytesIO(si.getvalue().encode("utf-8-sig"))
+        filename = f"requisicoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return send_file(mem, as_attachment=True, download_name=filename, mimetype="text/csv; charset=utf-8")
+
+
+#bloco8
+# SGP: leitura de itens em ponto de pedido (preferencial + fallback adaptativo)
+
+def _fetch_itens_em_ponto_de_pedido() -> List[Dict[str, Any]]:
+    """
+    Lê do SQLite (SGP_DB) os itens em Ponto de Pedido, PRIORITARIAMENTE via:
+      pecas (p) LEFT JOIN fornecedores_por_peca (fp)
+    Campos usados (suas tabelas):
+      - p.codigo_pneumark  -> cod_interno
+      - p.descricao        -> descricao
+      - p.codigo_omie      -> cod_prod (normalizado para inteiro em texto, ex: "3268963259")
+      - p.estoque_atual    -> estoque_atual
+      - p.ponto_pedido     -> ponto_pedido
+      - p.estoque_maximo   -> estoque_max
+      - fp.fornecedor      -> fornecedor (opcional)
+
+    Se esse SELECT falhar (tabela não existir, etc.), cai para um modo genérico (fallback).
+    """
+    def _norm_codprod(v) -> Optional[str]:
+        # normaliza "3268963259.0" -> "3268963259"
+        if v is None:
+            return None
+        s = str(v).strip()
+        if s == "":
+            return None
+        try:
+            return str(int(float(s)))
+        except Exception:
+            # se não der para normalizar, descarta (OMIE só aceita número)
+            return None
+
+    if not os.path.exists(SGP_DB):
+        logger.warning("[SGP] Banco não encontrado em %s", SGP_DB)
+        return []
+
+    try:
+        with sqlite3.connect(SGP_DB) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # 1) Caminho preferencial: usar suas tabelas reais (pecas + fornecedores_por_peca)
+            try:
+                sql = """
+                    SELECT
+                        p.codigo_pneumark AS cod_interno,
+                        p.descricao       AS descricao,
+                        p.codigo_omie     AS cod_prod,
+                        p.estoque_atual   AS estoque_atual,
+                        p.ponto_pedido    AS ponto_pedido,
+                        p.estoque_maximo  AS estoque_max,
+                        fp.fornecedor     AS fornecedor
+                    FROM pecas p
+                    LEFT JOIN fornecedores_por_peca fp ON fp.peca_id = p.id
+                    WHERE CAST(p.estoque_atual AS REAL) <= CAST(p.ponto_pedido AS REAL)
+                """
+                cur.execute(sql)
+                rows = cur.fetchall()
+
+                dados: List[Dict[str, Any]] = []
+                for r in rows:
+                    cod_prod = _norm_codprod(r["cod_prod"])
+                    if not cod_prod:
+                        # sem cod_prod válido não conseguimos enviar ao OMIE — ignora
+                        continue
+
+                    fornecedor_nome = r["fornecedor"] if r["fornecedor"] is not None else "SEM_FORNECEDOR"
+                    # agrupar por fornecedor_nome (o job usa 'cod_fornecedor' como chave — podemos usar o próprio nome)
+                    dados.append({
+                        "cod_interno":    str(r["cod_interno"]),
+                        "descricao":      str(r["descricao"]) if r["descricao"] is not None else "",
+                        "cod_fornecedor": fornecedor_nome,  # chave de agrupamento
+                        "fornecedor":     fornecedor_nome,  # exibido no e-mail
+                        "cod_prod":       cod_prod,         # já normalizado em texto numérico
+                        "estoque_atual":  float(r["estoque_atual"]),
+                        "ponto_pedido":   float(r["ponto_pedido"]),
+                        "estoque_max":    float(r["estoque_max"]),
+                        "status_compra":  "",               # não temos coluna equivalente aqui
+                    })
+
+                logger.info("[SGP] (preferencial) Itens em PP: %d", len(dados))
+                if dados:
+                    return dados
+                # se não retornou nada aqui, ainda tentaremos o fallback abaixo
+            except Exception as e:
+                logger.warning("[SGP] SELECT preferencial (pecas + fornecedores_por_peca) falhou: %s", e)
+
+            # 2) Fallback genérico (versão adaptativa) — MENOS EXIGENTE
+            #    Não exige 'cod_fornecedor' e nem 'fornecedor'; agrupa por 'SEM_FORNECEDOR' se necessário.
+            def list_tables(cur):
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+                return [r[0] for r in cur.fetchall()]
+
+            def list_columns(cur, table):
+                cur.execute(f"PRAGMA table_info({table})")
+                return [r[1] for r in cur.fetchall()]
+
+            synonyms = {
+                "cod_interno":   ["cod_interno", "codigo_interno", "codigo", "cod_int", "cod", "codigo_pneumark"],
+                "descricao":     ["descricao", "descricao_produto", "desc", "produto"],
+                "cod_prod":      ["cod_prod", "codigo_produto", "codigo_produto_omie", "nCodProd", "codProd", "codigo_omie"],
+                "estoque_atual": ["estoque_atual", "qtd_estoque", "saldo", "estoque", "qtd"],
+                "ponto_pedido":  ["ponto_pedido", "ponto_de_pedido", "pp"],
+                "estoque_max":   ["estoque_max", "estoque_maximo", "maximo"],
+                "fornecedor":    ["fornecedor", "razao_social", "nome_fornecedor"],  # opcional
+            }
+            mandatory = ["cod_interno", "descricao", "cod_prod", "estoque_atual", "ponto_pedido", "estoque_max"]
+
+            tables = list_tables(cur)
+            best = None
+            best_map = None
+            best_score = -1
+            for t in tables:
+                cols = set(list_columns(cur, t))
+                colmap = {}
+                for logical, opts in synonyms.items():
+                    hit = next((c for c in opts if c in cols), None)
+                    if hit:
+                        colmap[logical] = hit
+                score = sum(1 for k in mandatory if k in colmap)
+                if score > best_score:
+                    best, best_map, best_score = t, colmap, score
+
+            if not best or best_score < len(mandatory) - 1:
+                logger.warning("[SGP] Fallback: não deu para inferir tabela/colunas. Tabelas: %s", tables[:10])
+                return []
+
+            logger.info("[SGP] Fallback usando tabela '%s' com mapeamento: %s", best, best_map)
+
+            ci = best_map["cod_interno"]
+            ds = best_map["descricao"]
+            cp = best_map["cod_prod"]
+            ea = best_map["estoque_atual"]
+            pp = best_map["ponto_pedido"]
+            mx = best_map["estoque_max"]
+            forn_col = best_map.get("fornecedor")
+
+            where_parts = [
+                f"CAST({ea} AS REAL) <= CAST({pp} AS REAL)",
+                f"{cp} IS NOT NULL",
+            ]
+            sql_fb = f"""
+                SELECT
+                    {ci} AS cod_interno,
+                    {ds} AS descricao,
+                    {cp} AS cod_prod,
+                    {ea} AS estoque_atual,
+                    {pp} AS ponto_pedido,
+                    {mx} AS estoque_max
+                    {"," + forn_col + " AS fornecedor" if forn_col else ""}
+                FROM {best}
+                WHERE {' AND '.join(where_parts)}
+            """
+            cur.execute(sql_fb)
+            rows = cur.fetchall()
+
+            dados_fb: List[Dict[str, Any]] = []
+            for r in rows:
+                cod_prod = _norm_codprod(r["cod_prod"])
+                if not cod_prod:
+                    continue
+                fornecedor_nome = str(r["fornecedor"]) if forn_col and r["fornecedor"] is not None else "SEM_FORNECEDOR"
+                dados_fb.append({
+                    "cod_interno":    str(r["cod_interno"]),
+                    "descricao":      str(r["descricao"]) if r["descricao"] is not None else "",
+                    "cod_fornecedor": fornecedor_nome,
+                    "fornecedor":     fornecedor_nome,
+                    "cod_prod":       cod_prod,
+                    "estoque_atual":  float(r["estoque_atual"]),
+                    "ponto_pedido":   float(r["ponto_pedido"]),
+                    "estoque_max":    float(r["estoque_max"]),
+                    "status_compra":  "",
+                })
+
+            logger.info("[SGP] (fallback) Itens em PP: %d", len(dados_fb))
+            return dados_fb
+
+    except Exception as e:
+        logger.exception("[SGP] Erro ao consultar itens em PP: %s", e)
+        return []
+
+
+#bloco9
+# Helpers OMIE + persistência local (SQLite)
+
+def _build_itens_reqcompra(itens: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Monta ItensReqCompra no formato do OMIE (mínimo = estoque_max - estoque_atual)."""
+    out: List[Dict[str, Any]] = []
+    for r in itens:
+        qtde = max(0, int(round(float(r["estoque_max"]) - float(r["estoque_atual"]))))
+        if qtde <= 0:
+            continue
+        cod_interno = str(r["cod_interno"])[:60]
+        out.append({
+            "codIntItem": f"ITEM_{cod_interno}",
+            "codIntProd": cod_interno,
+            "codProd": int(r["cod_prod"]),
+            "obsItem": sanitize_obs(r["descricao"]),
+            "precoUnit": 1,
+            "qtde": qtde,
+        })
+    return out
+
+
+
+
+#parsear resposta do OMIE e retornar dados estruturados
+def _omie_incluir_requisicao(cod_int_req: str, itens_req: List[Dict[str, Any]]) -> Tuple[int, Dict[str, Any]]:
+    payload = {
+        "call": "IncluirReq",
+        "app_key": _omie_key(),
+        "app_secret": _omie_secret(),
+        "param": [{
+            "codCateg": "2.04.06",
+            "codIntReqCompra": cod_int_req,
+            "codProj": 0,
+            "codReqCompra": 0,
+            "dtSugestao": datetime.now().strftime("%d/%m/%Y"),
+            "obsIntReqCompra": "Requisição automática via SGP",
+            "obsReqCompra": "Itens gerados automaticamente",
+            "ItensReqCompra": itens_req
+        }]
+    }
+    status, text = _http_post_json(OMIE_ENDPOINT.rstrip('?JSON=true') + '/', payload)
+    data = {}
+    try:
+        raw = json.loads(text)
+        data = raw.get("result", raw)  # alguns retornos vêm embrulhados em "result"
+    except Exception:
+        data = {"raw": text}
+    return status, data
+
+
+#bloco10
+# Util SGP: rota para inspecionar schema do SQLite (diagnóstico)
+
+@bp.route("/api/util/sgp_schema", methods=["GET"])
+def api_sgp_schema():
+    """
+    Diagnóstico do SQLite do SGP: lista todas as tabelas, colunas e até 3 linhas de exemplo.
+    Ajuda a mapear quais colunas usar na leitura de Ponto de Pedido.
+    """
+    try:
+        if not os.path.exists(SGP_DB):
+            logger.warning("[SGP] DB não encontrado para schema: %s", SGP_DB)
+            return jsonify({"ok": False, "error": f"DB não encontrado: {SGP_DB}"}), 500
+
+        with sqlite3.connect(SGP_DB) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # lista de tabelas (exceto internas)
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+            tables = [r[0] for r in cur.fetchall()]
+
+            out = []
+            for t in tables:
+                # colunas
+                cur.execute(f"PRAGMA table_info({t})")
+                cols = [r[1] for r in cur.fetchall()]
+
+                # amostra de até 3 linhas
+                sample = []
+                try:
+                    cur.execute(f"SELECT * FROM {t} LIMIT 3")
+                    rows = cur.fetchall()
+                    for row in rows:
+                        sample.append({k: row[k] for k in row.keys()})
+                except Exception as e:
+                    sample = [f"erro ao selecionar: {e}"]
+
+                out.append({"table": t, "columns": cols, "sample": sample})
+
+            logger.info("[SGP] Schema tables: %s", [o["table"] for o in out])
+            return jsonify({"ok": True, "db": SGP_DB, "tables": out})
+
+    except Exception as e:
+        logger.exception("[SGP] erro ao inspecionar schema: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+#bloco11
+# Util OMIE: rota de ping para validar credenciais e endpoint
+
+@bp.route("/api/util/omie_ping", methods=["POST"])
+def api_omie_ping():
+    payload = {
+        "call": "PesquisarReq",
+        "app_key": _omie_key(),
+        "app_secret": _omie_secret(),
+        "param": [{ "pagina": 1, "registros_por_pagina": 1 }]
+    }
+    status, text = _http_post_json(OMIE_ENDPOINT, payload)
+    from flask import jsonify
+    return jsonify({"status": status, "raw": text}), (200 if status == 200 else 502)
+
+
+#bloco12
+# JOB: varre ponto de pedido, cria requisições no OMIE, envia e-mail e persiste no SQLite
+
+@bp.route("/api/jobs/scan_pontopedido", methods=["POST"])
+def job_scan_pontopedido():
+    """
+    Busca itens em ponto de pedido, agrupa por fornecedor, cria 1 requisição por fornecedor no OMIE,
+    envia e-mail via Outlook e grava no SQLite para exibição na UI.
+    """
+    itens = _fetch_itens_em_ponto_de_pedido()
+    if not itens:
+        return jsonify({"ok": True, "created": 0, "total_itens": 0, "details": []})
+
+    # Agrupa por fornecedor (código OMIE)
+    por_forn: Dict[str, List[Dict[str, Any]]] = {}
+    forn_nome: Dict[str, str] = {}
+    for r in itens:
+        f = str(r["cod_fornecedor"])
+        por_forn.setdefault(f, []).append(r)
+        forn_nome[f] = r.get("fornecedor") or f
+
+    detalhes: List[Dict[str, Any]] = []
+    total_itens = 0
+
+    for cod_forn, itens_forn in por_forn.items():
+        itens_req = _build_itens_reqcompra(itens_forn)
+        if not itens_req:
+            logger.info("[OMIE] Fornecedor %s sem itens válidos para requisição", cod_forn)
+            continue
+
+        cod_int_req = make_cod_int_req()
+        status, resposta = _omie_incluir_requisicao(cod_int_req, itens_req)
+
+        qtde_total = sum(i["qtde"] for i in itens_req)
+        cab = {
+            "data_hora": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "fornecedor": forn_nome[cod_forn],
+            "cod_fornecedor": cod_forn,
+            "cod_int": cod_int_req,
+            "itens": len(itens_req),
+            "qtde_total": qtde_total,
+            "status": "enviado" if status == 200 else "erro",
+            "email_enviado": False,
+            "link_omie": "https://app.omie.com.br/...",
+        }
+
+        # Monta itens para persistir (mesmo formato da UI de detalhes)
+        itens_for_db = [
+            {
+                "codigo_interno": i["codIntProd"],
+                "descricao": i["obsItem"],
+                "codProd": str(i["codProd"]),
+                "qtde": i["qtde"],
+                "obs": ""
+            } for i in itens_req
+        ]
+
+        # E-mail (TEMPLATE OFICIAL: tabela rica com estoques e codProd)
+        try:
+            # Mapa: código interno -> qtde realmente enviada ao OMIE
+            map_qtde = {i["codIntProd"]: i["qtde"] for i in itens_req}
+
+            def _s(v) -> str:
+                """formata números como inteiros quando possível"""
+                try:
+                    return str(int(round(float(v))))
+                except Exception:
+                    return str(v)
+
+            # Linhas da tabela: usamos itens_forn para ter estoques/PP/Max
+            linhas = []
+            for r in itens_forn:
+                cod = str(r["cod_interno"])[:60]
+                desc = sanitize_obs(str(r.get("descricao", "")))
+                cod_prod = str(r.get("cod_prod", ""))
+                ea = _s(r.get("estoque_atual", ""))
+                pp = _s(r.get("ponto_pedido", ""))
+                mx = _s(r.get("estoque_max", ""))
+                # mesma regra usada na requisição: mínimo = Max - Atual
+                sug_min = _s(max(0, int(round(float(r["estoque_max"]) - float(r["estoque_atual"])))))
+                qtde_req = _s(map_qtde.get(cod, 0))
+                linhas.append(
+                    f"<tr>"
+                    f"<td>{cod}</td><td>{desc}</td><td>{cod_prod}</td>"
+                    f"<td>{qtde_req}</td><td>{ea}</td><td>{pp}</td><td>{mx}</td><td>{sug_min}</td>"
+                    f"</tr>"
+                )
+
+            linhas_html = "".join(linhas)
+
+            html = (
+                "<p><b>Requisição criada no OMIE</b></p>"
+                f"<p><b>Fornecedor:</b> {forn_nome[cod_forn]} ({cod_forn})<br>"
+                f"<b>Código de Integração:</b> {cod_int_req}<br>"
+                f"<b>Data/Hora:</b> {cab['data_hora']}</p>"
+                "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse'>"
+                "<tr style='background:#f6f8fa'>"
+                "<th>Código</th><th>Descrição</th><th>codProd (OMIE)</th>"
+                "<th>Qtde</th><th>Estoque Atual</th><th>PP</th><th>Max</th><th>Sug. Mínima</th>"
+                "</tr>"
+                f"{linhas_html}</table>"
+                f"<p><b>Total:</b> {cab['itens']} itens / {cab['qtde_total']} un.</p>"
+                "<p><a href='https://app.omie.com.br/...' target='_blank' rel='noopener'>Abrir no OMIE</a></p>"
+                "<p style='color:#555'>Gerado automaticamente pelo SGP quando peças atingem o Ponto de Pedido.</p>"
+            )
+
+            subject = (
+                f"[SGP→OMIE] Requisição criada | {forn_nome[cod_forn]} | "
+                f"{cod_int_req} | {cab['itens']} itens/{cab['qtde_total']} un"
+            )
+
+            ok_mail = _email_send_html(
+                subject=subject,
+                html=html,
+                to_addr=_env("MAIL_TO", "adriano.saraiva@pneumark.com.br"),
+                preview=False,   # coloque True para abrir a janela do Outlook na próxima rodada de testes
+            )
+            cab["email_enviado"] = bool(ok_mail)
+            logger.info("[EMAIL] %s -> %s | ok=%s",
+                        cod_int_req, _env("MAIL_TO", "adriano.saraiva@pneumark.com.br"), ok_mail)
+        except Exception as e:
+            logger.warning("[EMAIL] Falha ao montar/enviar e-mail do fornecedor %s: %s", cod_forn, e)
+
+        # Persiste no banco (UI passa a listar daqui)
+        _persist_req(cab, itens_for_db)
+
+        detalhes.append({"fornecedor": forn_nome[cod_forn], "cod_int": cod_int_req, "status_http_omie": status})
+        total_itens += len(itens_req)
+
+    resp = jsonify({"ok": True, "created": len(detalhes), "total_itens": total_itens, "details": detalhes})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp

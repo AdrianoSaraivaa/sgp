@@ -1,0 +1,183 @@
+{% extends "_base.html" %}
+{% block title %}HiPot • Execução manual{% endblock %}
+{% block module_name %}Produção · HiPot{% endblock %}
+
+{% block module_nav %}
+  <a href="{{ url_for('gp_hipot_bp.perfil_editor') }}">Perfil</a>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root{
+    --bg:#f6f7fb;
+    --card:#ffffff;
+    --text:#1f2937;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+    --primary:#2563eb;
+    --ok:#16a34a;
+    --nok:#dc2626;
+    --r:10px;
+  }
+  .wrap{width:min(1200px,96vw);margin:0 auto;padding:8px 6px;}
+  h1{font-size:1.05rem;margin:2px 0 4px;color:var(--text);}
+  .subtitle{color:var(--muted);font-size:.85rem;margin:0 0 8px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--r);
+    padding:10px;
+    margin:8px 0;
+    box-shadow:0 1px 2px rgba(0,0,0,.02);
+  }
+  .card h3{font-size:.95rem;margin:0 0 6px;color:var(--text);}
+
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;}
+  .cards-grid{display:grid;gap:8px;}
+  @media (min-width:1100px){ .cards-grid{grid-template-columns:1fr 1fr;} }
+
+  label{font-size:.8rem;color:var(--muted);display:block;margin:0 0 3px;}
+  input,select,textarea{
+    width:100%;padding:6px 9px;font-size:.95rem;
+    border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);
+    outline:none;
+  }
+  textarea{min-height:56px;resize:vertical;}
+  input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.15);}
+
+  .btn{padding:7px 12px;border-radius:9px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-weight:600}
+  .btn:active{transform:translateY(1px);}
+  #status{font-size:.95rem;margin:6px 0 0;}
+  .ok{color:var(--ok);font-weight:700;}
+  .nok{color:var(--nok);font-weight:700;}
+  .muted{color:var(--muted);font-size:.8rem;margin:4px 0 0;}
+  body{background:var(--bg);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>HiPot — Execução manual (Passo 1 — sem salvar)</h1>
+  <p class="subtitle">Preencha os campos e valide o resultado final. Nada é salvo no banco ainda.</p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="serial">Serial</label>
+        <input id="serial" type="text" placeholder="Escaneie ou digite o nº de série" autocomplete="off">
+      </div>
+      <div>
+        <label for="operador">Operador (opcional)</label>
+        <input id="operador" type="text" placeholder="Nome do operador" autocomplete="name">
+      </div>
+      <div>
+        <label for="responsavel">Responsável/Supervisor (opcional)</label>
+        <input id="responsavel" type="text" placeholder="Nome do responsável" autocomplete="name">
+      </div>
+      <div>
+        <label for="obs">Observação (obrigatória se houver reprovação)</label>
+        <textarea id="obs" placeholder="Ex.: motivo da reprovação"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <h3>GB — Continuidade de aterramento</h3>
+      <div class="row">
+        <div>
+          <label for="gb_r_mohm">Resistência medida (mΩ)</label>
+          <input id="gb_r_mohm" type="number" step="0.1" placeholder="ex.: 35.0">
+        </div>
+        <div>
+          <label for="gb_ok">Resultado</label>
+          <select id="gb_ok">
+            <option value="true">Aprovado</option>
+            <option value="false">Reprovado</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted">No Passo 2 adicionaremos limites por modelo (Rmax) e cálculo automático.</p>
+    </div>
+
+    <div class="card">
+      <h3>HP — Tensão suportável</h3>
+      <div class="row">
+        <div>
+          <label for="hp_ileak_ma">Corrente de fuga (mA)</label>
+          <input id="hp_ileak_ma" type="number" step="0.1" placeholder="ex.: 2.5">
+        </div>
+        <div>
+          <label for="hp_ok">Resultado</label>
+          <select id="hp_ok">
+            <option value="true">Aprovado</option>
+            <option value="false">Reprovado</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted">No Passo 2 entra cálculo por limites (Imax, Vmin/Vmax) e multi-medidas.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <!-- BOTÃO SUBSTITUÍDO -->
+    <button class="btn" id="btnSalvar" type="button">Salvar execução</button>
+    <p id="status" style="margin-top:10px;"></p>
+  </div>
+</div>
+
+<!-- SCRIPT SUBSTITUÍDO -->
+<script>
+  async function salvarExecucao() {
+    const gbOK = document.getElementById('gb_ok').value === 'true';
+    const hpOK = document.getElementById('hp_ok').value === 'true';
+    const obs  = (document.getElementById('obs').value || '').trim();
+
+    if ((!gbOK || !hpOK) && !obs) {
+      document.getElementById('status').innerHTML = "<span class='nok'>Reprovação exige observação.</span>";
+      return;
+    }
+
+    const payload = {
+      serial: document.getElementById('serial').value,
+      operador: document.getElementById('operador').value,
+      responsavel: document.getElementById('responsavel').value,
+      obs,
+      gb_ok: gbOK,
+      gb_r_mohm: parseFloat(document.getElementById('gb_r_mohm').value || null),
+      hp_ok: hpOK,
+      hp_ileak_ma: parseFloat(document.getElementById('hp_ileak_ma').value || null),
+
+      // opcionais (já aceitos no backend; podem ficar null)
+      modelo: new URLSearchParams(location.search).get('modelo') || null,
+      ordem: "GB>HP",
+      gb_i_a: null,
+      gb_t_s: null,
+      hp_v_obs_v: null,
+      hp_t_s: null,
+    };
+
+    const r = await fetch("/producao/gp/hipot/api/save", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    let out; try { out = await r.json(); } catch { out = {ok:false, error:"Falha ao salvar"}; }
+    const el = document.getElementById('status');
+
+    if (out.ok) {
+      el.innerHTML = out.final_ok
+        ? "<span class='ok'>Execução salva: FINAL OK</span>"
+        : "<span class='nok'>Execução salva: FINAL REPROVADO</span>";
+      document.getElementById('serial').focus();
+      document.getElementById('serial').select?.();
+    } else {
+      el.innerHTML = "<span class='nok'>Erro: " + (out.error || "Falha ao salvar") + "</span>";
+    }
+  }
+
+  document.getElementById('btnSalvar').addEventListener('click', salvarExecucao);
+</script>
+{% endblock %}

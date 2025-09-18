@@ -1,0 +1,35 @@
+{% extends "_base.html" %}
+{% set active_page = 'listar' %}
+{% block title %}Consulta de Peça — Pneumark SGP{% endblock %}
+{% block module_name %}Módulo de Estoque{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('listar_pecas_bp.listar_pecas') }}">Estoque</a> &nbsp;/&nbsp;
+      <strong>Consulta de Peça</strong>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="wrap" style="display:grid; gap:18px">
+    <div class="card">
+      <div class="peca-info" style="display:grid; gap:14px 28px; grid-template-columns:repeat(2,minmax(240px,1fr))">
+        <p><strong><i class="fa-solid fa-barcode"></i> Código Pneumark:</strong> {{ peca.codigo_pneumark or "—" }}</p>
+        <p><strong><i class="fa-solid fa-qrcode"></i> Código OMIE:</strong> {{ peca.codigo_omie or "—" }}</p>
+        <p><strong><i class="fa-solid fa-align-left"></i> Descrição:</strong> {{ peca.descricao or "—" }}</p>
+        <p><strong><i class="fa-solid fa-ruler-combined"></i> Unidade:</strong> {{ peca.unidade or "—" }}</p>
+        <p><strong><i class="fa-solid fa-arrow-down-short-wide"></i> Estoque Mínimo:</strong> {{ peca.estoque_minimo if peca.estoque_minimo is not none else "—" }}</p>
+        <p><strong><i class="fa-solid fa-boxes-stacked"></i> Estoque Atual:</strong> {{ peca.estoque_atual if peca.estoque_atual is not none else "—" }}</p>
+        <p><strong><i class="fa-solid fa-arrow-up-short-wide"></i> Estoque Máximo:</strong> {{ peca.estoque_maximo if peca.estoque_maximo is not none else "—" }}</p>
+        <p><strong><i class="fa-solid fa-percent"></i> Margem:</strong> {{ (peca.margem|string) ~ '%' if peca.margem is not none else "—" }}</p>
+        <p><strong><i class="fa-solid fa-dollar-sign"></i> Custo:</strong> R$ {{ "%.2f"|format(peca.custo) if peca.custo is not none else "—" }}</p>
+      </div>
+      <div style="margin-top:14px">
+        <a class="btn" href="{{ url_for('listar_pecas_bp.listar_pecas') }}"><i class="fa-solid fa-arrow-left"></i> Voltar para lista</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

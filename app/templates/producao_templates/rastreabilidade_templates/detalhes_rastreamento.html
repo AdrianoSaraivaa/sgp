@@ -1,0 +1,190 @@
+{% extends "_base.html" %}
+
+
+{% block title %}Rastreabilidade • {{ serial }}{% endblock %}
+{% block module_name %}Rastreabilidade{% endblock %}
+
+{% block content %}
+<div class="card" style="padding:24px;margin:20px auto;max-width:1100px;">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" style="margin:-6px 0 14px 0; font-size:14px;">
+  <a href="{{ url_for('gp_setup_bp.page_setup_home') }}">Home</a>
+  <span class="muted">›</span>
+  <a href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">Produção · Rastreabilidade</a>
+  <span class="muted">›</span>
+  <span class="muted">Serial {{ serial }}</span>
+  </nav>
+
+
+  <!-- Cabeçalho -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0;">Rastreabilidade do Serial</h2>
+      <div style="margin-top:4px;color:#667;">
+        <strong>Serial:</strong> <span style="font-family:monospace">{{ serial }}</span>
+      </div>
+      <div id="headMeta" class="muted" style="margin-top:6px;">Carregando...</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a class="btn" href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">← Voltar à lista</a>
+      <button id="btnReport" class="btn outline" disabled title="Em breve">Gerar Relatório</button>
+    </div>
+  </div>
+
+  <hr style="margin:16px 0 20px;opacity:.15;">
+
+  <!-- Blocos -->
+  <section style="margin-bottom:18px;">
+    <h3 style="margin:0 0 8px;">Dados gerais</h3>
+    <div id="dadosGerais" class="muted">Carregando...</div>
+  </section>
+
+  <section style="margin-bottom:18px;">
+    <h3 style="margin:0 0 8px;">Linha do tempo (bancadas)</h3>
+    <div id="bancadasBox" class="muted">Carregando...</div>
+  </section>
+
+  <section style="margin-bottom:18px;">
+    <h3 style="margin:0 0 8px;">Bancada 5 — HiPot</h3>
+    <div id="hipotBox" class="muted">Carregando...</div>
+  </section>
+
+  <section>
+    <h3 style="margin:0 0 8px;">Bancada 8 — Checklist</h3>
+    <div id="checklistBox" class="muted">Carregando...</div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const serial = "{{ serial }}";
+  const headMeta = document.getElementById('headMeta');
+  const dadosGerais = document.getElementById('dadosGerais');
+  const bancadasBox = document.getElementById('bancadasBox');
+  const hipotBox = document.getElementById('hipotBox');
+  const checklistBox = document.getElementById('checklistBox');
+  const btnReport = document.getElementById('btnReport');
+
+  function fmt(iso){
+    if(!iso) return '-';
+    try{
+      const d = new Date(iso);
+      const p = n => String(n).padStart(2,'0');
+      return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }catch(e){ return iso; }
+  }
+
+  function chip(label, cls){
+    return `<span class="chip ${cls||''}">${label}</span>`;
+  }
+
+  function statusLabel(st){
+    const s = (st||'').toLowerCase();
+    if(s==='done') return chip('Aprovado','success');
+    if(s==='in_progress') return chip('Em andamento','warning');
+    if(s==='queued') return chip('Em fila','');
+    if(s==='reprovado' || s==='rejected') return chip('Reprovado','danger');
+    return chip(st||'-','');
+  }
+
+  async function load(){
+    try{
+      const resp = await fetch(`/producao/gp/rastreabilidade/api/${encodeURIComponent(serial)}`);
+      const json = await resp.json();
+      if(!json.ok) throw new Error(json.error || 'Erro na API');
+
+      const d = json.data || {};
+
+      // Cabeçalho meta
+      headMeta.innerHTML = `
+        Modelo: <strong>${d.modelo||'-'}</strong> ·
+        Status: ${statusLabel(d.status_atual)}
+        · Bancada atual: <code>${d.current_bench||'-'}</code>
+        · Última atualização: ${fmt(d.ultima_atualizacao)}
+      `;
+
+      // Dados gerais
+      dadosGerais.innerHTML = `
+        <div>Ordem de Produção: <strong>${d.ordem_producao ?? '-'}</strong></div>
+        <div>Lote: <strong>${d.lote ?? '-'}</strong></div>
+        <div>Criado em: ${fmt(d.criado_em)} · Responsável: <strong>${d.criado_por || '-'}</strong></div>
+        <div style="margin-top:6px;">Separação: início ${fmt(d.separacao?.inicio)} · fim ${fmt(d.separacao?.fim)} · duração ${d.separacao?.duracao_min ?? '-'} min · resp. <strong>${d.separacao?.responsavel || '-'}</strong></div>
+      `;
+
+      // Bancadas
+      if(!d.bancadas || d.bancadas.length===0){
+        bancadasBox.innerHTML = `<div class="muted">Sem registros de bancadas (ainda) para este serial.</div>`;
+      }else{
+        const list = d.bancadas.map(b => {
+          const oc = (b.ocorrencias||[]).length ? ` · Ocorrências: ${b.ocorrencias.length}` : '';
+          const habil = b.habilitada===false ? chip('Não habilitada','') : '';
+          return `
+            <div style="padding:10px 12px;border:1px solid #e4e6eb;border-radius:10px;margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <strong>${b.nome || ('Bancada ' + (b.bench_id||''))}</strong>
+                ${habil}
+              </div>
+              <div class="muted" style="margin-top:4px;">
+                Início: ${fmt(b.inicio)} · Fim: ${fmt(b.fim)} · Total: ${b.duracao_min ?? '-'} min · Resp.: <strong>${b.responsavel || '-'}</strong>${oc}
+              </div>
+            </div>
+          `;
+        }).join('');
+        bancadasBox.innerHTML = list;
+      }
+
+      // HiPot
+      if(!d.hipot || d.hipot.executado===false){
+        hipotBox.innerHTML = `<div class="muted">Sem execução registrada.</div>`;
+      }else{
+        const h = d.hipot;
+        hipotBox.innerHTML = `
+          <div>Equipamento: <strong>${h.equipamento?.patrimonio || '-'}</strong></div>
+          <div>Calibração: validade ${h.calibracao?.validade || '-'} · certificado ${h.calibracao?.certificado || '-'}</div>
+          <div style="margin-top:6px;">
+            Continuidade (GB1): <strong>${h.gb1?.valor || '-'}</strong> ${statusLabel(h.gb1?.status)}
+            · Tensão suportável (HP1): <strong>${h.hp1?.valor || '-'}</strong> ${statusLabel(h.hp1?.status)}
+            · Resultado: ${statusLabel(h.resultado_final)}
+          </div>
+          ${h.observacao_reprovacao ? `<div class="muted" style="margin-top:6px;">Obs. reprovação: ${h.observacao_reprovacao}</div>` : ''}
+        `;
+      }
+
+      // Checklist
+      if(!d.checklist || d.checklist.executado===false){
+        checklistBox.innerHTML = `<div class="muted">Sem execução registrada.</div>`;
+      }else{
+        const items = (d.checklist.itens||[]).map(it => {
+          const res = (it.resultado||'').toLowerCase()==='ok' ? chip('OK','success') : chip('Não conforme','danger');
+          const occ = (it.ocorrencias||[]).length ? ` · Ocorrências: ${it.ocorrencias.length}` : '';
+          const blq = it.bloqueante ? chip('Bloqueante','danger') : '';
+          return `<li style="margin:2px 0;">${blq} <strong>${it.ordem||''}.</strong> ${it.descricao||'-'} — ${res} · Resp.: <strong>${it.responsavel||'-'}</strong>${occ}</li>`;
+        }).join('');
+        checklistBox.innerHTML = `
+          <div style="margin-bottom:6px;">Resultado: ${statusLabel(d.checklist.resultado_final)}</div>
+          <ol style="padding-left:18px;margin:0;">${items || '<li class="muted">Sem itens.</li>'}</ol>
+        `;
+      }
+
+      // Habilita botão de relatório (em breve)
+      btnReport.disabled = false;
+      btnReport.title = "Abrir relatório de rastreabilidade (em breve)";
+
+    }catch(err){
+      const msg = `Falha ao carregar detalhes: ${err.message}`;
+      headMeta.textContent = msg;
+      dadosGerais.textContent = msg;
+      bancadasBox.textContent = msg;
+      hipotBox.textContent = msg;
+      checklistBox.textContent = msg;
+    }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}
+
+

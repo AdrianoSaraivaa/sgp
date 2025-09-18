@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Estoque — Pneumark SGP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Prefetch das rotas usadas nesta tela -->
+  <link rel="prefetch" href="/cadastrar_peca">
+  <link rel="prefetch" href="/listar_pecas">
+  <link rel="prefetch" href="/entrada_manual">
+  <link rel="prefetch" href="/saida_manual">
+  <link rel="prefetch" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}">
+ 
+  <link rel="prefetch" href="/consultar_estoque">
+  <link rel="prefetch" href="/relatorios_estoque">
+
+  <style>
+  :root{
+    /* Paleta Pneumark Bold */
+    --bg:        #f2f5fb;         /* fundo claro com leve azul */
+    --bg-elev:   #ffffff;
+    --panel:     #ffffff;
+    --text:      #0e1a2b;         /* navy escuro para texto */
+    --muted:     #51607a;         /* cinza-azulado p/ textos fracos */
+
+    --brand:     #e60000;         /* vermelho marca */
+    --brand-200: #ff4d4d;         /* vermelho claro para halos */
+    --navy:      #12263a;         /* navy para barras */
+    --accent:    #2d7ff9;         /* azul vivo p/ CTAs/links */
+
+    --ok:        #16a34a;
+    --warn:      #ffb020;
+    --border:    #d7deea;
+    --ring:      rgba(230,0,0,.25); /* foco com vermelho translúcido */
+
+    --radius: 16px;
+    --radius-sm: 12px;
+    --shadow-1: 0 2px 10px rgba(18,38,58,.06);
+    --shadow-2: 0 12px 28px rgba(18,38,58,.16);
+
+    --speed: .22s;
+    --easing: cubic-bezier(.2,.8,.2,1);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1100px 600px at 8% -10%, rgba(230,0,0,.06) 20%, transparent 60%),
+      radial-gradient(900px 520px at 95% -20%, rgba(45,127,249,.06) 15%, transparent 65%),
+      var(--bg);
+    color:var(--text);
+    font: 15px/1.45 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    letter-spacing:.2px;
+  }
+  /* Marca d'água com a logomarca (suave, canto inferior direito) */
+  body::after{
+    content:"";
+    position:fixed; inset:0;
+    background: url('{{ url_for("static", filename="img/Logo jpg.jpg") }}') no-repeat 96% 92%;
+    background-size: 360px auto;
+    opacity:.06; pointer-events:none; z-index:0;
+  }
+
+  /* ====== APP SHELL ====== */
+  .app{
+    position:relative; z-index:1; /* acima da marca d'água */
+    min-height:100%;
+    display:grid;
+    grid-template-rows:auto 1fr;
+    opacity:0; transform:translateY(8px);
+    transition:opacity .35s var(--easing), transform .35s var(--easing);
+  }
+  .app.ready{opacity:1; transform:none}
+
+  /* ====== APPBAR ====== */
+  header.appbar{
+    position:sticky; top:0; z-index:50;
+    background: linear-gradient(180deg, rgba(18,38,58,.98), rgba(18,38,58,.94)); /* navy */
+    backdrop-filter: blur(6px);
+    border-bottom:1px solid rgba(255,255,255,.06);
+    box-shadow: var(--shadow-1);
+  }
+  .appbar-inner{
+    max-width:1200px; margin:0 auto; padding:14px 20px;
+    display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:center;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-logo{
+    height:36px; width:auto; border-radius:10px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 2px 6px rgba(0,0,0,.25);
+  }
+  .brand h1{ margin:0;font-size:18px;font-weight:800; letter-spacing:.3px; color:#fff }
+  .brand small{display:block;color:#c9d6ea;font-weight:600;margin-top:2px}
+
+  /* NAV pills */
+  .nav{ display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  .nav a{
+    --xpad:14px;
+    color:#c9d6ea; text-decoration:none; font-weight:700; font-size:13px;
+    padding:10px var(--xpad); border-radius:999px; position:relative;
+    border:1px solid transparent; cursor:pointer;
+    transition: color var(--speed) var(--easing), border-color var(--speed) var(--easing), background var(--speed) var(--easing);
+  }
+  .nav a:hover{ color:#fff; background:rgba(255,255,255,.10); border-color:rgba(255,255,255,.16) }
+  .nav a:hover i{ transform: translateY(-1px); transition: transform .15s var(--easing) }
+  .nav a.active{
+    color:#0e1a2b;
+    background:linear-gradient(180deg, #ffd9d9, #ffc7c7); /* vermelho claro */
+    border-color:#ffb3b3;
+    box-shadow: 0 0 0 6px rgba(230,0,0,.12);
+  }
+
+  /* AÇÕES À DIREITA */
+  .actions{display:flex;align-items:center;gap:10px}
+  .kbd{
+    background:#20384f; border:1px solid rgba(255,255,255,.22); color:#e0e9f7;
+    padding:4px 8px;border-radius:8px;font-size:12px;font-weight:800;letter-spacing:.4px
+  }
+  .actions .muted{ color:#c9d6ea; font-size:12px }
+  .userchip{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;
+    border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff;
+  }
+  .userchip i{color:#ffb3b3}
+
+  /* ====== MAIN ====== */
+  main{ max-width:1200px; margin:0 auto; padding:20px; width:100%; }
+
+  /* BREADCRUMB + SEARCH BAR */
+  .toolbar{
+    display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; margin-bottom:18px;
+  }
+  .breadcrumb{ color:var(--muted); font-size:13px }
+  .breadcrumb a{ color:#324255; text-decoration:none; border-bottom:1px dashed transparent }
+  .breadcrumb a:hover{ border-color:#90a4bf }
+
+  .searchbar{
+    display:flex; align-items:center; gap:10px; background:#ffffff;
+    border:1px solid var(--border); border-radius:12px; padding:8px 10px; min-width:260px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
+    transition: border-color var(--speed) var(--easing), box-shadow var(--speed) var(--easing);
+  }
+  .searchbar:focus-within{
+    border-color:#ffb3b3;
+    box-shadow: 0 0 0 4px rgba(230,0,0,.10);
+  }
+  .searchbar i{ color:#7a8696 }
+  .searchbar input{
+    background:transparent; border:0; outline:0; color:var(--text); width:220px; font-size:14px;
+  }
+  .searchbar input::placeholder{ color:#8aa0bf }
+
+  /* ====== GRID DE CARDS ====== */
+  .grid{
+    display:grid; gap:16px;
+    grid-template-columns: repeat(6, minmax(160px, 1fr));
+  }
+  @media (max-width:1200px){ .grid{ grid-template-columns: repeat(5, 1fr)} }
+  @media (max-width:1000px){ .grid{ grid-template-columns: repeat(4, 1fr)} }
+  @media (max-width:780px){  .grid{ grid-template-columns: repeat(3, 1fr)} }
+  @media (max-width:540px){  .grid{ grid-template-columns: repeat(2, 1fr)} }
+  @media (max-width:380px){  .grid{ grid-template-columns: 1fr } }
+
+  .card{
+    position:relative; overflow:hidden; isolation:isolate;
+    background: linear-gradient(180deg, #ffffff, #f9fbff);
+    border:1px solid var(--border); border-radius: var(--radius);
+    padding:14px; min-height:150px; display:flex; flex-direction:column; gap:10px;
+    color:inherit; text-decoration:none; cursor:pointer;
+    transition: transform var(--speed) var(--easing), box-shadow var(--speed) var(--easing), border-color var(--speed) var(--easing);
+    box-shadow: 0 1px 0 rgba(18,38,58,.04);
+  }
+  .card::after{
+    content:""; position:absolute; inset:-40% -40% auto auto; height:160px; width:160px; border-radius:50%;
+    background: radial-gradient(closest-side, rgba(230,0,0,.16), transparent 70%); /* vermelho */
+    transform: translate(20px,-20px) rotate(8deg);
+    z-index:0; filter: blur(6px);
+  }
+  .card:hover{
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-2);
+    border-color: #cfd5e4;
+  }
+
+  .medal{
+    height:72px; width:72px; border-radius:16px; display:grid; place-items:center;
+    background: #f7f8fb;
+    border:1px solid var(--border);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
+    z-index:1;
+  }
+  .medal i{ font-size:26px; color: var(--brand) }
+
+  .card h3{ z-index:1; margin:2px 0 0 0; font-size:16px; letter-spacing:.2px }
+  .card p{ z-index:1; margin:0; color:var(--muted); font-size:13px; }
+  .cta{
+    margin-top:auto; z-index:1;
+    display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:13px;
+    color: var(--accent);
+  }
+
+  /* Badge de atalho (1–9) */
+  .card .kbd-hint{
+    position:absolute; top:10px; left:10px; z-index:2;
+    background:#f3f5f8; border:1px solid var(--border);
+    padding:2px 6px; font-size:11px; border-radius:7px; color:#5b6470; font-weight:800;
+  }
+
+  /* Rótulo opcional (status) */
+  .chip{
+    position:absolute; top:10px; right:10px; z-index:2;
+    background: linear-gradient(180deg, #e7f0ff, #dbe8ff);
+    color:#1a3a6b; border:1px solid #c5d8ff;
+    padding:4px 8px; font-size:11px; border-radius:999px; letter-spacing:.3px; font-weight:800;
+  }
+
+  /* Aviso/placeholder */
+  .notice{
+    background: #ffffff;
+    border:1px dashed var(--border); color:var(--muted);
+    padding:12px 14px; border-radius:12px; margin-bottom:16px;
+  }
+
+  /* Ripple */
+  .ripple{
+    position:absolute; border-radius:50%; transform:scale(0);
+    background: radial-gradient(circle, rgba(230,0,0,.22) 0%, rgba(230,0,0,.0) 70%);
+    animation: ripple .6s ease-out forwards; pointer-events:none; z-index:3;
+  }
+  @keyframes ripple{ to{ transform:scale(18); opacity:0 } }
+
+  /* Transição entre páginas */
+  .fadeout{
+    position:fixed; inset:0; background:rgba(255,255,255,.75);
+    pointer-events:none; opacity:0; transition:opacity .28s var(--easing)
+  }
+  .fadeout.active{ opacity:1 }
+
+  /* Acessibilidade: foco visível */
+  .nav a:focus-visible,
+  .card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+    border-color: #ffb3b3;
+  }
+
+  /* Reduz movimento */
+  @media (prefers-reduced-motion: reduce){
+    .app{ transition:none }
+    .card{ transition:none }
+    .fadeout{ transition:none }
+  }
+  </style>
+</head>
+<body>
+  <div class="fadeout" id="fadeout"></div>
+
+  <div class="app" id="app">
+    <!-- ====== TOP BAR ====== -->
+    <header class="appbar" role="banner">
+      <div class="appbar-inner">
+        <div class="brand">
+          <img class="brand-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+          <div>
+            <h1>Pneumark SGP</h1>
+            <small>Módulo de Estoque</small>
+          </div>
+        </div>
+
+        <!-- Navegação entre páginas do módulo -->
+        <nav class="nav" role="navigation" aria-label="Navegação principal">
+          <a href="{{ request.path }}" class="active" aria-current="page"><i class="fa-solid fa-grip"></i> &nbsp;Início</a>
+          <a href="/cadastrar_peca"><i class="fa-solid fa-cubes"></i> &nbsp;Cadastrar Peça</a>
+          <a href="/listar_pecas"><i class="fa-solid fa-list"></i> &nbsp;Listar Peças</a>
+        
+          <a href="/relatorios_estoque"><i class="fa-solid fa-file-chart-column"></i> &nbsp;Relatórios</a>
+          <a href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}"><i class="fa-solid fa-handshake"></i> &nbsp;Fornecedores</a>
+        </nav>
+
+        <div class="actions">
+          <span class="kbd">/</span><span class="muted" aria-hidden="true">buscar</span>
+          <div class="userchip" aria-label="Usuário atual"><i class="fa-regular fa-circle-user"></i><span>Operador</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ====== CONTEÚDO ====== -->
+    <main role="main">
+      <div class="toolbar">
+        <div class="breadcrumb" aria-label="Você está em">
+          <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp; <strong>Estoque</strong>
+        </div>
+
+        <label class="searchbar" for="filtro" title="Atalho: pressione / para focar" aria-label="Buscar cards">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input id="filtro" type="text" placeholder="Filtrar (ex.: cadastrar, listar, relatório...)" autocomplete="off"/>
+        </label>
+      </div>
+
+      <section class="grid" id="cardsGrid">
+        <!-- 1 -->
+        <a class="card navlink" href="/cadastrar_peca" data-title="cadastrar peça" data-index="1" tabindex="0" role="link">
+          <span class="kbd-hint">1</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-cubes
+            "></i></div>
+          <h3>Cadastrar Peça</h3>
+          <p>Nova peça no catálogo e estrutura.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 2 -->
+        <a class="card navlink" href="/listar_pecas" data-title="listar peças" data-index="2" tabindex="0" role="link">
+          <span class="kbd-hint">2</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-list"></i></div>
+          <h3>Listar Peças</h3>
+          <p>Consulta e manutenção de itens.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 3 -->
+        <a class="card navlink"
+   
+
+   data-title="omie integração api estoque compras notas fiscais omie"
+   data-index="3"
+   tabindex="0"
+   role="link"
+   aria-label="Abrir Comunicação com OMIE, atalho 3"
+   title="Abrir • atalho 3">
+  <span class="kbd-hint">3</span>
+  <div class="medal" aria-hidden="true"><i class="fa fa-right-left"></i></div>
+  <h3>Comunicação com OMIE</h3>
+  <p>Comunicações via API do OMIE.</p>
+  <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+</a>
+
+
+        <!-- 4 -->
+        <a class="card navlink" href="/saida_manual" data-title="relatórios" data-index="4" tabindex="0" role="link">
+          <span class="kbd-hint">4</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-file-lines"></i></div>
+          <h3>Relatórios</h3>
+          <p>Exportações e análises pontuais.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 5 -->
+        <a class="card navlink" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}" data-title="cadastrar fornecedores" data-index="5" tabindex="0" role="link">
+          <span class="kbd-hint">5</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-handshake"></i></div>
+          <h3>Cadastrar Fornecedores</h3>
+          <p>Cadastro e manutenção de parceiros.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 6 -->
+        <a class="card navlink" href="/contagem_estoque" data-title="livre" data-index="6" tabindex="0" role="link">
+          <span class="kbd-hint">6</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-boxes-stacked"></i></div>
+          <h3>LIVRE</h3>
+          <p>Espaço reservado para função futura.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 7 -->
+        <a class="card navlink" href="/consultar_estoque" data-title="livre" data-index="7" tabindex="0" role="link">
+          <span class="kbd-hint">7</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-magnifying-glass"></i></div>
+          <h3>LIVRE</h3>
+          <p>Espaço reservado para função futura.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+
+        <!-- 8 -->
+        <a class="card navlink" href="/relatorios_estoque" data-title="livre" data-index="8" tabindex="0" role="link">
+          <span class="kbd-hint">8</span>
+          <div class="medal" aria-hidden="true"><i class="fa fa-chart-column"></i></div>
+          <h3>LIVRE</h3>
+          <p>Espaço reservado para função futura.</p>
+          <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Inicialização com transição de entrada
+    const app = document.getElementById('app');
+    requestAnimationFrame(()=> app.classList.add('ready'));
+
+    // Busca com debounce
+    const filtro = document.getElementById('filtro');
+    const grid = document.getElementById('cardsGrid');
+    let timer;
+    function applyFilter(){
+      const q = (filtro.value || '').toLowerCase().trim();
+      [...grid.querySelectorAll('.card')].forEach(card=>{
+        const txt = (card.getAttribute('data-title')||'') + ' ' + (card.querySelector('h3')?.innerText||'').toLowerCase();
+        card.style.display = txt.includes(q)? '':'none';
+      });
+    }
+    filtro?.addEventListener('input', ()=>{
+      clearTimeout(timer); timer = setTimeout(applyFilter, 80);
+    });
+
+    // Atalhos: "/" foca a busca; "1–9" abrem cards visíveis
+    window.addEventListener('keydown', (e)=>{
+      if (e.key === '/' && document.activeElement !== filtro){
+        e.preventDefault(); filtro?.focus();
+      }
+      if (/^[1-9]$/.test(e.key)){
+        const n = Number(e.key);
+        const visibles = [...grid.querySelectorAll('.card')].filter(el=> el.style.display !== 'none');
+        if (visibles[n-1]) simulateClick(visibles[n-1]);
+      }
+    });
+
+    // Ripple
+    function addRipple(target, evt){
+      const rect = target.getBoundingClientRect();
+      const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
+      const cy = evt && typeof evt.clientY === 'number' ? evt.clientY - rect.top  : rect.height/2;
+      const r = document.createElement('span');
+      r.className = 'ripple';
+      r.style.left = (cx-10)+'px';
+      r.style.top = (cy-10)+'px';
+      r.style.width = r.style.height = '20px';
+      target.appendChild(r);
+      setTimeout(()=> r.remove(), 600);
+    }
+
+    // Transição de saída suave
+    const fadeout = document.getElementById('fadeout');
+    function routeTo(href){
+      fadeout.classList.add('active');
+      setTimeout(()=> window.location.assign(href), 180);
+    }
+
+    function simulateClick(el){
+      const href = el.getAttribute('href');
+      if (!href) return;
+      addRipple(el, null);       // ripple central (teclado)
+      routeTo(href);
+    }
+
+    grid?.querySelectorAll('.navlink').forEach(link=>{
+      link.addEventListener('click', (e)=>{
+        e.preventDefault();
+        addRipple(link, e);      // ripple no ponto do clique
+        const href = link.getAttribute('href');
+        routeTo(href);
+      });
+      // acessibilidade: Enter/Space também aciona
+      link.addEventListener('keydown', (e)=>{
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          simulateClick(link);
+        }
+      });
+      // tooltip com atalho
+      const idx = link.getAttribute('data-index');
+      if (idx && Number(idx) <= 9) link.title = `Abrir • atalho ${idx}`;
+    });
+  </script>
+</body>
+</html>

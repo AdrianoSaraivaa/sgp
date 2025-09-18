@@ -1,0 +1,148 @@
+{% extends "_base.html" %}
+{% set active_page = 'listar' %}
+
+{% block title %}Lista de Peças — Pneumark SGP{% endblock %}
+{% block module_name %}Módulo de Estoque{% endblock %}
+
+{% block head_extra %}
+  <!-- Estilos específicos da página (pode mover pro app.css depois) -->
+  <style>
+    .table-wrap{ background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-1); overflow:auto }
+    table.listing{ width:100%; border-collapse:collapse; min-width:920px }
+    .listing th, .listing td{ padding:12px 14px; border-bottom:1px solid #eef2f7; text-align:center; font-size:14px }
+    .listing thead th{ position:sticky; top:0; background:var(--navy); color:#fff; z-index:1 }
+    .listing tr:hover td{ background:#f8fbff }
+    /* status */
+    .estoque-critico{ background:#ffebeb; color:#9d0000; font-weight:800 }
+    .estoque-alerta{ background:#fff7d6; color:#856404; font-weight:800 }
+    .estoque-alto{    background:#e9f7ee; color:#155724; font-weight:800 }
+
+    .actions-top{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap }
+    .actions-left, .actions-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#fff; text-decoration:none; color:#0e1a2b; font-weight:800 }
+    .btn:hover{ transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:#cfd5e4 }
+    .btn i{ color:var(--brand) }
+    .searchbar--compact{ min-width:260px }
+
+    .icon-actions{ display:flex; justify-content:center; gap:12px }
+    .icon-actions a, .icon-actions button{ color:#263341; font-size:16px }
+    .icon-actions a:hover{ color:var(--brand) }
+    .icon-actions button{ border:none; background:none; cursor:pointer }
+
+    @media (max-width: 760px){
+      .listing th:nth-child(3), .listing td:nth-child(3),
+      .listing th:nth-child(5), .listing td:nth-child(5),
+      .listing th:nth-child(6), .listing td:nth-child(6) { display:none; } /* esconde colunas menos críticas no mobile */
+    }
+  </style>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('estoque_bp.tela_estoque') }}">Estoque</a> &nbsp;/&nbsp;
+      <strong>Lista de Peças</strong>
+    </div>
+
+    <!-- Busca rápida (atalho / já funciona no shell) -->
+    <label class="searchbar searchbar--compact" for="q">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="q" type="text" placeholder="Filtrar por código ou descrição" autocomplete="off" value="{{ busca or '' }}">
+    </label>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <!-- Ações topo -->
+  <div class="actions-top">
+    <div class="actions-left">
+      <a class="btn" href="{{ url_for('estoque_bp.tela_estoque') }}"><i class="fa-solid fa-arrow-left"></i> Voltar</a>
+
+      <!-- Filtro via GET (mantém compatibilidade com seu backend) -->
+      <form method="GET" action="{{ url_for('listar_pecas_bp.listar_pecas') }}" class="searchbar searchbar--compact" style="border:none; padding:0; box-shadow:none">
+        <input type="text" name="busca" placeholder="Buscar peça ou código" value="{{ busca or '' }}" style="border:1px solid var(--border); border-radius:12px; padding:8px 10px; width:260px">
+        <button class="btn" type="submit" style="margin-left:6px"><i class="fas fa-search"></i> Buscar</button>
+      </form>
+    </div>
+    <div class="actions-right">
+      <button class="btn" type="button" id="sortAZ"><i class="fas fa-font"></i> A–Z</button>
+      <a class="btn" href="#">
+    <i class="fas fa-file-pdf"></i> Relatório
+</a>
+</div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="listing" id="tabelaPecas">
+      <thead>
+        <tr>
+          <th data-col="codigo">Código Pneumark</th>
+          <th data-col="descricao">Descrição</th>
+          <th>Estoque Mínimo</th>
+          <th>Estoque Atual</th>
+          <th>Estoque Máximo</th>
+          <th>Margem (%)</th>
+          <th>Custo (R$)</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for peca in pecas %}
+          {% set status_class = 'estoque-alto' %}
+          {% if peca.estoque_atual < peca.estoque_minimo %}
+            {% set status_class = 'estoque-critico' %}
+          {% elif peca.estoque_atual == peca.estoque_minimo %}
+            {% set status_class = 'estoque-alerta' %}
+          {% endif %}
+
+          <tr data-codigo="{{ peca.codigo_pneumark|lower }}" data-descricao="{{ peca.descricao|lower }}">
+            <td>{{ peca.codigo_pneumark }}</td>
+            <td>{{ peca.descricao }}</td>
+            <td>{{ peca.estoque_minimo }}</td>
+            <td class="{{ status_class }}">{{ peca.estoque_atual }}</td>
+            <td>{{ peca.estoque_maximo }}</td>
+            <td>{{ "%.1f"|format(peca.margem) if peca.margem is not none else "—" }}</td>
+            <td>{{ "%.2f"|format(peca.custo) if peca.custo is not none else "—" }}</td>
+            <td class="icon-actions">
+              {% if peca.tipo == 'conjunto' %}
+                <a href="{{ url_for('editar_conjunto_bp.editar_conjunto', conjunto_id=peca.id) }}" title="Editar Conjunto"><i class="fas fa-sitemap"></i></a>
+              {% else %}
+                <a href="{{ url_for('editar_peca_bp.editar_peca', peca_id=peca.id) }}" title="Editar Peça"><i class="fas fa-pen-to-square"></i></a>
+              {% endif %}
+              <a href="{{ url_for('consultar_peca_bp.consultar_peca', peca_id=peca.id) }}" title="Visualizar"><i class="fas fa-search"></i></a>
+              <form action="{{ url_for('deletar_peca_bp.deletar_peca', peca_id=peca.id) }}" method="POST" style="display:inline">
+                <button type="submit" title="Excluir" onclick="return confirm('Tem certeza que deseja deletar esta peça?');"><i class="fas fa-trash-alt" style="color:#e60000"></i></button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block scripts_extra %}
+  <script>
+    // Filtro rápido no cliente (campo da toolbar)
+    const inputQ = document.getElementById('q');
+    const tbody = document.querySelector('#tabelaPecas tbody');
+    function filtrar(){
+      const q = (inputQ?.value || '').toLowerCase().trim();
+      [...tbody.rows].forEach(r=>{
+        const hit = (r.dataset.codigo||'').includes(q) || (r.dataset.descricao||'').includes(q);
+        r.style.display = hit ? '' : 'none';
+      });
+    }
+    inputQ?.addEventListener('input', ()=>{ window.clearTimeout(window.__flt); window.__flt=setTimeout(filtrar,80); });
+
+    // Ordenação A–Z por descrição (botão)
+    document.getElementById('sortAZ')?.addEventListener('click', ()=>{
+      const rows = [...tbody.rows];
+      const sorted = rows.sort((a,b)=>{
+        return (a.dataset.descricao||'').localeCompare(b.dataset.descricao||'', 'pt-BR', { sensitivity:'base' });
+      });
+      sorted.forEach(r=> tbody.appendChild(r));
+    });
+  </script>
+{% endblock %}

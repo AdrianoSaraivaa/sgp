@@ -1,0 +1,91 @@
+<div style="overflow-x:auto;">
+  <table class="table" style="width:100%; min-width:700px;">
+    <thead>
+      <tr>
+        <th>Modelo</th>
+        <th>Nº Série</th>
+        <th>Status</th>
+        <th>Última atualização</th>
+        <th style="width:120px;">Ações</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr><td colspan="5" class="muted">Carregando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function(){
+  const rows = document.getElementById('rows');
+
+  function fmtDate(iso){
+    if(!iso) return '-';
+    try{
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2,'0');
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }catch(e){ return iso; }
+  }
+
+  function statusMap(s){
+    // mapeia status do backend -> rótulo e classe do chip
+    switch((s||'').toLowerCase()){
+      case 'done':         return {label:'Aprovado',      cls:'chip success'};
+      case 'in_progress':  return {label:'Em andamento',  cls:'chip warning'};
+      case 'queued':       return {label:'Em fila',       cls:'chip'};
+      case 'rejected':
+      case 'reprovado':    return {label:'Reprovado',     cls:'chip danger'};
+      default:             return {label:(s||'-'),        cls:'chip'};
+    }
+  }
+
+  function qsParams(){
+    // lê os filtros atuais da URL (form usa GET)
+    const p = new URLSearchParams(window.location.search);
+    const obj = {};
+    for (const [k,v] of p.entries()){ if(v) obj[k]=v; }
+    return obj;
+  }
+
+  async function load(){
+    rows.innerHTML = `<tr><td colspan="5" class="muted">Carregando...</td></tr>`;
+    const params = new URLSearchParams(qsParams());
+    // paginação simples (primeira página por padrão)
+    if(!params.has('page')) params.set('page','1');
+    if(!params.has('page_size')) params.set('page_size','20');
+
+    try{
+      const resp = await fetch(`/producao/gp/rastreabilidade/api/search?${params.toString()}`);
+      const data = await resp.json();
+      if(!data.ok) throw new Error(data.error || 'Erro na API');
+
+      const items = data.items || [];
+      if(items.length === 0){
+        rows.innerHTML = `<tr><td colspan="5" class="muted">Nenhum registro encontrado.</td></tr>`;
+        return;
+      }
+
+      const html = items.map(it => {
+        const st = statusMap(it.status);
+        const detalheUrl = `{{ url_for('gp_rastreabilidade_bp.rastreabilidade_detalhes', serial='__SER__') }}`.replace('__SER__', String(it.serial));
+        return `
+          <tr>
+            <td>${it.modelo || '-'}</td>
+            <td><code>${it.serial || '-'}</code></td>
+            <td><span class="${st.cls}">${st.label}</span></td>
+            <td>${fmtDate(it.ultima_atualizacao)}</td>
+            <td><a class="btn small" href="${detalheUrl}">Detalhes</a></td>
+          </tr>
+        `;
+      }).join('');
+      rows.innerHTML = html;
+    }catch(err){
+      rows.innerHTML = `<tr><td colspan="5" class="muted">Falha ao carregar: ${err.message}</td></tr>`;
+    }
+  }
+
+  // Carrega na entrada da página
+  load();
+})();
+</script>

@@ -1,0 +1,295 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastrar Peça ou Conjunto</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #e60000;
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .linha {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .campo {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 150px;
+            max-width: 250px;
+        }
+
+        input, select {
+            padding: 6px;
+            font-size: 14px;
+        }
+
+        .fornecedores {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .fornecedor-bloco {
+            flex: 1;
+            min-width: 240px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f2f2f2;
+        }
+
+        .total {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .botao {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 15px;
+            background-color: #e60000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: fit-content;
+        }
+
+        .botao:hover {
+            background-color: #b80000;
+        }
+
+        #botao_conjunto {
+            display: none;
+        }
+
+        .sugestoes {
+            background-color: white;
+            border: 1px solid #ccc;
+            position: absolute;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 9999;
+            width: 95%;
+        }
+
+        .sugestoes div {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .sugestoes div:hover {
+            background-color: #eee;
+        }
+
+        #modal_estrutura {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+            overflow-y: auto;
+        }
+
+        .modal-conteudo {
+            background: white;
+            margin: 50px auto;
+            padding: 20px;
+            width: 600px;
+            max-height: 90vh;
+            border-radius: 10px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #lista_conjunto {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<header style="background:#222; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
+    <button onclick="window.location.href='{{ url_for('estoque_bp.tela_estoque') }}'" style="background:#e60000; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">← Voltar</button>
+    <h2 style="margin:0;">Cadastro de Peça ou Conjunto</h2>
+</header>
+
+<h1>Cadastrar Peça ou Conjunto</h1>
+
+<form method="POST" action="{{ url_for('cadastrar_peca_bp.cadastrar_peca') }}">
+    <div class="linha">
+        <div class="campo">
+            <label for="tipo_item">Tipo:</label>
+            <select name="tipo_item" id="tipo_item" onchange="verificarTipo()">
+                <option value="peca">Peça</option>
+                <option value="conjunto">Conjunto</option>
+            </select>
+        </div>
+        <div id="botao_conjunto" class="campo">
+            <label>&nbsp;</label>
+            <button type="button" class="botao" onclick="abrirModal()">Montar Estrutura</button>
+        </div>
+    </div>
+
+    <div class="linha">
+        <div class="campo"><label for="descricao">Descrição:</label><input type="text" name="descricao" required></div>
+        <div class="campo"><label for="codigo_pneumark">Código Pneumark:</label><input type="text" name="codigo_pneumark" maxlength="10" required></div>
+        <div class="campo"><label for="codigo_omie">Código OMIE:</label><input type="text" name="codigo_omie" maxlength="10"></div>
+    </div>
+
+    <div class="linha">
+        <div class="campo"><label for="estoque_minimo">Estoque Mínimo:</label><input type="number" name="estoque_minimo"></div>
+        <div class="campo"><label for="ponto_pedido">Ponto de Pedido:</label><input type="number" name="ponto_pedido"></div>
+        <div class="campo"><label for="estoque_maximo">Estoque Máximo:</label><input type="number" name="estoque_maximo"></div>
+        <div class="campo"><label for="estoque_atual">Estoque Atual:</label><input type="number" name="estoque_atual"></div>
+    </div>
+
+    <h3>Fornecedores</h3>
+<div class="fornecedores">
+    {% for i in range(1, 5) %}
+    <div class="fornecedor-bloco">
+        <label for="fornecedor{{ i }}">Fornecedor {{ i }}:</label>
+        <select name="fornecedor{{ i }}" id="fornecedor{{ i }}">
+            <option value="">-- selecione --</option>
+            {% for f in fornecedores %}
+                <option value="{{ f }}">{{ f }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="etapa{{ i }}">Etapa:</label>
+        <input type="text" name="etapa{{ i }}" id="etapa{{ i }}">
+
+        <label for="preco{{ i }}">Preço:</label>
+        <input type="number" name="preco{{ i }}" id="preco{{ i }}" step="0.01" class="preco" oninput="calcularCustoTotal()">
+    </div>
+    {% endfor %}
+</div>
+
+
+    <div class="linha">
+        <div class="campo"><label for="margem">Margem de Segurança (%):</label><input type="number" name="margem" id="margem" value="5" oninput="calcularCustoTotal()"></div>
+        <div class="campo" style="align-self: flex-end;"><div class="total" id="total_custo">Custo total: R$ 0,00</div></div>
+    </div>
+
+    <input type="hidden" name="estrutura_conjunto" id="estrutura_conjunto">
+    <button type="submit" class="botao">Salvar Peça</button>
+</form>
+
+<!-- MODAL -->
+<div id="modal_estrutura">
+    <div class="modal-conteudo">
+        <h2>Montar Estrutura do Conjunto</h2>
+        <label>Peça:</label>
+        <input type="text" id="input_peca" placeholder="Digite o nome da peça..." oninput="sugerirPecas()">
+        <div id="sugestoes_peca" class="sugestoes"></div>
+
+        <label>Código:</label>
+        <input type="text" id="input_codigo" readonly>
+
+        <label>Quantidade:</label>
+        <input type="number" id="input_quantidade">
+
+        <button type="button" class="botao" onclick="adicionarPecaConjunto()">Adicionar</button>
+        <button type="button" class="botao" style="background:gray;" onclick="fecharModal()">Fechar</button>
+
+        <h3>Peças no Conjunto:</h3>
+        <ul id="lista_conjunto"></ul>
+        <button type="button" class="botao" onclick="fecharModal()">Salvar Estrutura</button>
+    </div>
+</div>
+
+<script>
+function verificarTipo() {
+    let tipo = document.getElementById("tipo_item").value;
+    document.getElementById("botao_conjunto").style.display = tipo === "conjunto" ? "block" : "none";
+}
+window.onload = verificarTipo;
+
+function abrirModal() {
+    document.getElementById("modal_estrutura").style.display = "block";
+}
+
+function fecharModal() {
+    document.getElementById("modal_estrutura").style.display = "none";
+}
+
+function sugerirPecas() {
+    const termo = document.getElementById("input_peca").value;
+    if (termo.length < 1) {
+        document.getElementById("sugestoes_peca").innerHTML = "";
+        return;
+    }
+    fetch(`/api/pecas_autocomplete?termo=${termo}`)
+        .then(response => response.json())
+        .then(dados => {
+            let html = '';
+            dados.forEach(p => {
+                html += `<div onclick="selecionarPeca('${p.descricao}', '${p.codigo}')">${p.descricao}</div>`;
+            });
+            document.getElementById("sugestoes_peca").innerHTML = html;
+        });
+}
+
+function selecionarPeca(descricao, codigo) {
+    document.getElementById("input_peca").value = descricao;
+    document.getElementById("input_codigo").value = codigo;
+    document.getElementById("sugestoes_peca").innerHTML = "";
+}
+
+function adicionarPecaConjunto() {
+    let nome = document.getElementById("input_peca").value;
+    let codigo = document.getElementById("input_codigo").value;
+    let quantidade = document.getElementById("input_quantidade").value;
+    if (nome && codigo && quantidade) {
+        let li = document.createElement("li");
+        li.textContent = `${quantidade}x ${nome} (${codigo})`;
+        document.getElementById("lista_conjunto").appendChild(li);
+
+        let estruturaAtual = document.getElementById("estrutura_conjunto").value;
+        let novaLinha = `${quantidade}|${nome}|${codigo};`;
+        document.getElementById("estrutura_conjunto").value = estruturaAtual + novaLinha;
+
+        document.getElementById("input_peca").value = '';
+        document.getElementById("input_codigo").value = '';
+        document.getElementById("input_quantidade").value = '';
+    }
+}
+
+function calcularCustoTotal() {
+    let total = 0;
+    document.querySelectorAll('.preco').forEach(p => {
+        total += parseFloat(p.value) || 0;
+    });
+    let margem = parseFloat(document.getElementById("margem").value) || 0;
+    let final = total + (total * margem / 100);
+    document.getElementById("total_custo").innerText = `Custo total: R$ ${final.toFixed(2)}`;
+}
+</script>
+
+</body>
+</html>

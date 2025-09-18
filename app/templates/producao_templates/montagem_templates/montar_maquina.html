@@ -1,0 +1,663 @@
+{% extends "_base.html" %}
+{% set active_page = 'producao' %}
+
+{% block title %}Painel de Montagem — Pneumark SGP{% endblock %}
+{% block module_name %}Produção — Montagem{% endblock %}
+
+{% block head_extra %}
+  <style>
+    /* Layout específico desta tela (sem conflitar com app.css) */
+    .grid-montagem{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+      gap:14px;
+    }
+    .card-montagem{ /* usa visual de .card do app.css e especializa */
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background:#fff;
+      box-shadow: var(--shadow-1);
+    }
+
+
+   
+
+
+    .modelo-title{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px }
+    .modelo-badge{ background:var(--brand); color:#fff; font-weight:800; padding:6px 10px; border-radius:999px; letter-spacing:.3px }
+    .capacidade{ display:flex; align-items:baseline; gap:8px; margin-bottom:4px }
+    .capacidade .valor{ font-size:40px; line-height:1; font-weight:900; letter-spacing:-.5px }
+    .capacidade .tag{ font-size:11px; color:#fff; background:#111; padding:3px 8px; border-radius:999px; opacity:.9 }
+    .hint-cap{ font-size:12px; color:var(--muted); margin-bottom:8px }
+    .gargalos{ margin-top:6px; border-top:1px dashed var(--border); padding-top:8px; font-size:12px; color:var(--muted) }
+    .gargalos-toggle{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none;
+                      padding:4px 8px; border-radius:8px; border:1px dashed var(--border); background:#fafafa }
+    .gargalos-list{ margin-top:8px; max-height:140px; overflow:auto; border-radius:8px; border:1px dashed var(--border); background:#fdfdfd; display:none }
+    .gargalos .linha{ display:grid; grid-template-columns:110px 1fr 80px 100px; gap:8px; padding:6px 8px; border-bottom:1px solid #f3f3f3 }
+    .gargalos .linha:last-child{ border-bottom:0 }
+
+    .controle{ display:grid; grid-template-columns:auto 90px auto 1fr; align-items:center; gap:8px; margin-top:10px }
+    .controle button.step{ border:1px solid var(--border); border-radius:10px; background:#fff; padding:6px 10px; cursor:pointer }
+    .controle input[type="number"]{ width:90px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; font-size:16px; text-align:center }
+    .btn-montar{ justify-self:end; background:linear-gradient(180deg,#ffd9d9,#ffc7c7); border:1px solid #ffb3b3; color:#0e1a2b;
+                 border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:800 }
+
+    .erro{ color:var(--brand); font-size:12px; margin-top:4px; display:none }
+
+    .card-wide{ grid-column:1 / -1 }
+    .otimizacao{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
+    .otimizacao .box{ background:#fafafa; border:1px dashed var(--border); border-radius:12px; padding:10px }
+    .otimizacao .qty{ font-size:28px; font-weight:900 }
+    .otimizacao .crit{ color:var(--muted); font-size:12px; margin-top:6px }
+
+    .actions{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap }
+    .btn-secondary{ background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px 16px; cursor:pointer; font-weight:800 }
+
+    .montadas{ margin-top:18px; background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-1); padding:14px }
+    .montadas-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px }
+    .montadas h2{ margin:0; font-size:18px }
+
+    .table{ width:100%; border-collapse:collapse; font-size:14px }
+    .table th,.table td{ border-bottom:1px solid #eef2f7; padding:8px 6px; text-align:left; white-space:nowrap; vertical-align:middle }
+    .table th{ color:var(--muted); font-weight:700 }
+    .empty{ color:var(--muted); font-size:13px; padding:8px 0 }
+
+    .toast{ position:fixed; bottom:16px; right:16px; background:#111; color:#fff; padding:10px 14px; border-radius:10px; box-shadow:var(--shadow-2); display:none; z-index:60 }
+
+    /* --- Etiqueta: ícones e estados --- */
+    .print-btn{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border); background:#fff; border-radius:10px;
+      padding:6px 10px; cursor:pointer; font-weight:700;
+    }
+    .print-btn .fa{ font-size:16px }
+    .print-cell{ display:flex; align-items:center; gap:8px }
+    .badge{
+      display:inline-block; padding:2px 6px; border-radius:10px; font-size:12px; font-weight:700;
+      background:#eef2f7; color:#334155; border:1px solid #e2e8f0;
+    }
+    .badge.ok{ background:#e7f8ef; color:#0f5132; border-color:#c7f0da }
+    .badge.warn{ background:#fff4e5; color:#8a4b00; border-color:#ffe0b2 }
+
+    /* --- Modal genérico --- */
+    .modal-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:100;
+      align-items:center; justify-content:center; padding:16px;
+    }
+    .modal{
+      width:min(720px, 95vw); background:#fff; border-radius:12px; box-shadow:var(--shadow-3); overflow:hidden;
+      display:flex; flex-direction:column;
+    }
+    .modal header{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #eee }
+    .modal header h3{ margin:0; font-size:16px }
+    .modal .content{ padding:12px 14px; max-height:70vh; overflow:auto }
+    .modal .footer{ padding:12px 14px; border-top:1px solid #eee; display:flex; gap:10px; justify-content:flex-end }
+    .btn{ border:1px solid var(--border); background:#fff; border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:800 }
+    .btn.primary{ background:linear-gradient(180deg,#ffd9d9,#ffc7c7); border:1px solid #ffb3b3 }
+    .btn.danger{ background:#ffe5e5; border-color:#f3c2c2; color:#7a1f1f }
+    .form-row{ display:grid; gap:8px; margin-bottom:10px }
+    .form-row label{ font-weight:700; font-size:13px }
+    .form-row input, .form-row textarea{
+      border:1px solid var(--border); border-radius:10px; padding:8px 10px; width:100%; font-size:14px
+    }
+    .preview-frame{
+      width:100%; height:360px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc;
+    }
+    .hint{ color:var(--muted); font-size:12px }
+  </style>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <strong>Produção</strong> &nbsp;/&nbsp;
+      <span>Montagem</span>
+    </div>
+    <div class="searchbar" aria-hidden="true" style="opacity:.6">
+      <i class="fa-solid fa-screwdriver-wrench"></i>
+      <input type="text" value="Painel de Montagem" disabled>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <!-- CARDS POR MODELO -->
+  <section class="grid-montagem" id="cards-modelos"></section>
+
+  <!-- PLANO OTIMIZADO -->
+  <section class="card-montagem card-wide" style="margin-top:14px">
+    <h2 style="margin:0 0 8px 0">Plano Otimizado (Quantidade Ideal por Modelo)</h2>
+    <div class="otimizacao" id="otimizacao-boxes"></div>
+    <div class="actions">
+      <button class="btn-secondary" id="btn-reset">Resetar quantidades</button>
+    </div>
+    <div class="crit" id="criterio-info"></div>
+  </section>
+
+  <!-- LISTA DE MÁQUINAS MONTADAS -->
+  <section class="montadas" id="montadas">
+    <div class="montadas-header">
+      <h2>Máquinas montadas</h2>
+      <div style="display:flex; gap:8px; align-items:center">
+        <span class="hint">PDF em 40×20 mm | QR = Nº de série</span>
+        <button class="btn-secondary" id="btn-refresh-log">Atualizar</button>
+         <a class="btn-primary" href="{{ url_for('series_bp.gerenciar_series') }}">Gerenciar nº de série</a>
+        </div>
+
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Modelo</th>
+            <th>Nº de série</th>
+            <th>Data/Hora</th>
+            <th>Usuário</th>
+            <th>Etiqueta</th>
+          </tr>
+        </thead>
+        <tbody id="montadas-body">
+          <tr><td colspan="5" class="empty">Nenhum registro ainda.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Modal: Preview/Impressão -->
+  <div class="modal-backdrop" id="modal-preview">
+    <div class="modal">
+      <header>
+        <h3 id="modal-title">Imprimir etiqueta</h3>
+        <button class="btn" data-close="#modal-preview">Fechar</button>
+      </header>
+      <div class="content">
+        <div class="form-row">
+          <div class="hint">Confirme a impressão apenas quando a etiqueta for realmente impressa na térmica (evita duplicidade).</div>
+        </div>
+        <iframe class="preview-frame" id="preview-frame" src=""></iframe>
+      </div>
+      <div class="footer">
+        <button class="btn" data-close="#modal-preview">Cancelar</button>
+        <button class="btn primary" id="btn-confirmar-print">Confirmar impressão</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Reimpressão -->
+  <div class="modal-backdrop" id="modal-reprint">
+    <div class="modal">
+      <header>
+        <h3>Reimprimir etiqueta</h3>
+        <button class="btn" data-close="#modal-reprint">Fechar</button>
+      </header>
+      <div class="content">
+        <div class="form-row">
+          <div class="hint badge warn">Atenção: etiqueta já foi impressa. Evite misturar etiquetas e duplicar números de série.</div>
+        </div>
+        <div class="form-row">
+          <label for="reprint-motivo">Motivo da reimpressão</label>
+          <textarea id="reprint-motivo" rows="3" placeholder="Ex.: etiqueta danificada, reconfiguração de impressão, etc."></textarea>
+        </div>
+        <iframe class="preview-frame" id="reprint-frame" src=""></iframe>
+      </div>
+      <div class="footer">
+        <button class="btn" data-close="#modal-reprint">Cancelar</button>
+        <button class="btn danger" id="btn-confirmar-reprint">Confirmar reimpressão</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+  // -------------------- Utils --------------------
+  async function jfetch(url, opts={}) {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      ...opts
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+  const qs = (sel, ctx=document)=> ctx.querySelector(sel);
+  const qsa = (sel, ctx=document)=> [...ctx.querySelectorAll(sel)];
+  function toast(msg){
+    const elToast = document.getElementById("toast");
+    elToast.textContent = msg;
+    elToast.style.display = "block";
+    setTimeout(()=> elToast.style.display = "none", 2200);
+  }
+  function openModal(id){ const el = document.getElementById(id); if (el) el.style.display='flex'; }
+  function closeModal(id){ const el = document.getElementById(id); if (el) el.style.display='none'; }
+
+  // -------------------- Endpoints (Flask) --------------------
+  const endpoints = {
+    capacidade: "{{ url_for('maquinas_bp.api_capacidade') }}",
+    otimizacao: "{{ url_for('maquinas_bp.api_otimizacao') }}",
+    validar:    "{{ url_for('maquinas_bp.api_validar') }}",
+    montar:     "{{ url_for('maquinas_bp.api_montar') }}",
+    montadas:   "{{ url_for('maquinas_bp.api_montadas') }}",
+    // Rotas de etiqueta (com placeholder para assembly_id)
+    etiquetaPreview: "{{ url_for('imprimir_etiqueta_bp.preview_label', assembly_id='__ID__') }}",     // GET
+    etiquetaConfirm: "{{ url_for('imprimir_etiqueta_bp.confirmar_primeira_impressao', assembly_id='__ID__') }}", // POST
+    etiquetaReprint: "{{ url_for('imprimir_etiqueta_bp.reimprimir_label', assembly_id='__ID__') }}"   // GET/POST
+  };
+
+  // -------------------- State & Elements --------------------
+  const state = {
+    modelos: ["PM2100","PM2200","PM700"],
+    capacidade: {},   // { PM2100:{capacidade, gargalos:[...]}, ... }
+    otimizacao: {},   // { ideal:{PM2100:N,...}, criterio:"..." }
+    montar: { PM2100:0, PM2200:0, PM700:0 },
+    montadas: [],     // [{id, modelo, serie, data_hora, usuario, label_printed?, label_print_count?}, ...]
+    currentPrint: null,  // item selecionado para impressão
+    currentReprint: null // item para reimpressão
+  };
+
+  const elCards    = document.getElementById("cards-modelos");
+  const elOtz      = document.getElementById("otimizacao-boxes");
+  const elCrit     = document.getElementById("criterio-info");
+  const elLogBody  = document.getElementById("montadas-body");
+
+  // -------------------- Render: Capacidade quick update --------------------
+  function renderCapacidades(capFlat){
+    if (!capFlat) return;
+    state.modelos.forEach(m=>{
+      const el = document.getElementById(`cap-${m}`);
+      if (el && typeof capFlat[m] !== "undefined") el.textContent = capFlat[m];
+    });
+  }
+
+  // -------------------- Render: Cards --------------------
+  function renderCards(){
+    elCards.innerHTML = "";
+    state.modelos.forEach(m=>{
+      const data   = state.capacidade[m] || { capacidade:0, gargalos:[] };
+      const capVal = data.capacidade ?? 0;
+      const gargalosHtml = (data.gargalos||[]).map(g=>`
+        <div class="linha">
+          <div><strong>${g.codigo}</strong></div>
+          <div>${g.descricao}</div>
+          <div title="Capacidade local">cap: ${g.cap_local}</div>
+          <div title="Estoque/Consumo">${g.estoque}/${g.consumo}</div>
+        </div>`).join("");
+
+      const card = document.createElement("div");
+      card.className = "card-montagem";
+      card.innerHTML = `
+        <div class="modelo-title">
+          <span class="modelo-badge">${m}</span>
+        </div>
+
+        <div class="capacidade">
+          <div class="valor" id="cap-${m}">${capVal}</div>
+          <span class="tag">capacidade máx</span>
+        </div>
+        <div class="hint-cap">A capacidade é limitada pelos gargalos abaixo.</div>
+
+        <div class="gargalos">
+          <div class="gargalos-toggle" data-toggle="${m}">
+            <span>Ver gargalos</span>
+            <svg width="12" height="12" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="#6b7280" stroke-width="2"/></svg>
+          </div>
+          <div class="gargalos-list" id="glist-${m}">
+            ${gargalosHtml || '<div class="linha"><div>—</div><div>Sem dados</div><div></div><div></div></div>'}
+          </div>
+        </div>
+
+        <div class="controle">
+          <button class="step" data-m="${m}" data-op="dec">−</button>
+          <input type="number" min="0" step="1" value="${state.montar[m]||0}" id="qty-${m}">
+          <button class="step" data-m="${m}" data-op="inc">+</button>
+          <button class="btn-montar" data-m="${m}">MONTAR</button>
+        </div>
+        <div class="erro" id="err-${m}"></div>
+      `;
+      elCards.appendChild(card);
+    });
+
+    // Toggle gargalos (com lazy-fetch se vier vazio)
+    elCards.querySelectorAll(".gargalos-toggle").forEach(tg=>{
+      tg.addEventListener("click", async ()=>{
+        const m = tg.getAttribute("data-toggle");
+        const lst = document.getElementById(`glist-${m}`);
+        const showing = lst.style.display === "block";
+        if (!showing && lst.textContent.includes("Sem dados")) {
+          try {
+            // tenta recarregar capacidade para pegar gargalos atualizados
+            const cap = await fetch(endpoints.capacidade).then(r=>r.json());
+            if (cap?.modelos?.[m]?.gargalos?.length) {
+              const g = cap.modelos[m].gargalos;
+              lst.innerHTML = g.map(it=>`
+                <div class="linha">
+                  <div><strong>${it.codigo}</strong></div>
+                  <div>${it.descricao}</div>
+                  <div title="Capacidade local">cap: ${it.cap_local}</div>
+                  <div title="Estoque/Consumo">${it.estoque}/${it.consumo}</div>
+                </div>`).join("");
+            }
+          } catch {}
+        }
+        lst.style.display = showing ? "none" : "block";
+        tg.querySelector("span").textContent = showing ? "Ver gargalos" : "Ocultar gargalos";
+      });
+    });
+
+    // Stepper
+    elCards.querySelectorAll("button.step").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const m  = b.getAttribute("data-m");
+        const op = b.getAttribute("data-op");
+        const cap = (state.capacidade[m]?.capacidade) ?? 0;
+        let v = state.montar[m] ?? 0;
+        v = op === "inc" ? v+1 : v-1;
+        v = clamp(v, 0, cap);
+        state.montar[m] = v;
+        document.getElementById(`qty-${m}`).value = v;
+        validateInline(m);
+      });
+    });
+
+    // Input direto
+    elCards.querySelectorAll("input[type='number']").forEach(inp=>{
+      inp.addEventListener("input", ()=>{
+        const m = inp.id.replace("qty-","");
+        const cap = (state.capacidade[m]?.capacidade) ?? 0;
+        let v = parseInt(inp.value || "0", 10);
+        if (isNaN(v)) v = 0;
+        if (v > cap) { v = cap; toast(`Limite para ${m}: ${cap}`); }
+        if (v < 0) v = 0;
+        state.montar[m] = v;
+        inp.value = v;
+        validateInline(m);
+      });
+    });
+
+    // Montar por modelo
+    elCards.querySelectorAll(".btn-montar").forEach(btn=>{
+      btn.addEventListener("click", ()=> montarModelo(btn.getAttribute("data-m")));
+    });
+  }
+
+  function validateInline(modelo){
+    const cap = (state.capacidade[modelo]?.capacidade) ?? 0;
+    const v   = state.montar[modelo] ?? 0;
+    const elErr = document.getElementById(`err-${modelo}`);
+    if (v > cap){
+      elErr.style.display = "block";
+      elErr.textContent = `Quantidade (${v}) excede capacidade (${cap}).`;
+    } else {
+      elErr.style.display = "none";
+      elErr.textContent = "";
+    }
+  }
+
+  // -------------------- Render: Otimização --------------------
+  function renderOtimizacao(){
+    elOtz.innerHTML = "";
+    state.modelos.forEach(m=>{
+      const ideal = state.otimizacao?.ideal?.[m] ?? 0;
+      const box = document.createElement("div");
+      box.className = "box";
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="modelo-badge">${m}</span>
+          <strong>Ideal sugerido</strong>
+        </div>
+        <div class="qty">${ideal}</div>
+        <div class="crit">Sugestão de balanceamento</div>
+      `;
+      elOtz.appendChild(box);
+    });
+    elCrit.textContent = state.otimizacao?.criterio ? `Critério: ${state.otimizacao.criterio}` : "";
+  }
+
+  // -------------------- Render: Montadas (tabela) --------------------
+  function renderMontadas(){
+    elLogBody.innerHTML = "";
+    if (!state.montadas || state.montadas.length === 0){
+      elLogBody.innerHTML = `<tr><td colspan="5" class="empty">Nenhum registro ainda.</td></tr>`;
+      return;
+    }
+    state.montadas.forEach(item=>{
+      const tr = document.createElement("tr");
+      const dt = item.data_hora || item.data_hora_iso || "";
+      // Estado de impressão (se backend ainda não enviar, assume não impresso)
+      const printed = !!item.label_printed;
+      const count = item.label_print_count ?? (printed ? 1 : 0);
+
+      // assembly_id: usa o id se existir; fallback para o próprio nº de série
+      const assemblyId = item.id ?? item.assembly_id ?? item.serie;
+
+      tr.innerHTML = `
+        <td>${item.modelo}</td>
+        <td>${item.serie || "—"}</td>
+        <td>${dt}</td>
+        <td>${item.usuario || "—"}</td>
+        <td class="print-cell">
+          <button class="print-btn" data-action="${printed ? 'reprint' : 'print'}"
+                  data-id="${assemblyId}" data-modelo="${item.modelo}" data-serie="${item.serie}" data-dt="${dt}">
+            <i class="fa fa-print"></i>
+            ${printed ? 'Reimprimir' : 'Imprimir'}
+          </button>
+          <span class="badge ${printed ? 'ok' : ''}" title="${printed ? 'Etiqueta já confirmada' : 'Ainda não impressa'}">
+            ${printed ? `impresso • ${count}x` : 'pendente'}
+          </span>
+        </td>
+      `;
+      elLogBody.appendChild(tr);
+    });
+  }
+
+  // -------------------- Etiqueta: helpers --------------------
+  function buildPreviewURL(item, format='pdf'){
+    // Usa rota com assembly_id + querystring (modelo, serial, dt) para o stub funcionar desde já
+    const id = encodeURIComponent(item.id || item.assembly_id || item.serie);
+    let url = endpoints.etiquetaPreview.replace('__ID__', id);
+    const params = new URLSearchParams();
+    if (item.modelo) params.set('modelo', item.modelo);
+    if (item.serie)  params.set('serial', item.serie);
+    if (item.data_hora) params.set('dt', item.data_hora);
+    if (format) params.set('format', format); // 'pdf' (se reportlab) ou 'png'
+    return `${url}?${params.toString()}`;
+  }
+
+  async function confirmarImpressao(item){
+    const id = encodeURIComponent(item.id || item.assembly_id || item.serie);
+    const url = endpoints.etiquetaConfirm.replace('__ID__', id);
+    const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ usuario: item.usuario || 'Operador' })
+    }).then(r=>r.json());
+    return resp;
+  }
+
+  async function efetivarReimpressao(item, motivo){
+    const id = encodeURIComponent(item.id || item.assembly_id || item.serie);
+    const url = endpoints.etiquetaReprint.replace('__ID__', id);
+    const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ motivo, usuario: item.usuario || 'Operador' })
+    }).then(r=>r.json());
+    return resp;
+  }
+
+  // -------------------- Actions --------------------
+  async function montarModelo(modelo, quantidade=null){
+    const qtd = quantidade ?? (state.montar[modelo] ?? 0);
+    const cap = (state.capacidade[modelo]?.capacidade) ?? 0;
+    if (qtd <= 0){ toast(`Defina a quantidade de ${modelo} para montar.`); return; }
+    if (qtd > cap){ toast(`Quantidade excede capacidade de ${modelo}.`); return; }
+
+    try{
+      const resp = await fetch(endpoints.montar, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ modelo, quantidade: qtd })
+      }).then(r=>r.json());
+
+      if (resp.ok){
+        toast(`${qtd} ${modelo} montada(s) com sucesso.`);
+        state.montar[modelo] = 0;
+        const inp = document.getElementById(`qty-${modelo}`);
+        if (inp) inp.value = 0;
+        validateInline(modelo);
+
+        await loadMontadas();
+        await loadCapacidadeEOtimizacao();
+        renderCards();
+        renderOtimizacao();
+      } else {
+        const msg = (resp.erros||[]).map(e=> `${e.motivo}`).join(" | ");
+        toast(`Não foi possível montar: ${msg || 'verifique os dados'}`);
+      }
+    } catch(e){
+      console.error(e);
+      toast("Erro ao montar.");
+    }
+  }
+
+  async function validarGeral(){
+    const r = await fetch(endpoints.validar,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(state.montar)
+    }).then(r=>r.json());
+    if (!r.ok){
+      const msg = (r.erros||[]).map(e=> `${e.modelo}: ${e.motivo}`).join(" | ");
+      toast(`Ajustes necessários: ${msg}`);
+      throw new Error("validação falhou");
+    }
+  }
+
+  // -------------------- Loaders --------------------
+  async function loadCapacidadeEOtimizacao(){
+    const [cap, otz] = await Promise.all([
+      fetch(endpoints.capacidade).then(r=>r.json()),
+      fetch(endpoints.otimizacao).then(r=>r.json())
+    ]);
+    state.capacidade = cap.modelos || {};
+    state.otimizacao = otz || {};
+    // usa ideais como ponto de partida (sem sobrescrever quem já digitou)
+    state.modelos.forEach(m=>{
+      if (state.montar[m] == null || state.montar[m] === 0){
+        state.montar[m] = state.otimizacao?.ideal?.[m] ?? 0;
+      }
+    });
+  }
+
+  async function loadMontadas(){
+    try{
+      const dados = await fetch(endpoints.montadas).then(r=>r.json());
+      state.montadas = Array.isArray(dados) ? dados : [];
+      renderMontadas();
+      bindPrintButtons(); // reatach handlers
+    } catch {
+      // silencia se endpoint ainda não existir
+    }
+  }
+
+  // -------------------- Print buttons binding --------------------
+  function bindPrintButtons(){
+    qsa(".print-btn", elLogBody).forEach(btn=>{
+      btn.addEventListener("click", onPrintButtonClick);
+    });
+  }
+
+  function onPrintButtonClick(ev){
+    const b = ev.currentTarget;
+    const action = b.getAttribute("data-action"); // 'print' ou 'reprint'
+    const item = {
+      id: b.getAttribute("data-id"),
+      assembly_id: b.getAttribute("data-id"),
+      modelo: b.getAttribute("data-modelo"),
+      serie:  b.getAttribute("data-serie"),
+      data_hora: b.getAttribute("data-dt"),
+      usuario: 'Operador'
+    };
+    if (action === 'print'){
+      state.currentPrint = item;
+      // carrega preview (PDF se disponível; o backend decide pelo ?format=pdf)
+      const url = buildPreviewURL(item, 'pdf');
+      document.getElementById("preview-frame").src = url;
+      document.getElementById("modal-title").textContent = `Imprimir etiqueta — ${item.modelo} ${item.serie}`;
+      openModal("modal-preview");
+    } else {
+      state.currentReprint = item;
+      const url = buildPreviewURL(item, 'pdf');
+      document.getElementById("reprint-frame").src = url;
+      openModal("modal-reprint");
+    }
+  }
+
+  // Modal: Fechar
+  qsa("[data-close]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const target = btn.getAttribute("data-close");
+      closeModal(target.replace('#',''));
+    });
+  });
+
+  // Confirmar primeira impressão
+  document.getElementById("btn-confirmar-print").addEventListener("click", async ()=>{
+    if (!state.currentPrint){ closeModal("modal-preview"); return; }
+    try{
+      const resp = await confirmarImpressao(state.currentPrint);
+      if (resp?.ok){
+        toast("Impressão confirmada e registrada.");
+        closeModal("modal-preview");
+        await loadMontadas(); // atualiza contadores/estados na tabela
+      } else {
+        toast("Não foi possível confirmar a impressão.");
+      }
+    } catch(e){
+      console.error(e);
+      toast("Erro ao confirmar impressão.");
+    }
+  });
+
+  // Confirmar reimpressão
+  document.getElementById("btn-confirmar-reprint").addEventListener("click", async ()=>{
+    if (!state.currentReprint){ closeModal("modal-reprint"); return; }
+    const motivo = (document.getElementById("reprint-motivo").value || "").trim();
+    if (!motivo){ toast("Informe o motivo da reimpressão."); return; }
+    try{
+      const resp = await efetivarReimpressao(state.currentReprint, motivo);
+      if (resp?.ok){
+        toast("Reimpressão registrada.");
+        closeModal("modal-reprint");
+        document.getElementById("reprint-motivo").value = "";
+        await loadMontadas();
+      } else {
+        toast("Não foi possível registrar a reimpressão.");
+      }
+    } catch(e){
+      console.error(e);
+      toast("Erro ao registrar reimpressão.");
+    }
+  });
+
+  // -------------------- Handlers fixos --------------------
+  document.getElementById("btn-reset").addEventListener("click", ()=>{
+    state.modelos.forEach(m=>{
+      state.montar[m] = 0;
+      const inp = document.getElementById(`qty-${m}`);
+      if (inp) inp.value = 0;
+      validateInline(m);
+    });
+  });
+  document.getElementById("btn-refresh-log").addEventListener("click", loadMontadas);
+
+  // -------------------- Boot --------------------
+  (async function init(){
+    await loadCapacidadeEOtimizacao();
+    renderCards();
+    renderOtimizacao();
+    await loadMontadas();
+  })();
+</script>
+{% endblock %}

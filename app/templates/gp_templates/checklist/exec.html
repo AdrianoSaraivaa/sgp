@@ -1,0 +1,127 @@
+{% extends "_base.html" %}
+{% block title %}Bancada 8 — Execução do Checklist{% endblock %}
+{% block subtitle %}Escaneie o nº de série; o checklist carrega automaticamente{% endblock %}
+
+{% block head_extra %}
+  <style>
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .top { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.8fr; gap: 10px; align-items: center; }
+    .top input, .top button { height: 44px; font-size: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
+
+    /* Responsivo p/ tablet (<= 1024px) */
+    @media (max-width: 1024px) {
+      .top { grid-template-columns: 1fr 1fr; }
+      .top input, .top button { height: 48px; font-size: 18px; }
+    }
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .statusline { margin-top: 8px; font-size: 14px; color: #555; display:flex; gap:12px; align-items:center; }
+    .status-dot { width:10px; height:10px; border-radius:999px; display:inline-block; background:#bbb; }
+    .status-dot.ok { background:#1e9e52; }
+    .status-dot.warn { background:#e6a700; }
+    .status-dot.err { background:#b00020; }
+
+    .item { border: 1px solid #eee; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .item h4 { margin: 0; font-size: 18px; }
+    .meta { font-size: 13px; color:#444; display:flex; gap:12px; flex-wrap:wrap; }
+    .progress { height: 12px; background: #f1f1f1; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; width: 0%; background: #1e9e52; transition: width .25s linear; }
+    .controls { display:flex; gap:8px; flex-wrap: wrap; }
+    .controls button { border:1px solid #ccc; background:#fafafa; border-radius:10px; padding:10px 12px; cursor:pointer; font-size: 16px; }
+    .controls button.primary { background:#e60000; color:#fff; border-color:#e60000; }
+    .controls button.warn { background:#fff2f2; border-color:#f3b0b0; }
+    .pill { font-size:12px; border:1px solid #ddd; padding:2px 8px; border-radius:999px; background:#fff; }
+    .status-ok { color:#1e9e52; font-weight:600; }
+    .status-nok { color:#b00020; font-weight:600; }
+    .dim { opacity: .35; pointer-events:none; }
+
+    /* Modal simples */
+    .modal-bg { position: fixed; inset:0; background: rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:999; }
+    .modal { background:#fff; width: 520px; max-width: 95vw; border-radius: 12px; padding: 16px; }
+    .modal h3 { margin:0 0 8px; color:#e60000; }
+    .row { display:grid; grid-template-columns: 1fr; gap:8px; }
+    .row textarea, .row input, .row select { width:100%; padding:10px; border:1px solid #ccc; border-radius:10px; font-size: 16px; }
+    .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <!-- Cabeçalho de execução -->
+  <div class="card" style="margin-bottom: 12px;">
+    <div class="top">
+      <input id="serial" type="text" placeholder="Escaneie/Digite o nº de série" autofocus />
+      <input id="operador" type="text" placeholder="Operador (opcional)" />
+      <input id="modeloInfo" type="text" placeholder="Modelo" readonly />
+      <button id="btnFinalizar" class="primary" disabled>Finalizar checklist</button>
+    </div>
+    <div class="statusline">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusMsg">Aguardando serial...</span>
+      <button id="btnCarregar" style="display:none;">Carregar manualmente</button>
+    </div>
+  </div>
+
+  <!-- Lista de itens -->
+  <div id="lista" class="grid"></div>
+</div>
+
+<!-- Modal Ocorrência -->
+<div id="modalBg" class="modal-bg">
+  <div class="modal">
+    <h3>Registrar ocorrência / NCR</h3>
+    <div class="row">
+      <label>Categoria (escolha uma ou digite)</label>
+      <input id="ncrCategoria" list="ncrSugestoes" placeholder="ex.: REBARBA" />
+      <datalist id="ncrSugestoes"></datalist>
+
+      <label>Descrição</label>
+      <textarea id="ncrDescricao" rows="4" placeholder="Descreva a não conformidade"></textarea>
+      <label>Foto/Evidência (opcional)</label>
+      <input id="ncrFoto" type="file" accept="image/*" />
+    </div>
+    <div class="actions">
+      <button id="ncrCancelar">Cancelar</button>
+      <button id="ncrSalvar" class="primary">Salvar ocorrência</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de sucesso (finalização) -->
+<div id="doneBg" class="modal-bg">
+  <div class="modal">
+    <h3>Checklist finalizado</h3>
+    <div class="row">
+      <p id="doneMsg">Teste validado e armazenado com sucesso.</p>
+    </div>
+    <div class="actions">
+      <button id="doneOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/gp_checklist/exec.js') }}"></script>
+<script>
+  // Feedback visual simples de status (opcional)
+  (function(){
+    const dot = document.getElementById('statusDot');
+    const msg = document.getElementById('statusMsg');
+    const serial = document.getElementById('serial');
+
+    function setStatus(kind, text){
+      dot.classList.remove('ok','warn','err');
+      if (kind) dot.classList.add(kind);
+      msg.textContent = text || '';
+    }
+    serial.addEventListener('input', () => {
+      if (serial.value.trim()) setStatus('warn', 'Buscando checklist...');
+      else setStatus('', 'Aguardando serial...');
+    });
+    window.__setExecStatus = setStatus;
+  })();
+</script>
+{% endblock %}

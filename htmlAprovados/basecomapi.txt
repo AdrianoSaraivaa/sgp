@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Pneumark SGP{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+  <style>
+    .topline{height:3px;background:linear-gradient(90deg,#e60000,#FF7A00,#00AEEF,#28a745,#e60000);background-size:300% 100%;animation:slide 12s linear infinite}
+    @keyframes slide{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+    .appbar{background:#0f1b2a;color:#fff}
+    .appbar-inner{max-width:1200px;margin:0 auto;padding:10px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand-logo{width:40px;height:40px;border-radius:8px;object-fit:cover}
+    .brand h1{font-size:1.1rem;margin:0;line-height:1.1}
+    .brand small{opacity:.8}
+    nav.nav{display:flex;gap:12px;justify-content:center}
+    nav.nav a{color:#cfe4ff;text-decoration:none;padding:8px 12px;border-radius:999px;border:1px solid transparent}
+    nav.nav a:hover{background:#132339;border-color:#234}
+    nav.nav a.active{background:#143055;border-color:#2c5a9a;color:#fff}
+    .widgets{display:flex;gap:14px;align-items:center}
+    .widget,.motd,.userchip{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:10px;background:#0c1624;border:1px solid #1c2b45}
+    .widget .label{opacity:.8;font-size:.8rem}
+    .widget strong{font-variant-numeric:tabular-nums}
+    .motd i{opacity:.9}
+    .motd-quote{font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px}
+    .container{max-width:1200px;margin:16px auto;padding:0 16px}
+    .footer{text-align:center;color:#7c8aa5;padding:24px 0}
+    .fadeout{position:fixed;inset:0;pointer-events:none;background:#0f1b2a;opacity:0;transition:opacity .18s ease;z-index:9999}
+    .fadeout.active{opacity:1}
+    .app{opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease}
+    .app.ready{opacity:1;transform:none}
+    @media (max-width:900px){.appbar-inner{grid-template-columns:1fr;gap:10px}nav.nav{justify-content:flex-start;overflow:auto}.widgets{flex-wrap:wrap}}
+  </style>
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <div class="topline"></div>
+  <div class="fadeout" id="fadeout"></div>
+
+  <div class="app" id="app">
+    <header class="appbar" role="banner">
+      <div class="appbar-inner">
+        <div class="brand">
+          <img class="brand-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+          <div>
+            <h1>Pneumark SGP</h1>
+            <small>{% block module_name %}Módulo{% endblock %}</small>
+          </div>
+        </div>
+
+        <!-- Navegação específica de cada módulo (vazia por padrão) -->
+        <nav class="nav" role="navigation" aria-label="Navegação principal">
+          {% block module_nav %}{% endblock %}
+        </nav>
+
+        <!-- Widgets globais -->
+        <div class="widgets">
+          <div class="widget" title="Data e hora local">
+            <i class="fa-regular fa-clock"></i>
+            <div class="label">Agora</div>
+            <strong id="clock">--:--</strong>
+          </div>
+
+          <div class="widget" title="Previsão do tempo">
+            <i class="fa-solid fa-cloud-sun"></i>
+            <div class="label" id="weather-label">Local</div>
+            <strong id="weather">localizando…</strong>
+          </div>
+
+          <div class="motd" title="Mensagem do dia">
+            <i class="fa-regular fa-lightbulb"></i>
+            <span class="motd-quote" id="motd-text">Carregando frase do dia…</span>
+          </div>
+
+          <div class="userchip" aria-label="Usuário atual">
+            <i class="fa-regular fa-circle-user"></i>
+            <span>
+              {# evita erro quando current_user não existe #}
+              {{ (current_user.name if current_user.is_authenticated else 'Operador') if current_user is defined else 'Operador' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- FLASHES -->
+    <div class="flash-container container">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% if msgs %}
+          {% for cat, msg in msgs %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <main class="container" role="main">
+      {% block toolbar %}{% endblock %}
+      {% block content %}{% endblock %}
+    </main>
+
+    {% block footer %}
+      <div class="footer">© {{ now().year if now is defined else '' }} Pneumark — SGP</div>
+    {% endblock %}
+  </div>
+
+  <script>
+    // Entrada suave
+    const app = document.getElementById('app');
+    requestAnimationFrame(()=> app.classList.add('ready'));
+
+    // Saída com fade
+    const fadeout = document.getElementById('fadeout');
+    function routeTo(href){
+      if(!href) return;
+      fadeout.classList.add('active');
+      setTimeout(()=> window.location.assign(href), 180);
+    }
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest('a');
+      if(!a) return;
+      const href = a.getAttribute('href');
+      if(!href || href.startsWith('#') || a.hasAttribute('data-no-fade')) return;
+      e.preventDefault(); routeTo(href);
+    });
+
+    // Relógio
+    const clockEl = document.getElementById('clock');
+    function tickClock(){
+      const d = new Date();
+      clockEl.textContent = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    tickClock(); setInterval(tickClock, 15000);
+
+    // ===== CLIMA com nome da cidade =====
+    const weatherEl = document.getElementById('weather');
+    const wlabel = document.getElementById('weather-label');
+
+    function setWeatherText(t){ weatherEl.textContent = t; }
+
+    function fetchWeather(lat, lon, labelText){
+      // Open-Meteo: sem API key
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`;
+      fetch(url, {cache:'no-store'})
+        .then(r => r.json())
+        .then(d => {
+          const t = d?.current?.temperature_2m;
+          const code = d?.current?.weather_code;
+          const icon = (code === 0) ? "☀️" :
+                       ([1,2,3].includes(code)) ? "🌤️" :
+                       ([45,48].includes(code)) ? "🌫️" :
+                       ([51,53,55,56,57].includes(code)) ? "🌦️" :
+                       ([61,63,65,66,67,80,81,82].includes(code)) ? "🌧️" :
+                       ([71,73,75,77,85,86].includes(code)) ? "🌨️" : "⛅";
+          wlabel.textContent = labelText || "Local";
+          setWeatherText(`${Math.round(t)}°C ${icon}`);
+        })
+        .catch(()=> setWeatherText("indisponível"));
+    }
+
+    function reverseGeocode(lat, lon){
+      // Nominatim (OpenStreetMap) — sem chave; limite de taxa. Pedimos nome em PT-BR.
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=pt-BR`;
+      return fetch(url, {headers: {'User-Agent':'Pneumark-SGP'}})
+        .then(r=>r.json())
+        .then(j=>{
+          const a = j.address || {};
+          // prioriza city/town/suburb/village, depois state_district/municipality
+          return a.city || a.town || a.village || a.suburb || a.municipality || a.state_district || "Local";
+        })
+        .catch(()=> "Local");
+    }
+
+    function withCity(lat, lon){
+      reverseGeocode(lat, lon).then(cidade=>{
+        fetchWeather(lat, lon, cidade);
+      }).catch(()=>{
+        fetchWeather(lat, lon, "Local");
+      });
+    }
+
+    // Fallback: Embu-Guaçu (SP) — aproximado
+    function fallbackEmbuGuacu(){
+      const lat = -23.832; const lon = -46.813;
+      withCity(lat, lon);
+    }
+
+    if (location.protocol === 'https:' || location.hostname === 'localhost'){
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => withCity(pos.coords.latitude, pos.coords.longitude),
+          ()  => fallbackEmbuGuacu(),
+          {timeout: 4000}
+        );
+      } else {
+        fallbackEmbuGuacu();
+      }
+    } else {
+      // geolocalização exige HTTPS — usa Embu-Guaçu
+      fallbackEmbuGuacu();
+    }
+
+    // ===== FRASE MOTIVACIONAL DIÁRIA (via API do seu backend) =====
+    // Rota que criaremos abaixo: /api/frase-motivacional
+    const motdEl = document.getElementById('motd-text');
+    fetch('{{ url_for("utilidades_bp.frase_motivacional") }}', {cache:'no-store'})
+      .then(r=>r.json())
+      .then(d=>{
+        if (d && d.texto) motdEl.textContent = d.texto + (d.autor ? ` — ${d.autor}` : '');
+      })
+      .catch(()=> { motdEl.textContent = "Qualidade é fazer o simples, bem feito."; });
+  </script>
+
+  {% block scripts_extra %}{% endblock %}
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Pneumark SGP{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+
+  <style>
+    /* Barra superior com gradiente animado */
+    .topline {
+      height: 3px;
+      background: linear-gradient(90deg, #e60000, #FF7A00, #00AEEF, #28a745, #e60000);
+      background-size: 300% 100%;
+      animation: slide 12s linear infinite;
+    }
+    @keyframes slide { 0% {background-position:0% 50%} 100% {background-position:100% 50%} }
+
+    .appbar { background: #0f1b2a; color: #fff; }
+    .appbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 10px 16px;
+      display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;
+    }
+    .brand { display:flex; gap:12px; align-items:center; }
+    .brand-logo { width:40px; height:40px; border-radius:8px; object-fit:cover; }
+    .brand h1 { font-size:1.1rem; margin:0; line-height:1.1; }
+    .brand small { opacity:.8; }
+
+    nav.nav { display:flex; gap: 12px; justify-content:center; }
+    nav.nav a { color: #cfe4ff; text-decoration:none; padding:8px 12px; border-radius:999px; border:1px solid transparent; }
+    nav.nav a:hover { background:#132339; border-color:#234; }
+    nav.nav a.active { background:#143055; border-color:#2c5a9a; color:#fff; }
+
+    .widgets { display:flex; gap:14px; align-items:center; }
+    .widget { display:flex; gap:8px; align-items:center; padding:6px 10px; border-radius:10px; background:#0c1624; border:1px solid #1c2b45; }
+    .widget .label { opacity:.8; font-size:.8rem; }
+    .widget strong { font-variant-numeric: tabular-nums; }
+
+    .motd { display:flex; gap:8px; align-items:center; padding:6px 10px; border-radius:10px; background:#0c1624; border:1px solid #1c2b45; max-width:430px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .userchip { display:flex; gap:8px; align-items:center; padding:6px 10px; border-radius:10px; background:#0c1624; border:1px solid #1c2b45; }
+    .userchip span { font-weight:600; }
+
+    .container { max-width:1200px; margin: 16px auto; padding: 0 16px; }
+
+    .footer { text-align:center; color:#7c8aa5; padding:24px 0; }
+
+    /* fade in/out */
+    .fadeout { position:fixed; inset:0; pointer-events:none; background:#0f1b2a; opacity:0; transition:opacity .18s ease; z-index:9999; }
+    .fadeout.active { opacity:1; }
+    .app { opacity:0; transform: translateY(4px); transition: opacity .25s ease, transform .25s ease; }
+    .app.ready { opacity:1; transform:none; }
+
+    /* responsivo */
+    @media (max-width: 900px){
+      .appbar-inner { grid-template-columns: 1fr; gap:10px; }
+      nav.nav { justify-content:flex-start; overflow:auto; }
+      .widgets { flex-wrap:wrap; }
+    }
+  </style>
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <div class="topline"></div>
+  <div class="fadeout" id="fadeout"></div>
+
+  <div class="app" id="app">
+    <!-- ====== TOP BAR ====== -->
+    <header class="appbar" role="banner">
+      <div class="appbar-inner">
+        <div class="brand">
+          <img class="brand-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+          <div>
+            <h1>Pneumark SGP</h1>
+            <small>{% block module_name %}Módulo{% endblock %}</small>
+          </div>
+        </div>
+
+        <!-- Navegação específica do módulo (cada página pode sobrescrever). Por padrão, vazio. -->
+        <nav class="nav" role="navigation" aria-label="Navegação principal">
+          {% block module_nav %}{% endblock %}
+        </nav>
+
+        <!-- Widgets globais -->
+        <div class="widgets">
+          <div class="widget" title="Data e hora local">
+            <i class="fa-regular fa-clock"></i>
+            <div class="label">Agora</div>
+            <strong id="clock">--:--</strong>
+          </div>
+
+          <div class="widget" title="Previsão do tempo">
+            <i class="fa-solid fa-cloud-sun"></i>
+            <div class="label" id="weather-label">Clima</div>
+            <strong id="weather">localizando…</strong>
+          </div>
+
+          <div class="motd" title="Mensagem do dia">
+            <i class="fa-regular fa-lightbulb"></i>
+            <span id="motd-text">Respire fundo e capriche! 💪</span>
+          </div>
+
+          <div class="userchip" aria-label="Usuário atual">
+            <i class="fa-regular fa-circle-user"></i>
+            <span>{{ current_user.name if current_user.is_authenticated else 'Operador' }}</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ====== FLASH MESSAGES ====== -->
+    <div class="flash-container container">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% if msgs %}
+          {% for cat, msg in msgs %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- ====== CONTEÚDO ====== -->
+    <main class="container" role="main">
+      {% block toolbar %}{% endblock %}
+      {% block content %}{% endblock %}
+    </main>
+
+    {% block footer %}
+      <div class="footer">© {{  now().year if now is defined else '' }} Pneumark — SGP</div>
+    {% endblock %}
+  </div>
+
+  <script>
+    // Entrada suave
+    const app = document.getElementById('app');
+    requestAnimationFrame(()=> app.classList.add('ready'));
+
+    // Saída com fade
+    const fadeout = document.getElementById('fadeout');
+    function routeTo(href){
+      if(!href) return;
+      fadeout.classList.add('active');
+      setTimeout(()=> window.location.assign(href), 180);
+    }
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest('a');
+      if(!a) return;
+      const href = a.getAttribute('href');
+      if(!href || href.startsWith('#') || a.hasAttribute('data-no-fade')) return;
+      e.preventDefault(); routeTo(href);
+    });
+
+    // Relógio
+    const clockEl = document.getElementById('clock');
+    function tickClock(){
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      clockEl.textContent = `${hh}:${mm}`;
+    }
+    tickClock(); setInterval(tickClock, 1000 * 15);
+
+    // Mensagens motivacionais (troca a cada 30s)
+    const frases = [
+      "Qualidade é fazer o simples, bem feito.",
+      "Segurança em primeiro lugar. O resto vem melhor.",
+      "Padrão hoje, excelência amanhã.",
+      "Pequenas melhorias, grandes resultados.",
+      "Quem mede, melhora. Vamos medir e melhorar!"
+    ];
+    const motdEl = document.getElementById('motd-text');
+    let idx = Math.floor(Math.random()*frases.length);
+    motdEl.textContent = frases[idx];
+    setInterval(()=> {
+      idx = (idx + 1) % frases.length;
+      motdEl.textContent = frases[idx];
+    }, 30000);
+
+    // Clima: geolocalização -> Open-Meteo (sem API key). Fallback: São Paulo.
+    const weatherEl = document.getElementById('weather');
+    const wlabel = document.getElementById('weather-label');
+
+    function setWeatherText(t){ weatherEl.textContent = t; }
+
+    function fetchWeather(lat, lon){
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`;
+      fetch(url, {cache:'no-store'})
+        .then(r => r.json())
+        .then(d => {
+          const t = d?.current?.temperature_2m;
+          const code = d?.current?.weather_code;
+          const icon = (code === 0) ? "☀️" :
+                       ([1,2,3].includes(code)) ? "🌤️" :
+                       ([45,48].includes(code)) ? "🌫️" :
+                       ([51,53,55,56,57].includes(code)) ? "🌦️" :
+                       ([61,63,65,66,67,80,81,82].includes(code)) ? "🌧️" :
+                       ([71,73,75,77,85,86].includes(code)) ? "🌨️" : "⛅";
+          setWeatherText(`${Math.round(t)}°C ${icon}`);
+          wlabel.textContent = "Clima";
+        })
+        .catch(()=> setWeatherText("indisponível"));
+    }
+
+    function fallbackSP(){ // Centro de SP aprox.
+      wlabel.textContent = "São Paulo";
+      fetchWeather(-23.55, -46.63);
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          wlabel.textContent = "Local";
+          fetchWeather(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => fallbackSP(),
+        {timeout: 4000}
+      );
+    } else {
+      fallbackSP();
+    }
+  </script>
+
+  {% block scripts_extra %}{% endblock %}
+</body>
+</html>

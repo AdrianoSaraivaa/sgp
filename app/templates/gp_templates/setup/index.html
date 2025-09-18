@@ -1,0 +1,468 @@
+{% extends "_base.html" %}
+{% block title %}Setup de Roteiro — Produção{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* MATRIZ: coluna fixa para ESTOQUE + 4 colunas de bancadas, 2 linhas */
+  #roteiroMatrix{
+    display:grid;
+    grid-template-columns: 200px repeat(4, minmax(230px, 1fr));
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas:
+      "estoque b8 b7 b6 b5"
+      "estoque b1 b2 b3 b4";
+    gap:16px;
+    align-items:stretch;
+  }
+
+  .bench-card{
+    position:relative;
+    display:grid;
+    grid-template-rows: auto 1fr auto;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:12px;
+    min-height: 230px;
+    box-shadow: var(--shadow-sm);
+    transition:.2s var(--easing);
+    cursor:pointer;
+  }
+  .bench-card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md); }
+  .bench-card.is-active{ background:#e9f7ef; border-color:#bfe6cd; }
+  .bench-card.is-required{ outline:2px dashed #bfe6cd; outline-offset:2px; }
+
+  .bench-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .bench-title{ font-weight:800; color:#0e1a2b; font-size:15px; }
+  .bench-top-actions{ display:flex; align-items:center; gap:10px; }
+  .bench-top-actions .toggle{ display:flex; align-items:center; gap:6px; font-size:13px; color:#324255; user-select:none; }
+  .chip{ background:#e6fff0; color:#0b6b3a; border:1px solid #bfe6cd; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+
+  .bench-image{ display:flex; align-items:center; justify-content:center; padding:6px; }
+  .bench-image img{ max-width:100%; max-height:130px; object-fit:contain; }
+
+  .bench-footer{ display:flex; align-items:center; justify-content:flex-end; margin-top:10px; }
+  .btn.sm{ padding:6px 10px; font-size:13px; border-radius:10px; }
+  .btn.outline{ background:#fff; border:1px solid var(--border); }
+
+  .ga-estoque{ grid-area: estoque; }
+  .ga-b1{ grid-area: b1; } .ga-b2{ grid-area: b2; } .ga-b3{ grid-area: b3; } .ga-b4{ grid-area: b4; }
+  .ga-b5{ grid-area: b5; } .ga-b6{ grid-area: b6; } .ga-b7{ grid-area: b7; } .ga-b8{ grid-area: b8; }
+
+  .toolbar-line{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .toolbar-line .left{ display:flex; align-items:center; gap:8px; }
+  .toolbar-line select{ padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:#fff; }
+  .toolbar-line .actions{ display:flex; gap:8px; align-items:center; }
+  .muted{ color:#697a8d; font-size:13px; }
+
+  dialog.modal{ border:none; border-radius:16px; width:min(820px, 92vw); padding:0; box-shadow: var(--shadow-lg); }
+  .modal header{ padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .modal main{ padding:16px; }
+  .modal footer{ padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+  .form-row{ display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:12px; }
+  .form-row.two{ grid-template-columns: repeat(2, 1fr); }
+  .form-row.full{ grid-template-columns: 1fr; }
+  .field label{ display:block; font-size:13px; color:#324255; margin-bottom:6px; }
+  .field input[type="number"], .field input[type="text"], .field textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#fff;
+  }
+  .attach{ display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; background:#fafafa; }
+  .attach input[type="file"]{ max-width:100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar-line">
+  <div class="left">
+    <label for="selectModelo" class="sr-only">Modelo</label>
+    <select id="selectModelo" aria-label="Modelo">
+      <option value="PM2100">PM2100</option>
+      <option value="PM2200">PM2200</option>
+      <option value="PM700">PM700</option>
+      <option value="PM25">PM25</option>
+    </select>
+    <span class="muted">Matriz do roteiro conforme a sequência física das bancadas.</span>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="btnSalvar" type="button">
+      <i class="fa fa-save"></i> Salvar roteiro
+    </button>
+  </div>
+</div>
+
+<section id="roteiroMatrix" aria-label="Roteiro de Produção (matriz)">
+  <!-- ESTOQUE / SEPARAR PEÇAS -->
+  <article class="bench-card is-active ga-estoque" data-bench="sep">
+    <div class="bench-header">
+      <div class="bench-title">Separar Peças</div>
+      <span class="chip">Ativo</span>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/ALMOXARIFADO.png') }}" alt="Separar Peças">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+    </div>
+  </article>
+
+  <!-- Bancada 8 (Obrigatória) -->
+  <article class="bench-card ga-b8 is-active is-required" data-bench="b8">
+    <div class="bench-header">
+      <div class="bench-title">Bancada 8 — Checklist</div>
+      <span class="chip">Obrigatória</span>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/checklistImagem.png') }}" alt="Bancada 8 — Checklist">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+    </div>
+  </article>
+
+  <!-- Bancada 7 -->
+  <article class="bench-card ga-b7" data-bench="b7">
+    <div class="bench-header">
+      <div class="bench-title">Bancada 7</div>
+      <div class="bench-top-actions">
+        <label class="toggle">
+          <input type="checkbox" class="bench-toggle" data-bench-id="b7"> Habilitar
+        </label>
+      </div>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/BANCADA.png') }}" alt="Bancada 7">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+    </div>
+  </article>
+
+  <!-- Bancada 6 -->
+  <article class="bench-card ga-b6" data-bench="b6">
+    <div class="bench-header">
+      <div class="bench-title">Bancada 6</div>
+      <div class="bench-top-actions">
+        <label class="toggle">
+          <input type="checkbox" class="bench-toggle" data-bench-id="b6"> Habilitar
+        </label>
+      </div>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/BANCADA.png') }}" alt="Bancada 6">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+    </div>
+  </article>
+
+  <!-- Bancada 5 (Obrigatória) -->
+  <article class="bench-card ga-b5 is-active is-required" data-bench="b5">
+    <div class="bench-header">
+      <div class="bench-title">Bancada 5 — Hi-Pot</div>
+      <span class="chip">Obrigatória</span>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/Hipot.png') }}" alt="Bancada 5 — Hi-Pot">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+      <a class="btn sm" href="/producao/gp/hipot/exec-manual">Executar Hi-Pot (manual)</a>
+    </div>
+  </article>
+
+  <!-- Bancadas 1 a 4 -->
+  {% for n in [1,2,3,4] %}
+  <article class="bench-card ga-b{{n}}" data-bench="b{{n}}">
+    <div class="bench-header">
+      <div class="bench-title">Bancada {{n}}</div>
+      <div class="bench-top-actions">
+        <label class="toggle">
+          <input type="checkbox" class="bench-toggle" data-bench-id="b{{n}}"> Habilitar
+        </label>
+      </div>
+    </div>
+    <div class="bench-image">
+      <img src="{{ url_for('static', filename='img/BANCADA.png') }}" alt="Bancada {{n}}">
+    </div>
+    <div class="bench-footer">
+      <button class="btn outline sm" type="button" data-open-modal>Detalhes</button>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+<!-- Mensagens -->
+<div id="msg" class="muted" style="margin-top:8px;"></div>
+
+<!-- MODAL -->
+<dialog class="modal" id="benchModal">
+  <header>
+    <h3 id="modalTitle">Detalhes da bancada</h3>
+    <button class="btn ghost" type="button" data-close-modal aria-label="Fechar">
+      <i class="fa fa-times"></i>
+    </button>
+  </header>
+  <main>
+    <form id="benchForm">
+      <div class="form-row">
+        <div class="field">
+          <label for="tempoMin">Tempo mínimo (s)</label>
+          <input type="number" id="tempoMin" name="tempo_min" min="0" step="1" placeholder="ex.: 90">
+        </div>
+        <div class="field">
+          <label for="tempoEsperado">Tempo esperado (s)</label>
+          <input type="number" id="tempoEsperado" name="tempo_esperado" min="0" step="1" placeholder="ex.: 120">
+        </div>
+        <div class="field">
+          <label for="tempoMax">Tempo máximo (s)</label>
+          <input type="number" id="tempoMax" name="tempo_max" min="0" step="1" placeholder="ex.: 180">
+        </div>
+      </div>
+
+      <div class="form-row two">
+        <div class="field">
+          <label for="operador">Nome do operador (padrão)</label>
+          <input type="text" id="operador" name="operador" placeholder="Ex.: João Silva">
+        </div>
+        <div class="field">
+          <label for="responsavel">Responsável/Supervisor (opcional)</label>
+          <input type="text" id="responsavel" name="responsavel" placeholder="Nome ou função">
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div class="field">
+          <label for="observacoes">Observações / instruções curtas</label>
+          <textarea id="observacoes" name="observacoes" rows="4" placeholder="Notas rápidas sobre esta bancada"></textarea>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div class="field">
+          <label>Anexos (POP, desenho, etc.)</label>
+          <div class="attach">
+            <i class="fa fa-paperclip"></i>
+            <input id="anexos" type="file" multiple>
+            <span class="muted">Solte arquivos aqui ou clique para anexar</span>
+          </div>
+        </div>
+      </div>
+    </form>
+  </main>
+  <footer>
+    <button class="btn" type="button" data-close-modal>Cancelar</button>
+    <button class="btn primary" type="button" id="btnSalvarDetalhes">Salvar detalhes</button>
+  </footer>
+</dialog>
+{% endblock %}
+
+{% block scripts_extra %}
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  console.debug('[setup-roteiro] scripts ativos');
+
+  // ========= ESTADO =========
+  const state = {
+    modelo: 'PM2100',
+    benches: {
+      sep: { ativo:true,  obrigatorio:true,  tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b1:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b2:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b3:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b4:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b5:  { ativo:true,  obrigatorio:true,  tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] }, // Hi-Pot
+      b6:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b7:  { ativo:false, obrigatorio:false, tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] },
+      b8:  { ativo:true,  obrigatorio:true,  tempo_min:null, tempo_esperado:null, tempo_max:null, operador:'', responsavel:'', observacoes:'', anexos:[] }  // Checklist
+    }
+  };
+
+  // ========= REFS =========
+  const matrix       = document.getElementById('roteiroMatrix');
+  const selectModelo = document.getElementById('selectModelo');
+  const modal        = document.getElementById('benchModal');
+  const modalTitle   = document.getElementById('modalTitle');
+
+  // Form modal
+  const tempoMin       = document.getElementById('tempoMin');
+  const tempoEsperado  = document.getElementById('tempoEsperado');
+  const tempoMax       = document.getElementById('tempoMax');
+  const operador       = document.getElementById('operador');
+  const responsavel    = document.getElementById('responsavel');
+  const observacoes    = document.getElementById('observacoes');
+  const anexosInput    = document.getElementById('anexos');
+
+  const msg     = document.getElementById('msg');
+  let currentBench = null; // 'sep', 'b1'...'b8'
+
+  // ========= FUNÇÕES =========
+  function setCardActive(benchId, active){
+    const card = matrix.querySelector(`.bench-card[data-bench="${benchId}"]`);
+    if (!card) return;
+    card.classList.toggle('is-active', !!active);
+    const cb = card.querySelector('.bench-toggle');
+    if (cb) cb.checked = !!active;
+  }
+
+  function serialize(){
+    const out = {
+      modelo: state.modelo,
+      benches: Object.fromEntries(
+        Object.entries(state.benches).map(([k, v]) => [k, {
+          ativo: v.ativo,
+          obrigatorio: v.obrigatorio,
+          tempo_min: v.tempo_min,
+          tempo_esperado: v.tempo_esperado,
+          tempo_max: v.tempo_max,
+          operador: v.operador,
+          responsavel: v.responsavel,
+          observacoes: v.observacoes,
+          anexos: (v.anexos || []).map(a => ({ name:a.name, size:a.size, type:a.type }))
+        }])
+      )
+    };
+    return out;
+  }
+
+  function openModal(benchId){
+    currentBench = benchId;
+    const card = matrix.querySelector(`.bench-card[data-bench="${benchId}"]`);
+    const st   = state.benches[benchId];
+
+    modalTitle.textContent =
+      card.querySelector('.bench-title')?.textContent?.trim() || 'Detalhes da bancada';
+
+    tempoMin.value       = st.tempo_min ?? '';
+    tempoEsperado.value  = st.tempo_esperado ?? '';
+    tempoMax.value       = st.tempo_max ?? '';
+    operador.value       = st.operador ?? '';
+    responsavel.value    = st.responsavel ?? '';
+    observacoes.value    = st.observacoes ?? '';
+    anexosInput.value    = '';
+
+    if (typeof modal.showModal === 'function') modal.showModal();
+    else modal.setAttribute('open','');
+  }
+
+  // >>> Carregar do backend ao abrir/trocar modelo <<<
+  async function loadModelo(modelo) {
+    try {
+      const r = await fetch(`/producao/gp/setup/load?modelo=${encodeURIComponent(modelo)}`, {cache: 'no-store'});
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      if (!data.ok) throw new Error();
+
+      state.modelo = data.modelo;
+
+      // aplica dados recebidos ao estado
+      for (const k of Object.keys(state.benches)) {
+        if (data.benches[k]) {
+          state.benches[k] = { ...state.benches[k], ...data.benches[k] };
+        }
+      }
+
+      // atualiza visual dos cards
+      Object.keys(state.benches).forEach(k => setCardActive(k, state.benches[k].ativo));
+      msg.textContent = `Configuração carregada para ${state.modelo}.`;
+    } catch {
+      msg.textContent = `Não foi possível carregar a configuração de ${modelo}.`;
+    }
+  }
+
+  // ===== Inicialização =====
+  Object.keys(state.benches).forEach(k => setCardActive(k, state.benches[k].ativo));
+  // carrega o modelo inicial do select
+  loadModelo(selectModelo.value);
+
+  // ===== Eventos =====
+  // Troca de modelo => carrega do backend
+  selectModelo.addEventListener('change', () => {
+    loadModelo(selectModelo.value);
+  });
+
+  // Fechar modal
+  document.querySelectorAll('[data-close-modal]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.close?.();
+      modal.removeAttribute('open');
+    });
+  });
+
+  // Salvar detalhes do modal
+  document.getElementById('btnSalvarDetalhes').addEventListener('click', () => {
+    if (!currentBench) return;
+    const st = state.benches[currentBench];
+    st.tempo_min       = tempoMin.value ? Number(tempoMin.value) : null;
+    st.tempo_esperado  = tempoEsperado.value ? Number(tempoEsperado.value) : null;
+    st.tempo_max       = tempoMax.value ? Number(tempoMax.value) : null;
+    st.operador        = (operador.value || '').trim();
+    st.responsavel     = (responsavel.value || '').trim();
+    st.observacoes     = (observacoes.value || '').trim();
+    st.anexos          = Array.from(anexosInput.files || []);
+
+    const benchTitulo = matrix.querySelector(`.bench-card[data-bench="${currentBench}"] .bench-title`)?.textContent?.trim() || currentBench.toUpperCase();
+    msg.textContent = `Operação salva: ${benchTitulo} para o Modelo ${state.modelo}.`;
+
+    modal.close?.();
+    modal.removeAttribute('open');
+  });
+
+  // Delegação de cliques na matriz
+  matrix.addEventListener('click', (e) => {
+    const card = e.target.closest('.bench-card');
+    if (!card) return;
+    const benchId = card.dataset.bench;
+
+    // 1) Toggle Habilitar
+    if (e.target.classList.contains('bench-toggle')) {
+      if (!benchId) return;
+      if (state.benches[benchId]?.obrigatorio) { e.target.checked = true; return; }
+      state.benches[benchId].ativo = !!e.target.checked;
+      setCardActive(benchId, state.benches[benchId].ativo);
+      return;
+    }
+
+    // 2) Botão "Detalhes"
+    if (e.target.matches('[data-open-modal], [data-open-modal] *')) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Tratamentos especiais
+      if (benchId === 'b8') {
+        window.location.href = "/producao/gp/checklist/builder?modelo=" + encodeURIComponent(state.modelo);
+        return;
+      }
+      // if (benchId === 'b5') {
+      //   window.location.href = "/producao/gp/hipot/perfil?modelo=" + encodeURIComponent(state.modelo);
+      //   return;
+      // }
+
+      openModal(benchId);
+      return;
+    }
+
+    // 3) Clique no card (fora do botão) — abre modal normal, exceto b8
+    if (benchId === 'b8') {
+      window.location.href = "/producao/gp/checklist/builder?modelo=" + encodeURIComponent(state.modelo);
+      return;
+    }
+    openModal(benchId);
+  });
+
+  // Salvar (POST para o backend)
+  document.getElementById('btnSalvar').addEventListener('click', () => {
+    const data = serialize();
+    fetch("/producao/gp/setup/save", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(data)
+    })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(() => { msg.textContent = `Roteiro do modelo ${state.modelo} salvo com sucesso.`; })
+    .catch(() => { msg.textContent = "Falha ao salvar o roteiro."; });
+  });
+});
+</script>
+
+{% endblock %}

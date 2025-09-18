@@ -1,0 +1,146 @@
+{% extends "_base.html" %}
+{% block title %}Módulos — Pneumark SGP{% endblock %}
+{% block subtitle %}Módulos do Sistema{% endblock %}
+
+{% block head_extra %}
+  <!-- Prefetch das rotas mais usadas -->
+  <link rel="prefetch" href="{{ url_for('estoque_bp.tela_estoque') }}">
+  <link rel="prefetch" href="/producao">
+  <link rel="prefetch" href="/qualidade">
+  <link rel="prefetch" href="/compras">
+  <link rel="prefetch" href="/assistencia">
+  <link rel="prefetch" href="/projetos">
+{% endblock %}
+
+{% block content %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="/">Home</a> &nbsp;/&nbsp; <strong>Módulos</strong>
+    </div>
+
+    <label class="searchbar" for="filtro" title="Atalho: pressione / para focar" aria-label="Buscar módulos">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="filtro" data-quicksearch type="text" placeholder="Filtrar módulos (ex.: estoque, produção...)" autocomplete="off"/>
+    </label>
+  </div>
+
+  <section class="grid" id="cardsGrid">
+    <!-- ESTOQUE -->
+    <a class="card navlink" href="{{ url_for('estoque_bp.tela_estoque') }}" data-title="estoque" data-index="1" tabindex="0" role="link">
+      <span class="kbd-hint">1</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-warehouse"></i></div>
+      <h3>Estoque</h3>
+      <p>Cadastro, listas, estruturas e movimentações.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <!-- PRODUÇÃO -->
+    <a class="card navlink" href="/producao" data-title="producao produção montagem" data-index="2" tabindex="0" role="link">
+      <span class="kbd-hint">2</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-industry"></i></div>
+      <h3>Produção</h3>
+      <p>Montagem, seriais e apontamentos.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <!-- QUALIDADE -->
+    <a class="card navlink" href="/qualidade" data-title="qualidade testes inspeção" data-index="3" tabindex="0" role="link">
+      <span class="kbd-hint">3</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-shield-heart"></i></div>
+      <h3>Qualidade</h3>
+      <p>Planos de teste e liberações.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <!-- COMPRAS -->
+    <a class="card navlink" href="/compras" data-title="compras suprimentos fornecedores" data-index="4" tabindex="0" role="link">
+      <span class="kbd-hint">4</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-cart-shopping"></i></div>
+      <h3>Compras</h3>
+      <p>Cotações e pedidos de compra.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <!-- ASSISTÊNCIA TÉCNICA -->
+    <a class="card navlink" href="/assistencia" data-title="assistencia técnica suporte rma" data-index="5" tabindex="0" role="link">
+      <span class="kbd-hint">5</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+      <h3>Assistência Técnica</h3>
+      <p>Atendimentos, RMA e histórico.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+
+    <!-- PROJETOS -->
+    <a class="card navlink" href="/projetos" data-title="projetos engenharia desenvolvimento" data-index="6" tabindex="0" role="link">
+      <span class="kbd-hint">6</span>
+      <div class="medal" aria-hidden="true"><i class="fa-solid fa-diagram-project"></i></div>
+      <h3>Projetos</h3>
+      <p>Engenharia e mudanças técnicas.</p>
+      <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Filtro rápido
+  const filtro = document.getElementById('filtro');
+  const grid = document.getElementById('cardsGrid');
+  let timer;
+  function applyFilter(){
+    const q = (filtro.value || '').toLowerCase().trim();
+    [...grid.querySelectorAll('.card')].forEach(card=>{
+      const txt = (card.getAttribute('data-title')||'') + ' ' + (card.querySelector('h3')?.innerText||'').toLowerCase();
+      card.style.display = txt.includes(q)? '':'none';
+    });
+  }
+  filtro?.addEventListener('input', ()=>{ clearTimeout(timer); timer = setTimeout(applyFilter, 80); });
+
+  // Ripple + transição suave (usa routeTo do _base.html)
+  function addRipple(target, evt){
+    const rect = target.getBoundingClientRect();
+    const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
+    const cy = evt && typeof evt.clientY === 'number' ? evt.clientY - rect.top  : rect.height/2;
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    r.style.left = (cx-10)+'px';
+    r.style.top = (cy-10)+'px';
+    r.style.width = r.style.height = '20px';
+    target.appendChild(r);
+    setTimeout(()=> r.remove(), 600);
+  }
+
+  function simulateClick(el){
+    const href = el.getAttribute('href');
+    if (!href) return;
+    addRipple(el, null);
+    routeTo(href);
+  }
+
+  grid?.querySelectorAll('.navlink').forEach(link=>{
+    link.addEventListener('click', (e)=>{
+      e.preventDefault();
+      addRipple(link, e);
+      const href = link.getAttribute('href');
+      routeTo(href);
+    });
+    link.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        simulateClick(link);
+      }
+    });
+    const idx = link.getAttribute('data-index');
+    if (idx && Number(idx) <= 9) link.title = `Abrir • atalho ${idx}`;
+  });
+
+  // Atalhos: "1–9" abrem cards visíveis
+  window.addEventListener('keydown', (e)=>{
+    if (/^[1-9]$/.test(e.key)){
+      const n = Number(e.key);
+      const visibles = [...grid.querySelectorAll('.card')].filter(el=> el.style.display !== 'none');
+      if (visibles[n-1]) simulateClick(visibles[n-1]);
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+{% block title %}HiPot • Perfil por modelo{% endblock %}
+{% block module_name %}Produção · HiPot{% endblock %}
+{% block module_nav %}
+  <a href="{{ url_for('gerenciamento_bp.setup_index') if 'gerenciamento_bp' in current_app.blueprints else '#' }}">Setup</a>
+{% endblock %}
+{% block content %}
+  <h1>HiPot — Perfil por modelo</h1>
+  <p class="muted">Tela vazia (placeholder). Aqui vamos configurar: modo de coleta, campos do relatório e padrões.</p>
+  <p>URL atual: <code>/producao/gp/hipot/perfil</code></p>
+{% endblock %}

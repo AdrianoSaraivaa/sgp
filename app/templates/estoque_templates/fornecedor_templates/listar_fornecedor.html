@@ -1,0 +1,119 @@
+{% extends "_base.html" %}
+{% set active_page = 'fornecedores' %}
+
+{% block title %}Lista de Fornecedores — Pneumark SGP{% endblock %}
+{% block module_name %}Módulo de Estoque{% endblock %}
+
+{% block head_extra %}
+  <link rel="prefetch" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}">
+  <style>
+    .table-wrap{ background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-1); overflow:auto }
+    table.listing{ width:100%; border-collapse:collapse; min-width:880px }
+    .listing th,.listing td{ padding:12px 14px; border-bottom:1px solid #eef2f7; text-align:left; font-size:14px }
+    .listing thead th{ position:sticky; top:0; background:var(--navy); color:#fff; z-index:1 }
+    .listing tbody tr:hover td{ background:#f8fbff }
+    .actions-top{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap }
+    .actions-left,.actions-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#fff; text-decoration:none; color:#0e1a2b; font-weight:800 }
+    .btn:hover{ transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:#cfd5e4 }
+    .btn i{ color:var(--brand) }
+    .btn.brand{ background:linear-gradient(180deg,#ffd9d9,#ffc7c7); border-color:#ffb3b3 }
+    .searchbar--compact{ min-width:260px }
+    .icon-actions{ display:flex; gap:10px; align-items:center }
+    .icon-actions a, .icon-actions button{ color:#263341; font-size:16px }
+    .icon-actions a:hover{ color:var(--brand) }
+    .icon-actions button{ border:none; background:none; cursor:pointer }
+    @media (max-width: 760px){
+      .listing th:nth-child(3), .listing td:nth-child(3),
+      .listing th:nth-child(4), .listing td:nth-child(4),
+      .listing th:nth-child(6), .listing td:nth-child(6) { display:none; }
+    }
+  </style>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('estoque_bp.tela_estoque') }}">Estoque</a> &nbsp;/&nbsp;
+      <strong>Fornecedores</strong>
+    </div>
+
+    <!-- Filtro instantâneo no cliente -->
+    <label class="searchbar searchbar--compact" for="q">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input id="q" type="text" placeholder="Filtrar por empresa/contato" autocomplete="off" value="{{ busca or '' }}">
+    </label>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <!-- Ações topo -->
+  <div class="actions-top">
+    <div class="actions-left">
+      <a class="btn" href="{{ url_for('estoque_bp.tela_estoque') }}"><i class="fa-solid fa-arrow-left"></i> Voltar</a>
+
+      <!-- Busca via GET (compatível com backend) -->
+      <form method="GET" action="{{ url_for('listar_fornecedor_bp.listar_fornecedor') }}" class="searchbar searchbar--compact" style="border:none; padding:0; box-shadow:none">
+        <input type="text" name="busca" placeholder="Buscar por empresa/contato" value="{{ busca or '' }}" style="border:1px solid var(--border); border-radius:12px; padding:8px 10px; width:260px">
+        <button class="btn" type="submit" style="margin-left:6px"><i class="fas fa-search"></i> Buscar</button>
+      </form>
+    </div>
+    <div class="actions-right">
+      <a class="btn brand" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}"><i class="fa-solid fa-plus"></i> Cadastrar fornecedor</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="listing" id="tabelaFornecedores">
+      <thead>
+        <tr>
+          <th>Empresa</th>
+          <th>Contato</th>
+          <th>Telefone 1</th>
+          <th>Telefone 2</th>
+          <th>Email 1</th>
+          <th>Email 2</th>
+          <th style="text-align:center">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fornecedor in fornecedores %}
+          <tr data-empresa="{{ fornecedor.nome_empresa|lower }}" data-contato="{{ fornecedor.nome_contato|lower }}">
+            <td>{{ fornecedor.nome_empresa }}</td>
+            <td>{{ fornecedor.nome_contato }}</td>
+            <td>{{ fornecedor.telefone1 or '—' }}</td>
+            <td>{{ fornecedor.telefone2 or '—' }}</td>
+            <td>{{ fornecedor.email1 or '—' }}</td>
+            <td>{{ fornecedor.email2 or '—' }}</td>
+            <td class="icon-actions" style="text-align:center">
+              <a href="{{ url_for('editar_fornecedor_bp.editar_fornecedor', id=fornecedor.id) }}" title="Editar"><i class="fa-solid fa-pen-to-square"></i></a>
+              <form action="{{ url_for('deletar_fornecedor_bp.deletar_fornecedor', id=fornecedor.id) }}" method="POST" style="display:inline">
+                {# Se usar CSRF, inclua aqui o token: {{ form.csrf_token }} #}
+                <button type="submit" title="Excluir" onclick="return confirm('Deseja excluir este fornecedor?');">
+                  <i class="fa-solid fa-trash" style="color:#e60000"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block scripts_extra %}
+  <script>
+    // Filtro rápido no cliente (campo da toolbar)
+    const inputQ = document.getElementById('q');
+    const tbody = document.querySelector('#tabelaFornecedores tbody');
+    function filtrar(){
+      const q = (inputQ?.value || '').toLowerCase().trim();
+      [...tbody.rows].forEach(r=>{
+        const hit = (r.dataset.empresa||'').includes(q) || (r.dataset.contato||'').includes(q);
+        r.style.display = hit ? '' : 'none';
+      });
+    }
+    inputQ?.addEventListener('input', ()=>{ clearTimeout(window.__flt); window.__flt=setTimeout(filtrar,80); });
+  </script>
+{% endblock %}

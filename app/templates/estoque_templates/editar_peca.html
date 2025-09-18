@@ -1,0 +1,112 @@
+{% extends "_base.html" %}
+{% set active_page = 'listar' %}
+
+{% block title %}Editar Peça — Pneumark SGP{% endblock %}
+{% block module_name %}Módulo de Estoque{% endblock %}
+
+{% block head_extra %}
+  <!-- Prefetch de rotas relacionadas -->
+  <link rel="prefetch" href="{{ url_for('listar_pecas_bp.listar_pecas') }}">
+  <link rel="prefetch" href="{{ url_for('consultar_peca_bp.consultar_peca', peca_id=peca.id) }}">
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <div class="breadcrumb" aria-label="Você está em">
+      <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+      <a href="{{ url_for('listar_pecas_bp.listar_pecas') }}">Estoque</a> &nbsp;/&nbsp;
+      <strong>Editar Peça</strong>
+    </div>
+
+    <div class="searchbar" aria-hidden="true" style="opacity:.6">
+      <i class="fa-solid fa-pen-to-square"></i>
+      <input type="text" value="Edição de: {{ peca.descricao }}" disabled>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <form method="POST" novalidate>
+      <!-- GRID 2 colunas -->
+      <div class="grid-2" style="display:grid; gap:14px 22px; grid-template-columns:repeat(2,minmax(260px,1fr))">
+        <div>
+          <label for="codigo_pneumark" style="font-weight:800; color:#334155">Código Pneumark</label>
+          <input id="codigo_pneumark" name="codigo_pneumark" type="text"
+                 value="{{ peca.codigo_pneumark }}" required
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="codigo_omie" style="font-weight:800; color:#334155">Código OMIE</label>
+          <input id="codigo_omie" name="codigo_omie" type="text"
+                 value="{{ peca.codigo_omie or '' }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div style="grid-column:1 / -1">
+          <label for="descricao" style="font-weight:800; color:#334155">Descrição</label>
+          <input id="descricao" name="descricao" type="text"
+                 value="{{ peca.descricao }}" required
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="unidade" style="font-weight:800; color:#334155">Unidade</label>
+          <input id="unidade" name="unidade" type="text"
+                 value="{{ peca.unidade or '' }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="margem" style="font-weight:800; color:#334155">Margem (%)</label>
+          <input id="margem" name="margem" type="number" step="0.01" min="0"
+                 value="{{ peca.margem if peca.margem is not none else '' }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="custo" style="font-weight:800; color:#334155">Custo (R$)</label>
+          <input id="custo" name="custo" type="number" step="0.01" min="0"
+                 value="{{ peca.custo if peca.custo is not none else '' }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="estoque_minimo" style="font-weight:800; color:#334155">Estoque Mínimo</label>
+          <input id="estoque_minimo" name="estoque_minimo" type="number" min="0"
+                 value="{{ peca.estoque_minimo if peca.estoque_minimo is not none else 0 }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="ponto_pedido" style="font-weight:800; color:#334155">Ponto de Pedido</label>
+          <input id="ponto_pedido" name="ponto_pedido" type="number" min="0"
+                 value="{{ peca.ponto_pedido if peca.ponto_pedido is not none else 0 }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="estoque_maximo" style="font-weight:800; color:#334155">Estoque Máximo</label>
+          <input id="estoque_maximo" name="estoque_maximo" type="number" min="0"
+                 value="{{ peca.estoque_maximo if peca.estoque_maximo is not none else 0 }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+
+        <div>
+          <label for="estoque_atual" style="font-weight:800; color:#334155">Estoque Atual</label>
+          <input id="estoque_atual" name="estoque_atual" type="number" min="0"
+                 value="{{ peca.estoque_atual if peca.estoque_atual is not none else 0 }}"
+                 style="width:100%; padding:10px; border:1px solid var(--border); border-radius:10px">
+        </div>
+      </div>
+
+      <!-- AÇÕES -->
+      <div class="actions-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px">
+        <button type="submit" class="btn brand"><i class="fa-solid fa-save"></i> Salvar alterações</button>
+        <a class="btn" href="{{ url_for('listar_pecas_bp.listar_pecas') }}"><i class="fa-solid fa-arrow-left"></i> Cancelar</a>
+        <a class="btn" href="{{ url_for('consultar_peca_bp.consultar_peca', peca_id=peca.id) }}"><i class="fa-solid fa-eye"></i> Ver peça</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

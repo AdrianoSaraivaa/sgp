@@ -1,0 +1,7 @@
+<form method="post" class="card" style="max-width:360px;margin:80px auto;">
+  <h2>Acesso — Gestão de Nº de Série</h2>
+  {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+  <label>PIN</label>
+  <input type="password" name="pin" required>
+  <button class="btn-primary" type="submit">Entrar</button>
+</form>
