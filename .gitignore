@@ -1,0 +1,26 @@
+# Ignorar ambientes virtuais
+venv/
+
+# Ignorar arquivos temporários
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Ignorar arquivos de log
+*.log
+
+# Ignorar arquivos temporários do sistema
+tmp/
+*.tmp
+*.swp
+*.swo
+
+# Ignorar configurações locais
+.env
+*.local
+
+# Ignorar backups do Windows
+Thumbs.db
+Desktop.ini
