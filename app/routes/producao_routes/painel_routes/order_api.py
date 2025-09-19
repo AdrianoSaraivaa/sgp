@@ -1,36 +1,62 @@
-from flask import Blueprint, request, jsonify
-from app import db
-from sqlalchemy import inspect
-from app.models.producao_models.gp_execucao import GPWorkOrder  # usa os models que já criamos
+# -*- coding: utf-8 -*-
+from datetime import datetime
+from typing import Optional
 
+from flask import Blueprint, jsonify, request
+
+from app import db
+
+# Tenta usar o caminho atual (models_sqla). Se não existir, cai no caminho antigo.
+try:
+    from app.models_sqla import GPWorkOrder  # tipo preferido/atual
+except Exception:  # pragma: no cover
+    from app.models.producao_models.gp_execucao import GPWorkOrder  # legado
+
+# -----------------------------------------------------------------------------
+# Blueprint para o app registrar rotas de ordens no Painel
+# -----------------------------------------------------------------------------
 gp_painel_order_api_bp = Blueprint(
     "gp_painel_order_api_bp",
     __name__,
-    url_prefix="/producao/gp/painel/api"
+    url_prefix="/producao/gp/painel/api/orders",
 )
 
-def _ensure_tables():
-    insp = inspect(db.engine)
-    for t in ("gp_work_order", "gp_work_stage"):
-        if not insp.has_table(t):
-            db.create_all()
-            break
+@gp_painel_order_api_bp.get("/ping")
+def ping():
+    """Healthcheck simples do serviço de ordens do Painel."""
+    return jsonify({"ok": True, "service": "order_api"})
 
-@gp_painel_order_api_bp.post("/order/create")
-def create_order():
-    _ensure_tables()
-    data = request.get_json(force=True) or {}
-    serial = (data.get("serial") or "").strip()
-    modelo = (data.get("modelo") or "DESCONHECIDO").strip()
-
+# -----------------------------------------------------------------------------
+# Serviço: garante que exista um GPWorkOrder para o serial informado.
+# Agora cria já com current_bench = 'sep' para aparecer no card ESTOQUE.
+# -----------------------------------------------------------------------------
+def ensure_gp_workorder(session: db.session, *, serial: str, modelo: str,
+                        model_code: Optional[str] = None) -> GPWorkOrder:
+    """
+    Garante que exista um GPWorkOrder para o serial informado.
+    - Se não existir, cria com status 'queued' e current_bench='sep' (entra em ESTOQUE).
+    - Se existir, apenas retorna.
+    """
+    serial = (serial or "").strip()
+    modelo = (modelo or "").strip()
     if not serial:
-        return jsonify({"ok": False, "error": "serial_requerido"}), 400
+        raise ValueError("serial vazio em ensure_gp_workorder")
 
-    # upsert simples por serial
     order = GPWorkOrder.query.filter_by(serial=serial).first()
-    if not order:
-        order = GPWorkOrder(serial=serial, modelo=modelo, current_bench="sep", status="queued")
-        db.session.add(order)
-        db.session.commit()
+    if order:
+        return order
 
-    return jsonify({"ok": True, "order_id": order.id, "current_bench": order.current_bench, "status": order.status})
+    # NOTA: hipot_status é NOT NULL no schema. Usamos string vazia como default seguro.
+    order = GPWorkOrder(
+        serial=serial,
+        modelo=modelo,
+        status="queued",
+        current_bench="sep",       # obrigatório para o board mostrar no ESTOQUE
+        hipot_flag=False,
+        hipot_status="",           # HOTFIX: evitar IntegrityError (NOT NULL)
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    session.add(order)
+    # commit fica a cargo do chamador
+    return order

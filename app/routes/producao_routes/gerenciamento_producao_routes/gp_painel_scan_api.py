@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 """
-Versão refatorada em BLOCOS (revisada).
+Versão refatorada em BLOCOS (revisada v4b).
 - Rota genérica /scan controla TODAS as bancadas (inclusive B5).
-- BLOCO 5 refeito para ser agnóstico ao schema (model_id/model_code).
-- BLOCO 8 transformado em shim: /scan-b5 -> scan_generic().
+- BLOCO 5 agnóstico ao schema (model_id/model_code).
+- BLOCO 8 é shim: /scan-b5 -> scan_generic().
 - Toggle start/finish com timer iniciando no primeiro scan.
+- FIX: GPWorkStage não aceita 'order' no construtor → usar order_id=order.id.
+- FIX v4b: resposta do FINISH monta dict e faz `_json_ok(**resp)` (evita
+  'got multiple values for keyword argument serial').
 """
 
 # ============================================================
@@ -218,7 +221,8 @@ def _get_last_b5_stage(order_id: int) -> Optional[GPWorkStage]:
     )
 
 def _open_stage(order: GPWorkOrder, bench_id: str, operador: str = "") -> GPWorkStage:
-    stage = GPWorkStage(order=order, bench_id=bench_id, operador=operador or "")
+    # FIX: construtor deve receber order_id, não 'order'
+    stage = GPWorkStage(order_id=order.id, bench_id=bench_id, operador=operador or "")
     stage.started_at = datetime.utcnow()  # IMPORTANTE para o timer
     db.session.add(stage)
     order.current_bench = bench_id
@@ -351,6 +355,7 @@ def scan_generic():
         say = ""
         did_start = False
         did_finish = False
+        bench_done = None
 
         # Toggle automático se não veio action
         if action not in ("start", "finish"):
@@ -364,14 +369,15 @@ def scan_generic():
                 order.current_bench = _next_bench_for_order(order, "sep")
                 db.session.add(order)
                 db.session.commit()
-                return _json_ok(
-                    serial=order.serial,
-                    bench_id=order.current_bench,
-                    toggled_action="noop",
-                    started=False,
-                    finished=False,
-                    say=say,
-                )
+                resp = {
+                    "serial": order.serial,
+                    "bench_id": order.current_bench,
+                    "toggled_action": "noop",
+                    "started": False,
+                    "finished": False,
+                    "say": say,
+                }
+                return _json_ok(**resp)
 
             # Reposiciona se a bancada não faz parte do Setup
             if bench not in seq:
@@ -384,6 +390,19 @@ def scan_generic():
                 order.current_bench = bench
                 say = f"Etapa já aberta na {bench}. Continue o trabalho."
             else:
+                # Fecha qualquer outra etapa aberta, se houver (consistência)
+                other_open = (
+                    GPWorkStage.query
+                    .filter(
+                        GPWorkStage.order_id == order.id,
+                        GPWorkStage.finished_at.is_(None),
+                        GPWorkStage.bench_id != bench,
+                    )
+                    .all()
+                )
+                for st in other_open:
+                    st.finished_at = datetime.utcnow()
+
                 _open_stage(order, bench, operador)  # started_at = utcnow (timer)
                 did_start = True
                 say = f"Início registrado na {bench}."
@@ -393,6 +412,7 @@ def scan_generic():
             if open_stage:
                 next_b = _finish_stage(order, open_stage)
                 did_finish = True
+                bench_done = bench
                 say = f"Etapa finalizada na {bench}. Mover para {next_b}."
             else:
                 if not order.current_bench:
@@ -402,14 +422,31 @@ def scan_generic():
         db.session.add(order)
         db.session.commit()
 
-        return _json_ok(
-            serial=order.serial,
-            bench_id=order.current_bench,
-            toggled_action=action,
-            started=did_start,
-            finished=did_finish,
-            say=say,
-        )
+        # ----- MONTA RESPOSTA (evita duplicidade de kwargs) -----
+        resp = {
+            "serial": order.serial,
+            "bench_id": order.current_bench,
+            "toggled_action": action,
+            "started": did_start,
+            "finished": did_finish,
+            "say": say,
+        }
+        if did_finish:
+            resp["bench_done"] = bench_done
+            resp["moved_to"] = order.current_bench
+            resp["modelo"] = getattr(order, "modelo", "")
+            resp["operador"] = operador
+
+            if order.current_bench == "final":
+                resp["final_message"] = {
+                    "titulo": "Montagem concluída",
+                    "mensagem": f"{getattr(order, 'modelo', '')} • {order.serial}",
+                    "modelo": getattr(order, "modelo", ""),
+                    "serial": order.serial,
+                    "operador": operador,
+                }
+
+        return _json_ok(**resp)
 
     except Exception as e:
         import traceback

@@ -6,6 +6,10 @@ from datetime import datetime
 import csv
 from io import StringIO
 from app import db  # usado em ações/rotas dev
+from app.routes.producao_routes.painel_routes.order_api import ensure_gp_workorder
+
+
+
 
 # 1) UM ÚNICO BLUEPRINT (sem template_folder relativo frágil)
 #    Usaremos render_template('nseries_template/...') nos handlers.
@@ -43,7 +47,7 @@ def series_login():
     return render_template('nseries_template/login.html')
 
 
-@series_bp.route('', methods=['GET'])
+@series_bp.route('/', methods=['GET'])
 def gerenciar_series():
     return render_template('nseries_template/gerenciar.html')
 
@@ -204,6 +208,10 @@ def dev_seed():
     )
     db.session.add(s)
     db.session.flush()
+
+    # garante a ordem de produção para este serial/modelo
+    ensure_gp_workorder(db.session, serial=str(s.numero_serie), modelo=str(s.modelo))
+
 
     ev1 = SerialEvent(serial_id=s.id, kind='mounted', payload={"obs": "seed dev"}, created_by='Seeder')
     ev2 = SerialEvent(

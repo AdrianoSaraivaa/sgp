@@ -1,4 +1,3 @@
-
 # app/routes/producao_routes/maquinas_routes/montar_maquinas.py
 from __future__ import annotations
 from datetime import datetime
@@ -26,6 +25,9 @@ from app.routes.producao_routes.maquinas_routes.consumo_service import (
     reservar_componentes_para_montagem,
     EstoqInsuficiente,
 )
+
+# importar somente uma vez, no topo
+from app.routes.producao_routes.painel_routes.order_api import ensure_gp_workorder
 
 # ============================================================
 # Logger
@@ -93,7 +95,9 @@ def api_capacidade():
         logger.info(f"[cap] módulo: {cap_srv.__file__}")
         logger.info(f"[cap] funções disponíveis: {[n for n in dir(cap_srv) if n.startswith('calcular_')]}")
         capacidades = calcular_todas_capacidades(MODELOS)
-        logger.info(f"[cap] resumo: {{ {', '.join(f'{k}: {v.get('capacidade')}' for k, v in capacidades['modelos'].items())} }}")
+        # corrigido: f-string sem aspas conflitantes
+        resumo = ", ".join([f"{k}: {v.get('capacidade')}" for k, v in capacidades["modelos"].items()])
+        logger.info("[cap] resumo: { " + resumo + " }")
         return jsonify(capacidades)
     except Exception as e:
         logger.exception("Erro ao calcular capacidade")
@@ -155,7 +159,7 @@ def api_montadas():
     return jsonify([
         {
             **m.as_dict(),
-            # Frontend expects "serie" instead of "serial"; provide both
+            # Frontend espera "serie"; manter também "serial"
             "serie": m.serial,
             "data_hora": _fmt_datetime(m.data_hora),
         }
@@ -197,7 +201,6 @@ def api_montar():
     # 2) Registros de montagem (sem commit ainda)
     criadas = []
     for s in seriais:
-        # Preenche campos obrigatórios de Montagem (status, label_printed, label_print_count, created_at, updated_at)
         m = Montagem(
             modelo=modelo,
             serial=s,
@@ -243,32 +246,31 @@ def api_montar():
         logger.exception("Erro ao salvar montagens/reserva")
         return jsonify({"ok": False, "erros": [{"modelo": modelo, "motivo": str(e)}]}), 400
 
-    # 5) Enfileirar no Painel (operação separada)
+    # 5) Garantir/Enfileirar ordens de produção (idempotente)
     warn = None
     try:
+        # Garante que a tabela exista (útil em dev/primeiro boot)
         insp = inspect(db.engine)
         if not insp.has_table("gp_work_order"):
-            logger.warning("Tabela gp_work_order não encontrada, criando...")
+            logger.warning("[painel] Tabela gp_work_order não encontrada. Criando com db.create_all()...")
             db.create_all()
 
+        logger.info(f"[painel] Garantindo ordens para {len(criadas)} seriais...")
         for m in criadas:
-            wo = GPWorkOrder.query.filter_by(serial=m.serial).first()
-            if not wo:
-                wo = GPWorkOrder(
-                    serial=m.serial,
-                    modelo=m.modelo,
-                    current_bench="sep",
-                    status="queued"
-                )
-                db.session.add(wo)
+            # cria se não existir; retorna a existente se já houver
+            order = ensure_gp_workorder(db.session, serial=str(m.serial), modelo=str(m.modelo))
+            # fallback defensivo (em teoria desnecessário)
+            if not getattr(order, "current_bench", None):
+                order.current_bench = "sep"
 
+        # Commit único no final do processo
         db.session.commit()
-        logger.info("Montagens enfileiradas no Painel com sucesso")
+        logger.info("[painel] Ordens garantidas/enfileiradas com sucesso.")
 
     except Exception as e:
         db.session.rollback()
-        warn = f"Falha ao enfileirar no Painel (SEP): {e}"
-        logger.exception("Erro ao enfileirar no Painel")
+        warn = f"Falha ao garantir/enfileirar ordens no Painel: {e}"
+        logger.exception("[painel] Erro ao garantir/enfileirar ordens no Painel")
 
     # 6) Resposta
     resp = {"ok": True, "itens": [m.as_dict() for m in criadas]}

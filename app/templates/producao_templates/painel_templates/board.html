@@ -533,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
     b2:   ({modelo}) => `Bancada 2 concluída para a ${modelo}.`,
     b3:   ({modelo}) => `Bancada 3 concluída. Continuidade autorizada.`,
     b4:   ({modelo}) => `Bancada 4 finalizada para o modelo ${modelo}.`,
-    b5:   ({modelo}) => `Ensaios elétricos da ${modelo} aprovados no Hi-Pot.`,
+    b5:   ({modelo}) => `Ensaios elétricos da ${modelo} aprovados no Rai-Pot.`,
     b6:   ({modelo}) => `Bancada 6 concluída. ${modelo} continuidade autorizada.`,
     b7:   ({modelo}) => `Bancada 7 finalizada. Preparar próxima etapa.`,
     b8:   ({modelo}) => `Checklist da ${modelo} concluído. Liberado.`,
@@ -916,10 +916,10 @@ async function checkRopAlert(){
     statusText.textContent = `Atualizado há ${diff}s`;
   }, 1000);
 
-  // Tickers
-  setInterval(repaintTimers, 1000);
+    // Tickers
+    setInterval(repaintTimers, 1000);
 
-  setInterval(loadBoard, 5000);
+    setInterval(loadBoard, 5000);
 
   /* ============================================================
      BLOCO 13 — UTILIDADES DE TESTE/DIAGNÓSTICO

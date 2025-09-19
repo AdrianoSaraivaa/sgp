@@ -14,6 +14,8 @@ from app.routes.producao_routes.maquinas_routes.consumo_service import (
 from app.services.serials import generate_serials
 from sqlalchemy import select  # precisa para as queries com with_for_update
 from app.models_sqla import EstruturaMaquina  # BOM está nessa tabela
+from app.routes.producao_routes.painel_routes.order_api import ensure_gp_workorder
+
 
 import logging
 
@@ -76,24 +78,17 @@ def criar_montagens():
         return abort(400, f"Erro ao salvar (serial pode já existir): {e}")
 
     # --- Enfileira no Painel (bancada SEP) para cada serial criado (idempotente) ---
+       # --- Garantir ordens no Painel (idempotente via ensure_gp_workorder) ---
     warn = None
     try:
         for m in criadas:
-            # Se já existir, não cria de novo (idempotente)
-            wo = GPWorkOrder.query.filter_by(serial=m.serial).first()
-            if not wo:
-                wo = GPWorkOrder(
-                    serial=m.serial,
-                    modelo=m.modelo,
-                    current_bench="sep",
-                    status="queued"
-                )
-                db.session.add(wo)
+            ensure_gp_workorder(db.session, serial=str(m.serial), modelo=str(m.modelo))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         # Não derruba a montagem; apenas reporta aviso no JSON
-        warn = f"Falha ao enfileirar no Painel (SEP): {e}"
+        warn = f"Falha ao garantir/enfileirar no Painel: {e}"
+
 
     resp = {"ok": True, "itens": [m.as_dict() for m in criadas]}
     if warn:
