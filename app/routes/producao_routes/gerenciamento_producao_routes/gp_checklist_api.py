@@ -1,268 +1,408 @@
 # app/routes/producao_routes/gerenciamento_producao_routes/gp_checklist_api.py
 from __future__ import annotations
+from datetime import datetime
+from typing import Optional, List, Dict
+
 from flask import Blueprint, request, jsonify
 from sqlalchemy import select, delete
+
 from app import db
-from app.models.producao_models.gp_models.gp_checklist import (
-    ChecklistTemplate, ChecklistItem,
-    ChecklistExec, ChecklistExecItem
+
+# Modelos ORM oficiais (corrigido para usar models_sqla)
+from app.models_sqla import (
+    GPChecklistTemplate as ChecklistTemplate,
+    GPChecklistItem as ChecklistTemplateItem,
+    GPChecklistExecution as ChecklistExec,
+    GPChecklistExecutionItem as ChecklistExecItemLog,
 )
-from datetime import datetime
+
+# Nota: ChecklistNCR não existe no models_sqla, usando estrutura simplificada
+# Para NCRs, utilizaremos o campo JSON existente em GPChecklistExecutionItem
 
 gp_checklist_api_bp = Blueprint(
     "gp_checklist_api_bp",
     __name__,
-    url_prefix="/api/gp/checklist"
+    url_prefix="/api/gp/checklist",
 )
 
-# ---- Regra simples para inferir modelo pelo serial (ajuste depois se desejar) ----
-# Regra REAL: 3º dígito do serial define o modelo.
-# Ex.: 5 (ano) 8 (mês) 1 (modelo=PM2100) 095 (sequencial)
-def inferir_modelo_por_serial(serial: str) -> str | None:
-    if not serial:
+
+# ===============================
+# Helpers
+# ===============================
+def _iso(dt: Optional[datetime]) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def _parse_iso(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
         return None
 
-    # Mantém só dígitos (caso o QR venha com prefixo/letras/traços)
-    s = "".join(ch for ch in serial.strip() if ch.isdigit())
+
+def _ok(**kw):
+    return jsonify({"ok": True, **kw}), 200
+
+
+def _err(msg: str, status: int = 400, **ctx):
+    return jsonify({"ok": False, "error": msg, **ctx}), status
+
+
+def _infer_model_by_serial(serial: str) -> Optional[str]:
+    s = "".join(ch for ch in (serial or "") if ch.isdigit())
     if len(s) < 3:
         return None
-
-    modelo_digit = s[2]  # 0-based: índice 2 = 3º dígito
-
-    MAP = {
-        "1": "PM2100",
-        "2": "PM2200",
-        "7": "PM700",
-        # adicione aqui outros mapeamentos se existirem
-    }
-    return MAP.get(modelo_digit)
+    # regra simples (ajuste conforme seu padrão de série)
+    MAP = {"1": "PM2100", "2": "PM2200", "7": "PM700"}
+    return MAP.get(s[2])
 
 
-# ===========================
+# ===============================
 # Templates (CRUD mínimo)
-# ===========================
-
+# ===============================
 @gp_checklist_api_bp.get("/templates")
-def listar_templates():
-    modelos = [row.modelo for row in db.session.scalars(select(ChecklistTemplate)).all()]
-    return jsonify({"ok": True, "modelos": modelos})
+def list_templates():
+    rows = db.session.scalars(select(ChecklistTemplate)).all()
+    modelos = sorted(
+        {
+            getattr(r, "model_code", None) or getattr(r, "modelo", None)
+            for r in rows
+            if r
+        }
+    )
+    return _ok(modelos=modelos)
+
 
 @gp_checklist_api_bp.get("/template/<modelo>")
-def obter_template(modelo: str):
+def get_template(modelo: str):
     modelo = (modelo or "").strip()
     if not modelo:
-        return jsonify({"ok": False, "error": "Modelo é obrigatório."}), 400
+        return _err("Modelo é obrigatório.", 400)
 
-    tpl = db.session.scalar(select(ChecklistTemplate).where(ChecklistTemplate.modelo == modelo))
+    # Compat: alguns schemas usam campo 'model_code', outros 'modelo'
+    tpl = db.session.scalar(
+        select(ChecklistTemplate).where(
+            (ChecklistTemplate.model_code == modelo)  # type: ignore[attr-defined]
+            | (ChecklistTemplate.modelo == modelo)  # type: ignore[attr-defined]
+        )
+    )
     if not tpl:
-        return jsonify({"ok": False, "error": "Template não encontrado para este modelo."}), 404
+        return _err("Template não encontrado para este modelo.", 404)
 
-    return jsonify({"ok": True, "data": tpl.to_dict()})
+    itens = db.session.scalars(
+        select(ChecklistTemplateItem)
+        .where(ChecklistTemplateItem.template_id == tpl.id)
+        .order_by(ChecklistTemplateItem.ordem.asc())
+    ).all()
+
+    # Serialização compatível com o Builder da Onda 2
+    data = {
+        "modelo": getattr(tpl, "model_code", None) or getattr(tpl, "modelo", None),
+        "tolerancia_inicio": getattr(tpl, "tolerancia_inicio", 0.9),
+        "permitir_pular_item": bool(getattr(tpl, "permitir_pular_item", False)),
+        "itens": [
+            {
+                "id": it.id,
+                "ordem": it.ordem,
+                "descricao": it.descricao,
+                "tempo_alvo_s": getattr(it, "tempo_alvo_s", None)
+                or getattr(it, "tempo_seg", None),
+                "min_s": getattr(it, "min_s", None),
+                "max_s": getattr(it, "max_s", None),
+                "bloqueante": bool(getattr(it, "bloqueante", False)),
+                "exige_nota_se_nao": bool(getattr(it, "exige_nota_se_nao", False)),
+                "habilitado": bool(getattr(it, "habilitado", True)),
+            }
+            for it in itens
+        ],
+    }
+    return _ok(data=data)
+
 
 @gp_checklist_api_bp.post("/template")
-def salvar_template():
-    """
-    Body JSON:
-    {
-      "modelo": "PM2100",
-      "items": [
-        {"ordem":1, "descricao":"...", "tempo_seg":30, "ncr_tags":["AJUSTE","REBARBA"]},
-        ...
-      ]
-    }
-    """
+def upsert_template():
+    # Body esperado (Builder Onda 2)
+    # {
+    #   "modelo": "PM2100",
+    #   "tolerancia_inicio": 0.9,
+    #   "permitir_pular_item": false,
+    #   "itens": [
+    #     {
+    #       "ordem": 1,
+    #       "descricao": "Ajustar ...",
+    #       "tempo_alvo_s": 120,
+    #       "min_s": 100,
+    #       "max_s": 180,
+    #       "bloqueante": true,
+    #       "exige_nota_se_nao": true,
+    #       "habilitado": true
+    #     },
+    #     ...
+    #   ]
+    # }
     data = request.get_json(silent=True) or {}
     modelo = (data.get("modelo") or "").strip()
-    items = data.get("items")
-
     if not modelo:
-        return jsonify({"ok": False, "error": "Modelo é obrigatório."}), 400
-    if not isinstance(items, list) or len(items) == 0:
-        return jsonify({"ok": False, "error": "Lista de itens é obrigatória."}), 400
-    if len(items) > 10:
-        return jsonify({"ok": False, "error": "Máximo de 10 itens."}), 400
+        return _err("Modelo é obrigatório.", 400)
 
-    itens_limpos = []
-    vistos_descricoes = set()
-    for idx, it in enumerate(items, start=1):
+    itens = data.get("itens")
+    if not isinstance(itens, list) or not itens:
+        return _err("Lista de itens é obrigatória.", 400)
+    if len(itens) > 10:
+        return _err("Máximo de 10 itens por template.", 400)
+
+    tol = data.get("tolerancia_inicio", 0.9)
+    try:
+        tol = float(tol)
+    except Exception:
+        return _err("tolerancia_inicio inválida.", 400)
+
+    permitir_pular = bool(data.get("permitir_pular_item", False))
+
+    # Validação item a item
+    ordens_vistas = set()
+    itens_ok: List[Dict] = []
+    for idx, it in enumerate(itens, start=1):
         desc = (it.get("descricao") or "").strip()
         if not desc:
-            return jsonify({"ok": False, "error": f"Item {idx}: 'descricao' é obrigatória."}), 400
-        if desc in vistos_descricoes:
-            return jsonify({"ok": False, "error": f"Item {idx}: descrições repetidas não são permitidas."}), 400
-        vistos_descricoes.add(desc)
+            return _err(f"Item {idx}: 'descricao' obrigatória.", 400)
 
+        ordem = it.get("ordem", idx)
         try:
-            tempo = int(it.get("tempo_seg"))
-            if tempo <= 0:
+            ordem = int(ordem)
+            if ordem <= 0 or ordem in ordens_vistas:
                 raise ValueError()
         except Exception:
-            return jsonify({"ok": False, "error": f"Item {idx}: 'tempo_seg' deve ser inteiro > 0."}), 400
+            return _err(f"Item {idx}: 'ordem' inválida/duplicada.", 400)
+        ordens_vistas.add(ordem)
 
-        ordem = it.get("ordem")
-        if ordem is None:
-            ordem = idx
-        else:
+        try:
+            alvo = int(it.get("tempo_alvo_s"))
+            if alvo <= 0:
+                raise ValueError()
+        except Exception:
+            return _err(f"Item {idx}: 'tempo_alvo_s' deve ser inteiro > 0.", 400)
+
+        def _int_or_none(v):
             try:
-                ordem = int(ordem)
-                if ordem <= 0:
-                    raise ValueError()
+                return int(v) if v is not None else None
             except Exception:
-                return jsonify({"ok": False, "error": f"Item {idx}: 'ordem' inválida."}), 400
+                return None
 
-        ncr_tags = it.get("ncr_tags") or []
-        if not isinstance(ncr_tags, list):
-            return jsonify({"ok": False, "error": f"Item {idx}: 'ncr_tags' deve ser lista."}), 400
-
-        itens_limpos.append({
+        item_ok = {
             "ordem": ordem,
             "descricao": desc,
-            "tempo_seg": tempo,
-            "ncr_tags": ncr_tags[:12],  # limite de bom senso
-        })
+            "tempo_alvo_s": alvo,
+            "min_s": _int_or_none(it.get("min_s")),
+            "max_s": _int_or_none(it.get("max_s")),
+            "bloqueante": bool(it.get("bloqueante", False)),
+            "exige_nota_se_nao": bool(it.get("exige_nota_se_nao", False)),
+            "habilitado": bool(it.get("habilitado", True)),
+        }
+        itens_ok.append(item_ok)
 
-    # upsert: apaga itens antigos e recria
-    tpl = db.session.scalar(select(ChecklistTemplate).where(ChecklistTemplate.modelo == modelo))
+    # UPSERT template por modelo (campo model_code ou modelo)
+    tpl = db.session.scalar(
+        select(ChecklistTemplate).where(
+            (ChecklistTemplate.model_code == modelo)  # type: ignore[attr-defined]
+            | (ChecklistTemplate.modelo == modelo)  # type: ignore[attr-defined]
+        )
+    )
+    now = datetime.utcnow()
     if not tpl:
-        tpl = ChecklistTemplate(modelo=modelo)
+        tpl = ChecklistTemplate(
+            model_code=modelo if hasattr(ChecklistTemplate, "model_code") else None,
+            modelo=modelo if hasattr(ChecklistTemplate, "modelo") else None,
+            tolerancia_inicio=(
+                tol if hasattr(ChecklistTemplate, "tolerancia_inicio") else None
+            ),
+            permitir_pular_item=(
+                permitir_pular
+                if hasattr(ChecklistTemplate, "permitir_pular_item")
+                else None
+            ),
+            created_at=now if hasattr(ChecklistTemplate, "created_at") else None,
+            updated_at=now if hasattr(ChecklistTemplate, "updated_at") else None,
+        )
         db.session.add(tpl)
-        db.session.flush()  # para ter tpl.id
+        db.session.flush()
+    else:
+        if hasattr(tpl, "tolerancia_inicio"):
+            tpl.tolerancia_inicio = tol
+        if hasattr(tpl, "permitir_pular_item"):
+            tpl.permitir_pular_item = permitir_pular
+        if hasattr(tpl, "updated_at"):
+            tpl.updated_at = now
+        db.session.add(tpl)
 
-    # remove itens antigos
-    db.session.execute(delete(ChecklistItem).where(ChecklistItem.template_id == tpl.id))
+    # Substitui os itens (delete + insert)
+    db.session.execute(
+        delete(ChecklistTemplateItem).where(ChecklistTemplateItem.template_id == tpl.id)
+    )
 
-    # cria itens novos
-    for it in sorted(itens_limpos, key=lambda x: x["ordem"]):
-        db.session.add(ChecklistItem(
-            template_id=tpl.id,
-            ordem=it["ordem"],
-            descricao=it["descricao"],
-            tempo_seg=it["tempo_seg"],
-            ncr_tags=it["ncr_tags"],
-        ))
+    for it in sorted(itens_ok, key=lambda x: x["ordem"]):
+        db.session.add(
+            ChecklistTemplateItem(
+                template_id=tpl.id,
+                ordem=it["ordem"],
+                descricao=it["descricao"],
+                tempo_alvo_s=(
+                    it["tempo_alvo_s"]
+                    if hasattr(ChecklistTemplateItem, "tempo_alvo_s")
+                    else None
+                ),
+                tempo_seg=(
+                    it["tempo_alvo_s"]
+                    if hasattr(ChecklistTemplateItem, "tempo_seg")
+                    else None
+                ),  # compat
+                min_s=it["min_s"] if hasattr(ChecklistTemplateItem, "min_s") else None,
+                max_s=it["max_s"] if hasattr(ChecklistTemplateItem, "max_s") else None,
+                bloqueante=(
+                    it["bloqueante"]
+                    if hasattr(ChecklistTemplateItem, "bloqueante")
+                    else None
+                ),
+                exige_nota_se_nao=(
+                    it["exige_nota_se_nao"]
+                    if hasattr(ChecklistTemplateItem, "exige_nota_se_nao")
+                    else None
+                ),
+                habilitado=(
+                    it["habilitado"]
+                    if hasattr(ChecklistTemplateItem, "habilitado")
+                    else True
+                ),
+            )
+        )
 
     db.session.commit()
-    return jsonify({"ok": True, "modelo": modelo})
-
-@gp_checklist_api_bp.get("/by-serial/<serial>")
-def obter_template_por_serial(serial: str):
-    modelo = inferir_modelo_por_serial(serial)
-    if not modelo:
-        return jsonify({"ok": False, "error": "Não foi possível inferir o modelo por este número de série."}), 404
-
-    tpl = db.session.scalar(select(ChecklistTemplate).where(ChecklistTemplate.modelo == modelo))
-    if not tpl:
-        return jsonify({"ok": False, "error": f"Sem template salvo para o modelo {modelo}."}), 404
-
-    return jsonify({"ok": True, "modelo": modelo, "data": tpl.to_dict()})
+    return _ok(modelo=modelo, template_id=tpl.id)
 
 
-# ===========================
-# Execuções (salvar resultado)
-# ===========================
-
+# ===============================
+# Execução (front-only consolidado)
+# ===============================
 @gp_checklist_api_bp.post("/exec")
 def salvar_execucao():
-    """
-    Body JSON esperado (gerado pela tela de execução):
-    {
-      "serial": "123...",
-      "operador": "Fulano" (opcional),
-      "modelo": "PM2100" (opcional),
-      "finished_at": "iso-datetime",
-      "items": [
-        {
-          "ordem":1, "descricao":"...", "tempo_estimado_seg":30,
-          "status": "ok" | "nok",
-          "started_at":"iso", "finished_at":"iso", "elapsed_seg": 28,
-          "ncrs":[ {"categoria":"...","descricao":"...","fotoDataUrl":"..."} ]
-        }, ...
-      ],
-      "result": "OK" | "NOK"
-    }
-    """
+    # Payload consolidado do exec.js:
+    # {
+    #   "serial": "...",
+    #   "modelo": "PM2100",
+    #   "operador": "Fulano",
+    #   "started_at": "iso",
+    #   "finished_at": "iso",
+    #   "status": "ok|fail",
+    #   "itens": [
+    #     {
+    #       "ordem":1, "descricao":"...", "tempo_alvo_s":120,
+    #       "started_at":"iso", "finished_at":"iso", "elapsed_s":118,
+    #       "resultado":"ok|nao", "nota": "se nao",
+    #       "pin_used": true, "pin_reason": "..." (se usado),
+    #       "ncrs":[ {"categoria":"...", "descricao":"...", "foto_path": null} ]
+    #     }, ...
+    #   ]
+    # }
     data = request.get_json(silent=True) or {}
     serial = (data.get("serial") or "").strip()
     if not serial:
-        return jsonify({"ok": False, "error": "Serial é obrigatório."}), 400
+        return _err("Serial é obrigatório.", 400)
 
-    operador = (data.get("operador") or None)
-    modelo = (data.get("modelo") or None)
-    finished_at = data.get("finished_at")
-    try:
-        finished_dt = datetime.fromisoformat(finished_at.replace("Z", "+00:00")) if finished_at else None
-    except Exception:
-        finished_dt = None
-
-    result = data.get("result")
-    if result not in (None, "OK", "NOK"):
-        return jsonify({"ok": False, "error": "Campo 'result' inválido."}), 400
-
-    items = data.get("items")
-    if not isinstance(items, list) or not items:
-        return jsonify({"ok": False, "error": "Lista de itens é obrigatória."}), 400
+    modelo = (data.get("modelo") or _infer_model_by_serial(serial) or "").strip()
+    operador = (data.get("operador") or "").strip() or None
+    started_at = _parse_iso(data.get("started_at")) or datetime.utcnow()
+    finished_at = _parse_iso(data.get("finished_at"))
+    status = (data.get("status") or "").lower() or None
+    if status not in (None, "ok", "fail"):
+        return _err("status inválido (use 'ok' ou 'fail').", 400)
 
     exec_ = ChecklistExec(
         serial=serial,
-        operador=operador,
-        modelo=modelo,
-        started_at=datetime.utcnow(),
-        finished_at=finished_dt,
-        result=result
+        model_code=modelo if hasattr(ChecklistExec, "model_code") else None,
+        modelo=modelo if hasattr(ChecklistExec, "modelo") else None,
+        template_id=(
+            data.get("template_id") if hasattr(ChecklistExec, "template_id") else None
+        ),
+        operador=operador if hasattr(ChecklistExec, "operador") else None,
+        started_at=started_at if hasattr(ChecklistExec, "started_at") else None,
+        finished_at=finished_at if hasattr(ChecklistExec, "finished_at") else None,
+        status=status if hasattr(ChecklistExec, "status") else None,
     )
     db.session.add(exec_)
-    db.session.flush()  # exec_.id
+    db.session.flush()
 
-    for idx, it in enumerate(items, start=1):
-        desc = (it.get("descricao") or "").strip()
-        if not desc:
-            db.session.rollback()
-            return jsonify({"ok": False, "error": f"Item {idx}: 'descricao' é obrigatória."}), 400
-        try:
-            t_est = int(it.get("tempo_estimado_seg"))
-        except Exception:
-            db.session.rollback()
-            return jsonify({"ok": False, "error": f"Item {idx}: 'tempo_estimado_seg' inválido."}), 400
-
-        status = it.get("status")
-        if status not in (None, "ok", "nok"):
-            db.session.rollback()
-            return jsonify({"ok": False, "error": f"Item {idx}: 'status' inválido."}), 400
-
-        # datas e elapsed são opcionais
-        st_at = it.get("started_at")
-        fn_at = it.get("finished_at")
-        try:
-            st_dt = datetime.fromisoformat(st_at.replace("Z", "+00:00")) if st_at else None
-        except Exception:
-            st_dt = None
-        try:
-            fn_dt = datetime.fromisoformat(fn_at.replace("Z", "+00:00")) if fn_at else None
-        except Exception:
-            fn_dt = None
-
-        elapsed = it.get("elapsed_seg")
+    itens = data.get("itens") or []
+    for idx, it in enumerate(itens, start=1):
+        ordem = int(it.get("ordem") or idx)
+        desc = (it.get("descricao") or "").strip()[:500]
+        started = _parse_iso(it.get("started_at"))
+        finished = _parse_iso(it.get("finished_at"))
+        elapsed = it.get("elapsed_s")
         try:
             elapsed = int(elapsed) if elapsed is not None else None
         except Exception:
             elapsed = None
 
-        ncrs = it.get("ncrs") or []
-        if not isinstance(ncrs, list):
-            db.session.rollback()
-            return jsonify({"ok": False, "error": f"Item {idx}: 'ncrs' deve ser lista."}), 400
+        resultado = (it.get("resultado") or "").lower() or None
+        if resultado not in (None, "ok", "nao"):
+            return _err(f"Item {idx}: resultado inválido.", 400)
 
-        db.session.add(ChecklistExecItem(
+        nota = (it.get("nota") or "").strip() or None
+        pin_used = bool(it.get("pin_used", False))
+        pin_reason = (it.get("pin_reason") or "").strip() or None
+
+        # NCRs vinculadas ao item (armazenadas no campo JSON)
+        ncrs_data = []
+        for n in it.get("ncrs") or []:
+            ncr = {
+                "categoria": (n.get("categoria") or "").strip()[:80],
+                "descricao": (n.get("descricao") or "").strip()[:1000],
+                "foto_path": n.get("foto_path"),
+                "created_at": datetime.utcnow().isoformat()
+            }
+            ncrs_data.append(ncr)
+
+        item_log = ChecklistExecItemLog(
             exec_id=exec_.id,
-            ordem=int(it.get("ordem") or idx),
+            ordem=ordem,
             descricao=desc,
-            tempo_estimado_seg=t_est,
-            status=status,
-            started_at=st_dt,
-            finished_at=fn_dt,
+            tempo_estimado_seg=it.get("tempo_alvo_s"),
+            status=resultado,
+            started_at=started,
+            finished_at=finished,
             elapsed_seg=elapsed,
-            ncrs=ncrs[:50],  # sanidade
-        ))
+            ncrs=ncrs_data if ncrs_data else None
+        )
+        db.session.add(item_log)
+
+    # Se não foi informado, inferir status final: qualquer "resultado=='nao'" -> fail
+    if status is None:
+        # Verificar se algum item teve resultado "nao"
+        any_fail = False
+        rows = db.session.scalars(
+            select(ChecklistExecItemLog.status).where(
+                ChecklistExecItemLog.exec_id == exec_.id
+            )
+        ).all()
+        any_fail = any((r or "").lower() == "nao" for r in rows)
+        status_calc = "fail" if any_fail else "ok"
+        
+        if hasattr(exec_, "result"):
+            exec_.result = status_calc
 
     db.session.commit()
-    return jsonify({"ok": True, "exec_id": exec_.id})
+    return _ok(exec_id=exec_.id)
+
+
+# ===============================
+# Atalhos úteis
+# ===============================
+@gp_checklist_api_bp.get("/template-by-serial/<serial>")
+def get_template_by_serial(serial: str):
+    modelo = _infer_model_by_serial(serial)
+    if not modelo:
+        return _err("Não foi possível inferir o modelo por este número de série.", 404)
+    # reutiliza get_template
+    return get_template(modelo)

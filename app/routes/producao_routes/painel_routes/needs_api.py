@@ -19,5 +19,6 @@ def api_needs():
         needs = list_rop_needs(db.session)
         return jsonify(needs), 200
     except Exception as e:
-        print("[NEEDS_API] ROP desativado temporariamente:", repr(e))
+        from flask import current_app
+        current_app.logger.exception(f"[NEEDS_API] ROP desativado temporariamente: {e}")
         return jsonify([]), 200

@@ -60,3 +60,45 @@ def ensure_gp_workorder(session: db.session, *, serial: str, modelo: str,
     session.add(order)
     # commit fica a cargo do chamador
     return order
+
+
+# -----------------------------------------------------------------------------
+# Nova rota: timeline completa de um serial
+# -----------------------------------------------------------------------------
+from app.models.producao_models.gp_execucao import GPWorkStage
+
+@gp_painel_order_api_bp.get("/timeline/<serial>")
+def timeline(serial):
+    """Retorna histórico completo de um serial, com etapas por bancada."""
+    order = GPWorkOrder.query.filter_by(serial=serial).first()
+    if not order:
+        return jsonify({"ok": False, "error": f"serial não encontrado: {serial}"}), 404
+
+    stages = (GPWorkStage.query
+              .filter_by(order_id=order.id)
+              .order_by(GPWorkStage.started_at.asc())
+              .all())
+
+    def _dt(x):
+        return x.isoformat() if x else None
+
+    data = []
+    for s in stages:
+        data.append({
+            "bench_id": s.bench_id,
+            "started_at": _dt(s.started_at),
+            "finished_at": _dt(s.finished_at),
+            "operador": getattr(s, "operador", None),
+            "result": getattr(s, "result", None),
+            "rework_flag": bool(getattr(s, "rework_flag", False)),
+            "workstation": getattr(s, "workstation", None),
+            "observacoes": getattr(s, "observacoes", None),
+        })
+
+    return jsonify({
+        "ok": True,
+        "serial": order.serial,
+        "modelo": order.modelo,
+        "finished_at": getattr(order, "finished_at", None) and order.finished_at.isoformat(),
+        "stages": data,
+    })

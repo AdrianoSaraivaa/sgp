@@ -1,127 +1,115 @@
 {% extends "_base.html" %}
-{% block title %}Bancada 8 — Execução do Checklist{% endblock %}
-{% block subtitle %}Escaneie o nº de série; o checklist carrega automaticamente{% endblock %}
+{% block title %}Checklist — Execução (B8){% endblock %}
+{% block subtitle %}Execução guiada por template (JSON){% endblock %}
 
 {% block head_extra %}
-  <style>
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
-    .card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
-    .top { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.8fr; gap: 10px; align-items: center; }
-    .top input, .top button { height: 44px; font-size: 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
-
-    /* Responsivo p/ tablet (<= 1024px) */
-    @media (max-width: 1024px) {
-      .top { grid-template-columns: 1fr 1fr; }
-      .top input, .top button { height: 48px; font-size: 18px; }
-    }
-    @media (max-width: 600px) {
-      .grid { grid-template-columns: 1fr; }
-    }
-
-    .statusline { margin-top: 8px; font-size: 14px; color: #555; display:flex; gap:12px; align-items:center; }
-    .status-dot { width:10px; height:10px; border-radius:999px; display:inline-block; background:#bbb; }
-    .status-dot.ok { background:#1e9e52; }
-    .status-dot.warn { background:#e6a700; }
-    .status-dot.err { background:#b00020; }
-
-    .item { border: 1px solid #eee; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .item h4 { margin: 0; font-size: 18px; }
-    .meta { font-size: 13px; color:#444; display:flex; gap:12px; flex-wrap:wrap; }
-    .progress { height: 12px; background: #f1f1f1; border-radius: 999px; overflow: hidden; }
-    .bar { height: 100%; width: 0%; background: #1e9e52; transition: width .25s linear; }
-    .controls { display:flex; gap:8px; flex-wrap: wrap; }
-    .controls button { border:1px solid #ccc; background:#fafafa; border-radius:10px; padding:10px 12px; cursor:pointer; font-size: 16px; }
-    .controls button.primary { background:#e60000; color:#fff; border-color:#e60000; }
-    .controls button.warn { background:#fff2f2; border-color:#f3b0b0; }
-    .pill { font-size:12px; border:1px solid #ddd; padding:2px 8px; border-radius:999px; background:#fff; }
-    .status-ok { color:#1e9e52; font-weight:600; }
-    .status-nok { color:#b00020; font-weight:600; }
-    .dim { opacity: .35; pointer-events:none; }
-
-    /* Modal simples */
-    .modal-bg { position: fixed; inset:0; background: rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:999; }
-    .modal { background:#fff; width: 520px; max-width: 95vw; border-radius: 12px; padding: 16px; }
-    .modal h3 { margin:0 0 8px; color:#e60000; }
-    .row { display:grid; grid-template-columns: 1fr; gap:8px; }
-    .row textarea, .row input, .row select { width:100%; padding:10px; border:1px solid #ccc; border-radius:10px; font-size: 16px; }
-    .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
-  </style>
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 12px; }
+  .card h3 { margin: 0 0 10px; color: #e60000; }
+  .meta { display:flex; gap:10px; flex-wrap: wrap; }
+  .meta > div { min-width: 180px; }
+  .controls { display:flex; gap:8px; flex-wrap: wrap; margin-top: 8px; }
+  .items { margin-top: 14px; }
+  .item { border:1px solid #eee; border-radius:8px; padding:10px; margin-bottom:10px; display:grid; grid-template-columns: 40px 1fr 120px 120px 120px 150px; gap:8px; align-items:center; }
+  .item.locked { opacity: 0.6; }
+  .item .ord { text-align:center; font-weight:600; }
+  .item .desc { font-size: 14px; }
+  .tag { display:inline-block; padding:2px 6px; border-radius: 6px; background:#f2f2f2; font-size: 12px; }
+  .ok { color: #0a7a0a; font-weight:600; }
+  .no { color: #b30000; font-weight:600; }
+  .hold { user-select:none; }
+  .timer { font-family: monospace; text-align:center; }
+  .btn { padding:6px 10px; border:1px solid #ccc; background:#fafafa; border-radius:6px; cursor:pointer; }
+  .btn.primary { background:#e60000; color:#fff; border-color:#e60000; }
+  .btn.ghost { background:transparent; }
+  .btn.small { padding:4px 8px; font-size:12px; }
+  .footer { display:flex; justify-content:flex-end; margin-top:14px; }
+  .hidden { display:none; }
+  .status-badge { padding:4px 8px; border-radius:6px; font-size:12px; }
+  .status-open { background:#fff6e6; border:1px solid #ffd699; }
+  .status-ok { background:#e6ffec; border:1px solid #b3f0c6; }
+  .status-fail { background:#ffe6e6; border:1px solid #ffb3b3; }
+  .pin-input { width: 100px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .modal .box { background: #fff; border-radius: 10px; width: 640px; max-width: 100%; padding: 16px; }
+  .modal .box h3 { margin-top: 0; }
+  .modal .row { display:flex; gap:8px; margin-bottom:8px; }
+  .modal label { min-width: 120px; display:inline-block; }
+  .modal textarea, .modal input, .modal select { width: 100%; padding:6px; border:1px solid #ccc; border-radius:6px; }
+  .modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top: 10px; }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="wrap">
-  <!-- Cabeçalho de execução -->
-  <div class="card" style="margin-bottom: 12px;">
-    <div class="top">
-      <input id="serial" type="text" placeholder="Escaneie/Digite o nº de série" autofocus />
-      <input id="operador" type="text" placeholder="Operador (opcional)" />
-      <input id="modeloInfo" type="text" placeholder="Modelo" readonly />
-      <button id="btnFinalizar" class="primary" disabled>Finalizar checklist</button>
+  <div class="card">
+    <h3>Dados de execução</h3>
+    <div class="meta">
+      <div>
+        <label><b>Serial</b></label>
+        <input id="inpSerial" placeholder="Ler ou digitar serial" />
+      </div>
+      <div>
+        <label><b>Modelo</b></label>
+        <select id="selModelo">
+          <option value="PM700">PM700</option>
+          <option value="PM2100">PM2100</option>
+          <option value="PM2200">PM2200</option>
+        </select>
+      </div>
+      <div>
+        <label><b>Operador</b></label>
+        <input id="inpOperador" placeholder="Nome do operador" />
+      </div>
+      <div>
+        <label><b>Tolerância início</b></label>
+        <input id="inpTol" type="number" value="0.9" step="0.05" min="0.5" max="1" />
+      </div>
     </div>
-    <div class="statusline">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusMsg">Aguardando serial...</span>
-      <button id="btnCarregar" style="display:none;">Carregar manualmente</button>
-    </div>
-  </div>
-
-  <!-- Lista de itens -->
-  <div id="lista" class="grid"></div>
-</div>
-
-<!-- Modal Ocorrência -->
-<div id="modalBg" class="modal-bg">
-  <div class="modal">
-    <h3>Registrar ocorrência / NCR</h3>
-    <div class="row">
-      <label>Categoria (escolha uma ou digite)</label>
-      <input id="ncrCategoria" list="ncrSugestoes" placeholder="ex.: REBARBA" />
-      <datalist id="ncrSugestoes"></datalist>
-
-      <label>Descrição</label>
-      <textarea id="ncrDescricao" rows="4" placeholder="Descreva a não conformidade"></textarea>
-      <label>Foto/Evidência (opcional)</label>
-      <input id="ncrFoto" type="file" accept="image/*" />
-    </div>
-    <div class="actions">
-      <button id="ncrCancelar">Cancelar</button>
-      <button id="ncrSalvar" class="primary">Salvar ocorrência</button>
+    <div class="controls">
+      <button class="btn" id="btnCarregar">Carregar template</button>
+      <button class="btn" id="btnPreview">Prévia</button>
     </div>
   </div>
+
+  <div class="card">
+    <h3>Execução</h3>
+    <div id="execStatus" class="status-badge status-open">Checklist aberto</div>
+    <div class="items" id="items"></div>
+    <div class="footer">
+      <button class="btn primary" id="btnFinalizar" disabled>Finalizar checklist</button>
+    </div>
+  </div>
 </div>
 
-<!-- Modal de sucesso (finalização) -->
-<div id="doneBg" class="modal-bg">
-  <div class="modal">
-    <h3>Checklist finalizado</h3>
-    <div class="row">
-      <p id="doneMsg">Teste validado e armazenado com sucesso.</p>
-    </div>
+<!-- Modal NCR -->
+<div class="modal" id="modalNcr">
+  <div class="box">
+    <h3>Registrar ocorrência (NCR)</h3>
+    <div class="row"><label>Item</label><input id="ncrItem" disabled /></div>
+    <div class="row"><label>Categoria</label><select id="ncrCategoria"><option>Falha de processo</option><option>Falha de componente</option><option>Outros</option></select></div>
+    <div class="row"><label>Descrição</label><textarea id="ncrTexto" rows="4" placeholder="Descreva a ocorrência"></textarea></div>
     <div class="actions">
-      <button id="doneOk" class="primary">OK</button>
+      <button class="btn" id="btnNcrCancelar">Cancelar</button>
+      <button class="btn primary" id="btnNcrSalvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal PIN -->
+<div class="modal" id="modalPin">
+  <div class="box">
+    <h3>PIN do Supervisor</h3>
+    <div class="row"><label>Motivo</label><input id="pinMotivo" placeholder="Ex.: liberar antes do tempo" /></div>
+    <div class="row"><label>PIN</label><input id="pinCode" class="pin-input" type="password" /></div>
+    <div class="actions">
+      <button class="btn" id="btnPinCancelar">Cancelar</button>
+      <button class="btn primary" id="btnPinConfirmar">Confirmar</button>
     </div>
   </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/gp_checklist/exec.js') }}"></script>
-<script>
-  // Feedback visual simples de status (opcional)
-  (function(){
-    const dot = document.getElementById('statusDot');
-    const msg = document.getElementById('statusMsg');
-    const serial = document.getElementById('serial');
-
-    function setStatus(kind, text){
-      dot.classList.remove('ok','warn','err');
-      if (kind) dot.classList.add(kind);
-      msg.textContent = text || '';
-    }
-    serial.addEventListener('input', () => {
-      if (serial.value.trim()) setStatus('warn', 'Buscando checklist...');
-      else setStatus('', 'Aguardando serial...');
-    });
-    window.__setExecStatus = setStatus;
-  })();
-</script>
 {% endblock %}

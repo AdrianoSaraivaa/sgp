@@ -1,4 +1,3 @@
-
 """SQLAlchemy models auto-generated from pneumark.db.
 
 This package contains SQLAlchemy model definitions for the tables in the
@@ -26,13 +25,15 @@ you may need to recreate them manually.
 
 from flask_sqlalchemy import SQLAlchemy  # type: ignore
 from app import db  # reuse the SQLAlchemy instance from the app
+from datetime import datetime
 
 # ============================
 # Estoque models
 # ============================
 
+
 class Peca(db.Model):
-    __tablename__ = 'pecas'
+    __tablename__ = "pecas"
 
     id = db.Column(db.Integer, primary_key=True)
     tipo = db.Column(db.String(20), nullable=True)
@@ -51,7 +52,7 @@ class Peca(db.Model):
 
 
 class EstruturaMaquina(db.Model):
-    __tablename__ = 'estruturas_maquina'
+    __tablename__ = "estruturas_maquina"
 
     id = db.Column(db.Integer, primary_key=True)
     codigo_maquina = db.Column(db.String(50), nullable=False)
@@ -60,7 +61,7 @@ class EstruturaMaquina(db.Model):
 
 
 class FornecedoresPorPeca(db.Model):
-    __tablename__ = 'fornecedores_por_peca'
+    __tablename__ = "fornecedores_por_peca"
 
     id = db.Column(db.Integer, primary_key=True)
     peca_id = db.Column(db.Integer, nullable=False)
@@ -70,7 +71,7 @@ class FornecedoresPorPeca(db.Model):
 
 
 class Fornecedor(db.Model):
-    __tablename__ = 'fornecedores'
+    __tablename__ = "fornecedores"
 
     id = db.Column(db.Integer, primary_key=True)
     nome_empresa = db.Column(db.String(100), nullable=False)
@@ -85,8 +86,9 @@ class Fornecedor(db.Model):
 # Produção / Montagem models
 # ============================
 
+
 class Montagem(db.Model):
-    __tablename__ = 'montagens'
+    __tablename__ = "montagens"
 
     id = db.Column(db.Integer, primary_key=True)
     modelo = db.Column(db.String(32), nullable=False)
@@ -111,7 +113,7 @@ class Montagem(db.Model):
 
 
 class LabelReprintLog(db.Model):
-    __tablename__ = 'label_reprint_logs'
+    __tablename__ = "label_reprint_logs"
 
     id = db.Column(db.Integer, primary_key=True)
     montagem_id = db.Column(db.Integer, nullable=False)
@@ -124,8 +126,9 @@ class LabelReprintLog(db.Model):
 # GP models
 # ============================
 
+
 class GPChecklistExecution(db.Model):
-    __tablename__ = 'gp_checklist_execucoes'
+    __tablename__ = "gp_checklist_execucoes"
 
     id = db.Column(db.Integer, primary_key=True)
     serial = db.Column(db.String(100), nullable=False)
@@ -137,7 +140,7 @@ class GPChecklistExecution(db.Model):
 
 
 class GPChecklistTemplate(db.Model):
-    __tablename__ = 'gp_checklist_templates'
+    __tablename__ = "gp_checklist_templates"
 
     id = db.Column(db.Integer, primary_key=True)
     modelo = db.Column(db.String(50), nullable=False)
@@ -146,7 +149,7 @@ class GPChecklistTemplate(db.Model):
 
 
 class GPChecklistExecutionItem(db.Model):
-    __tablename__ = 'gp_checklist_exec_items'
+    __tablename__ = "gp_checklist_exec_items"
 
     id = db.Column(db.Integer, primary_key=True)
     exec_id = db.Column(db.Integer, nullable=False)
@@ -161,7 +164,7 @@ class GPChecklistExecutionItem(db.Model):
 
 
 class GPChecklistItem(db.Model):
-    __tablename__ = 'gp_checklist_items'
+    __tablename__ = "gp_checklist_items"
 
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(db.Integer, nullable=False)
@@ -172,14 +175,14 @@ class GPChecklistItem(db.Model):
 
 
 class GPModel(db.Model):
-    __tablename__ = 'gp_model'
+    __tablename__ = "gp_model"
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False)
 
 
 class GPBenchConfig(db.Model):
-    __tablename__ = 'gp_bench_config'
+    __tablename__ = "gp_bench_config"
 
     id = db.Column(db.Integer, primary_key=True)
     model_id = db.Column(db.Integer, nullable=False)
@@ -195,7 +198,7 @@ class GPBenchConfig(db.Model):
 
 
 class GPWorkStage(db.Model):
-    __tablename__ = 'gp_work_stage'
+    __tablename__ = "gp_work_stage"
 
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, nullable=False)
@@ -204,10 +207,14 @@ class GPWorkStage(db.Model):
     finished_at = db.Column(db.DateTime, nullable=True)
     operador = db.Column(db.String(120), nullable=True)
     observacoes = db.Column(db.Text, nullable=True)
+    # Campos adicionados para Onda 2:
+    result = db.Column(db.String(10), nullable=True)
+    rework_flag = db.Column(db.Boolean, nullable=False, server_default="0")
+    workstation = db.Column(db.String(120), nullable=True)
 
 
 class GPROPAlert(db.Model):
-    __tablename__ = 'gp_rop_alerts'
+    __tablename__ = "gp_rop_alerts"
 
     id = db.Column(db.Integer, primary_key=True)
     peca_id = db.Column(db.Integer, nullable=False)
@@ -218,7 +225,7 @@ class GPROPAlert(db.Model):
 
 
 class GPHipotRun(db.Model):
-    __tablename__ = 'gp_hipot_run'
+    __tablename__ = "gp_hipot_run"
 
     id = db.Column(db.Integer, primary_key=True)
     serial = db.Column(db.String(64), nullable=False)
@@ -241,7 +248,7 @@ class GPHipotRun(db.Model):
 
 
 class GPWorkOrder(db.Model):
-    __tablename__ = 'gp_work_order'
+    __tablename__ = "gp_work_order"
 
     id = db.Column(db.Integer, primary_key=True)
     serial = db.Column(db.String(64), nullable=False)
@@ -253,17 +260,49 @@ class GPWorkOrder(db.Model):
     hipot_flag = db.Column(db.Boolean, nullable=False)
     hipot_status = db.Column(db.String(10), nullable=False)
     hipot_last_at = db.Column(db.DateTime, nullable=True)
+    # Campo novo para Onda 2:
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+
+class OmieRequisicao(db.Model):
+    __tablename__ = "omie_requisicoes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    peca_id = db.Column(db.Integer, nullable=False)
+    fornecedor = db.Column(db.String(100), nullable=True)
+    quantidade = db.Column(db.Integer, nullable=False)
+    cod_int = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="pendente")
+    erro_msg = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    sent_at = db.Column(db.DateTime, nullable=True)
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 __all__ = [
     # Estoque
-    'Peca', 'EstruturaMaquina', 'Fornecedor', 'FornecedoresPorPeca',
+    "Peca",
+    "EstruturaMaquina",
+    "Fornecedor",
+    "FornecedoresPorPeca",
     # Produção/Montagem
-    'Montagem', 'LabelReprintLog',
+    "Montagem",
+    "LabelReprintLog",
     # GP
-    'GPChecklistExecution', 'GPChecklistTemplate', 'GPChecklistExecutionItem',
-    'GPChecklistItem', 'GPModel', 'GPBenchConfig', 'GPWorkStage',
-    'GPROPAlert', 'GPHipotRun', 'GPWorkOrder'
+    "GPChecklistExecution",
+    "GPChecklistTemplate",
+    "GPChecklistExecutionItem",
+    "GPChecklistItem",
+    "GPModel",
+    "GPBenchConfig",
+    "GPWorkStage",
+    "GPROPAlert",
+    "GPHipotRun",
+    "GPWorkOrder",
+    # OMIE
+    "OmieRequisicao",
 ]
 
 # ------------------------------------------------------------
@@ -273,4 +312,4 @@ __all__ = [
 # pacote ``models_sqla``.  Como essa tabela não existe no banco de dados,
 # apontamos para ``GPWorkOrder`` para evitar erros de importação.
 GPWorkOrderHistory = GPWorkOrder  # type: ignore
-__all__.append('GPWorkOrderHistory')
+__all__.append("GPWorkOrderHistory")

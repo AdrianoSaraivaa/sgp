@@ -86,6 +86,9 @@ def create_app() -> Flask:
         app.logger.info("[BOOT] Rastreabilidade registrada via init_app().")
     except Exception as e:
         app.logger.warning("[BOOT] Rastreabilidade indisponível: %s", e)
+    
+    # 1.1) Trace API (nova API consolidada de rastreabilidade)
+    _try_register(app, "app.routes.producao_routes.rastreabilidade_nserie_routes.trace_api", "trace_api_bp", required=False)
 
     # 2) Home / Módulos
     _try_register(app, "app.routes.home_routes.login", "login_bp", required=False)
@@ -111,7 +114,7 @@ def create_app() -> Flask:
     _try_register(app, "app.routes.producao_routes.maquinas_routes.montar_maquinas", "maquinas_bp", required=False)
     _try_register(app, "app.routes.estoque_routes.editar_conjunto", "editar_conjunto_bp", required=False)
     _try_register(app, "app.routes.producao_routes.maquinas_routes.imprimir_etiqueta", "imprimir_etiqueta_bp", required=False)
-    _try_register(app, "app.routes.producao_routes.maquinas_routes.montagens", "montagens_bp", required=False)
+    # # _try_register(app, "app.routes.producao_routes.maquinas_routes.montagens", "montagens_bp", required=False) # Removido, arquivo obsoleto # Removido, arquivo obsoleto
     _try_register(app, "app.routes.producao_routes.maquinas_routes.series", "series_bp", required=False)
 
     # 5) Utilidades (AGORA: apenas via home_routes.utilidades_routes)
@@ -134,9 +137,9 @@ def create_app() -> Flask:
     _try_register(app, "app.routes.producao_routes.painel_routes.needs_api", "gp_needs_api_bp", required=False)
 
     # =========================
-    # OMIE (NOVA INTEGRAÇÃO) — manter comentado até consolidar
+    # OMIE (NOVA INTEGRAÇÃO) — habilitado
     # =========================
-    # _try_register(app, "app.routes.estoque_routes.OMIE_routes", "omie_bp", required=True, alias="omie_bp")
+    _try_register(app, "app.routes.estoque_routes.OMIE_routes.omie_routes", "estoque_omie_bp", required=False)
 
     # -----------------------------
     # Models (import após db.init_app, antes do migrate)

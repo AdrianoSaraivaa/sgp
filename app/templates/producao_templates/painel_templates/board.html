@@ -192,6 +192,19 @@
 /* permite exibir \n como nova linha no banner */
 .rop-banner #ropMsg { white-space: pre-line; }
 
+
+/* --- tags/metadados nos cards (Onda1) --- */
+.kitem .meta{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;font-weight:700}
+.tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid #2a3a56;background:#0b1a2c;color:#cfe3ff}
+.tag.ok{border-color:#16a34a;color:#16a34a;background:rgba(22,163,74,.08)}
+.tag.fail{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
+.tag.apr{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.08)}
+.tag.rep{border-color:#0ea5e9;color:#0ea5e9;background:rgba(14,165,233,.08)}
+.tag.rework{border-color:#e11d48;color:#e11d48;background:rgba(225,29,72,.08)}
+.tag.ws{border-color:#64748b;color:#94a3b8;background:rgba(100,116,139,.08)}
+.tag.fin{border-color:#22c55e;color:#86efac;background:rgba(34,197,94,.08)}
+.small{font-size:11px;opacity:.95}
+
 </style>
 {% endblock %}
 
@@ -579,9 +592,9 @@ function renderBoard(columns){
       if ((col.id || '') === 'sep')   el.classList.add('sep');
       if ((col.id || '') === 'final') el.classList.add('final');
 
-      // NOVO: marcar card com flag de reprovação no HiPot
+      // Hi-Pot reprovação com destaque
       if (it.hipot_flag) {
-        el.classList.add('danger-pulse'); // borda vermelha pulsante
+        el.classList.add('danger-pulse');
         el.title = (el.title || '') + " • Reprovado no Hi-Pot";
       }
 
@@ -592,16 +605,50 @@ function renderBoard(columns){
       sub.textContent = it.modelo || '';
       el.appendChild(sub);
 
+      // Estado por tempo/esperado
       if (/^b[1-8]$/.test(col.id || '') && it.since && it.expected_s){
         const elapsed = (Date.now() - Date.parse(it.since)) / 1000;
         applyStateByRatio(el, elapsed / it.expected_s);
       }
 
+      // Meta row (result, rework, workstation, finished_at)
+      const meta = h('div','meta');
+      // RESULT
+      const res = (it.result || '').toString().toUpperCase();
+      if (res) {
+        let label = res, cls = 'tag';
+        if (res === 'OK') { label = '✅ OK'; cls += ' ok'; }
+        else if (res === 'FAIL' || res === 'NG') { label = '❌ FAIL'; cls += ' fail'; }
+        else if (res === 'APR') { label = '⚠ APR'; cls += ' apr'; }
+        else if (res === 'REP') { label = '🔄 REP'; cls += ' rep'; }
+        meta.appendChild(h('span', cls, label));
+      }
+      // REWORK
+      if (it.rework_flag) {
+        meta.appendChild(h('span','tag rework','Retrabalho'));
+      }
+      // WORKSTATION
+      if (it.workstation) {
+        meta.appendChild(h('span','tag ws', `WS ${it.workstation}`));
+      }
+      // FINISHED_AT (somente na coluna final)
+      if ((col.id || '') === 'final' && it.finished_at){
+        const d = new Date(it.finished_at);
+        const txt = isNaN(d.getTime()) ? it.finished_at : d.toLocaleString();
+        meta.appendChild(h('span','tag fin', `Concluído: ${txt}`));
+      }
+      if (meta.children.length) el.appendChild(meta);
+
+      // Tooltip enriquecido
       el.title = [
         it.modelo ? `Modelo: ${it.modelo}` : null,
         it.since  ? `Desde: ${new Date(it.since).toLocaleString()}` : null,
         it.expected_s ? `Esperado: ${formatMMSS(it.expected_s)}` : null,
-        it.hipot_flag ? `⚠ Reprovado no Hi-Pot` : null
+        it.hipot_flag ? `⚠ Reprovado no Hi-Pot` : null,
+        it.workstation ? `Estação: ${it.workstation}` : null,
+        it.result ? `Resultado: ${it.result}` : null,
+        it.rework_flag ? `Retrabalho: sim` : null,
+        (col.id||'')==='final' && it.finished_at ? `Finalizado em: ${new Date(it.finished_at).toLocaleString()}` : null
       ].filter(Boolean).join(' • ');
 
       colEl.appendChild(el);
@@ -611,75 +658,42 @@ function renderBoard(columns){
   });
 }
 
-function repaintTimers(){
-  grid.querySelectorAll('.board-col').forEach(colEl => {
-    const colId = colEl.dataset.colId || '';
-    const isTimedBench = /^b[1-8]$/.test(colId);
 
-    colEl.querySelectorAll('.kitem .sub').forEach(sub => {
-      const sinceISO = sub.dataset.since;
-      const expected = Number(sub.dataset.expected || 0);
-      const modelo   = sub.dataset.modelo || '';
-      const card     = sub.parentElement;
-
-      const baseModelo = modelo;
-      if (sinceISO && expected){
-        const elapsed = (Date.now() - Date.parse(sinceISO)) / 1000;
-        sub.textContent = `${baseModelo} • ${formatMMSS(elapsed)}`;
-        if (isTimedBench && card){
-          const ratio = elapsed / expected;
-          applyStateByRatio(card, ratio);
-        }
-      } else {
-        sub.textContent = baseModelo || '';
-      }
-    });
-  });
-}
-
-
-  /* ============================================================
-   BLOCO 8 — ROP / NEEDS (banner + pulso na coluna 'sep')
+/* ============================================================
+   BLOCO 8 — REPAINT TIMERS (ATUALIZAÇÃO DO TEMPO)
 ============================================================ */
-async function checkRopAlert(){
-  try{
-    const r = await fetch('/producao/gp/needs', {cache:'no-store'});
-    if(!r.ok) throw 0;
+function repaintTimers(){
+    if (!lastData) return;
 
-    const arr = await r.json();
-    const needs = Array.isArray(arr) ? arr : [];
+    // Seleciona todos os spans que guardam a info do tempo
+    const subs = document.querySelectorAll('.kitem .sub');
 
-    const sepCol = [...document.querySelectorAll('.board-col')]
-      .find(el => (el.dataset.colId || '') === 'sep');
+    subs.forEach(sub => {
+        const since = sub.dataset.since;
+        const expected_s = sub.dataset.expected;
+        const parentCard = sub.closest('.kitem');
+        const colEl = sub.closest('.board-col');
 
-    if (needs.length && sepCol){
-      sepCol.classList.add('danger-pulse');
-      ropBanner.style.display = 'flex';
+        if (!since || !expected_s || !parentCard || !colEl) return;
+        
+        // Pega o ID da coluna (ex: 'b1', 'b2')
+        const colId = colEl.dataset.colId || '';
+        if (!/^b[1-8]$/.test(colId)) return; // Só atualiza bancadas com tempo
 
-      const nameMap = {
-        '2-000'  : 'PM 2100',
-        '28-000' : 'PM 2200',
-        'PM0025' : 'PM 25'
-      };
+        const start = Date.parse(since);
+        const expected = Number(expected_s);
+        
+        if (isNaN(start) || isNaN(expected)) return;
 
-      const lines = needs.map(n => {
-        const qty = Number(n.necessaria ?? n.qty ?? 0);
-        const pretty = nameMap[n.modelo] || n.modelo || '';
-        const qtyStr = String(qty).padStart(2,'0');
-        return `${qtyStr} ${pretty}`;
-      });
+        const elapsed_s = (Date.now() - start) / 1000;
+        const ratio = elapsed_s / expected;
 
-      // usa tabulação simulada com vários espaços não-quebráveis
-      const sep = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0'; // 4 espaços firmes
-      ropMsg.textContent = 'Precisamos produzir! ' + lines.join(sep);
-    } else {
-      sepCol?.classList.remove('danger-pulse');
-      ropBanner.style.display = 'none';
-      ropMsg.textContent = '';
-    }
-  }catch(e){
-    // silencioso
-  }
+        // Atualiza a exibição do tempo (ex: 02:35)
+        sub.textContent = `${sub.dataset.modelo} (${formatMMSS(elapsed_s)})`;
+
+        // Atualiza a cor (OK, WARN, LATE, CRITICAL)
+        applyStateByRatio(parentCard, ratio);
+    });
 }
 
 
