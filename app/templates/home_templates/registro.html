@@ -1,0 +1,34 @@
+{% extends "_base.html" %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px;">
+    <h2 style="text-align: center;">Criar Nova Conta</h2>
+    
+    {% if erro %}
+        <div style="color: red; text-align: center; margin-bottom: 15px;">{{ erro }}</div>
+    {% endif %}
+    
+    <form method="POST">
+        <div style="margin-bottom: 15px;">
+            <label>Usuário:</label>
+            <input type="text" name="usuario" class="form-control" required style="width: 100%;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label>Senha:</label>
+            <input type="password" name="senha" class="form-control" required style="width: 100%;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label>Confirmar Senha:</label>
+            <input type="password" name="confirmar_senha" class="form-control" required style="width: 100%;">
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Cadastrar</button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 15px;">
+        <a href="{{ url_for('login_bp.login') }}">Já tenho conta (Login)</a>
+    </div>
+</div>
+{% endblock %}
