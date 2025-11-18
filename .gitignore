@@ -24,3 +24,4 @@ tmp/
 # Ignorar backups do Windows
 Thumbs.db
 Desktop.ini
+tree.txt 
