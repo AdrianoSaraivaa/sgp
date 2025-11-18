@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+{% block title %}HiPot Manual{% endblock %}
+{% block module_name %}Produção · HiPot{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:480px;margin:0 auto;padding:12px;">
+  <h1>HiPot — Registro Manual</h1>
+  <p>Preencha o valor medido e indique se o teste foi aprovado ou reprovado.</p>
+  <form method="post" action="{{ url_for('gp_hipot_bp.hipot_manual_submit', serial=serial) }}" style="display:flex;flex-direction:column;gap:10px;">
+    <label for="valor">Valor medido (mA ou mΩ)</label>
+    <input type="number" step="0.1" id="valor" name="valor" placeholder="ex.: 2.5" />
+    <label for="resultado">Resultado</label>
+    <select id="resultado" name="resultado">
+      <option value="aprovado">Aprovado</option>
+      <option value="reprovado">Reprovado</option>
+    </select>
+    <button type="submit" class="btn">Salvar</button>
+  </form>
+</div>
+{% endblock %}

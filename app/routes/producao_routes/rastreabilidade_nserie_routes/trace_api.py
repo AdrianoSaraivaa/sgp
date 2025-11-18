@@ -5,203 +5,232 @@ from sqlalchemy import select, desc
 from datetime import datetime
 from app import db
 from app.models_sqla import (
-    GPWorkOrder, 
-    GPWorkStage, 
-    GPChecklistExecution, 
+    GPWorkOrder,
+    GPWorkStage,
+    GPChecklistExecution,
     GPChecklistExecutionItem,
-    GPHipotRun
+    GPHipotRun,
 )
 
-trace_api_bp = Blueprint(
-    "trace_api_bp",
-    __name__,
-    url_prefix="/producao/gp"
-)
+trace_api_bp = Blueprint("trace_api_bp", __name__, url_prefix="/producao/gp")
+
+
+def _iso(dt):
+    try:
+        return dt.isoformat() if dt else None
+    except Exception:
+        return str(dt) if dt else None
+
 
 @trace_api_bp.route("/trace/<serial>", methods=["GET"])
 def get_trace_timeline(serial):
-    """
-    Retorna uma timeline consolidada de rastreabilidade para um número de série.
-    Combina dados de WorkStages, Checklist Executions, HiPot Runs em ordem cronológica.
-    """
     try:
-        # Buscar a ordem de trabalho
         work_order = db.session.scalars(
-            select(GPWorkOrder).where(GPWorkOrder.serial == serial)
+            select(GPWorkOrder).where(GPWorkOrder.serial == str(serial))
         ).first()
-        
         if not work_order:
             return jsonify({"error": f"Número de série {serial} não encontrado"}), 404
-        
+
         timeline = []
-        
-        # 1. Work Stages (bancadas)
+
         work_stages = db.session.scalars(
             select(GPWorkStage)
-            .where(GPWorkStage.order_id == work_order.id)
-            .order_by(GPWorkStage.started_at)
+            .where(getattr(GPWorkStage, "order_id") == getattr(work_order, "id"))
+            .order_by(getattr(GPWorkStage, "started_at"))
         ).all()
-        
+
         for stage in work_stages:
-            timeline.append({
-                "timestamp": stage.started_at.isoformat() if stage.started_at else None,
-                "type": "work_stage",
-                "event": "Início de Etapa",
-                "details": {
-                    "bench_id": stage.bench_id,
-                    "operador": stage.operador,
-                    "started_at": stage.started_at.isoformat() if stage.started_at else None,
-                    "finished_at": stage.finished_at.isoformat() if stage.finished_at else None,
-                    "result": getattr(stage, 'result', None),
-                    "observacoes": stage.observacoes,
-                    "workstation": getattr(stage, 'workstation', None),
-                    "rework_flag": getattr(stage, 'rework_flag', False)
+            started_at = getattr(stage, "started_at", None)
+            finished_at = getattr(stage, "finished_at", None)
+            timeline.append(
+                {
+                    "timestamp": _iso(started_at),
+                    "type": "work_stage",
+                    "event": "Início de Etapa",
+                    "details": {
+                        "bench_id": getattr(stage, "bench_id", None),
+                        "operador": getattr(stage, "operador", None),
+                        "started_at": _iso(started_at),
+                        "finished_at": _iso(finished_at),
+                        "result": getattr(stage, "result", None),
+                        "observacoes": getattr(stage, "observacoes", None),
+                        "workstation": getattr(stage, "workstation", None),
+                        "rework_flag": getattr(stage, "rework_flag", False),
+                    },
                 }
-            })
-        
-        # 2. Checklist Executions
+            )
+
         checklist_execs = db.session.scalars(
             select(GPChecklistExecution)
-            .where(GPChecklistExecution.order_id == work_order.id)
-            .order_by(GPChecklistExecution.started_at)
+            .where(
+                getattr(GPChecklistExecution, "serial") == getattr(work_order, "serial")
+            )
+            .order_by(getattr(GPChecklistExecution, "started_at"))
         ).all()
-        
+
         for exec_item in checklist_execs:
-            # Buscar itens da execução
+            exec_id = getattr(exec_item, "id", None)
             exec_items = db.session.scalars(
                 select(GPChecklistExecutionItem)
-                .where(GPChecklistExecutionItem.exec_id == exec_item.id)
-                .order_by(GPChecklistExecutionItem.ordem)
+                .where(getattr(GPChecklistExecutionItem, "exec_id") == exec_id)
+                .order_by(getattr(GPChecklistExecutionItem, "ordem"))
             ).all()
-            
-            timeline.append({
-                "timestamp": exec_item.started_at.isoformat() if exec_item.started_at else None,
-                "type": "checklist",
-                "event": "Execução de Checklist",
-                "details": {
-                    "template_id": exec_item.template_id,
-                    "bench_id": exec_item.bench_id,
-                    "operador": exec_item.operador,
-                    "started_at": exec_item.started_at.isoformat() if exec_item.started_at else None,
-                    "finished_at": exec_item.finished_at.isoformat() if exec_item.finished_at else None,
-                    "result": getattr(exec_item, 'result', None),
-                    "total_items": len(exec_items),
-                    "items_ok": len([item for item in exec_items if getattr(item, 'status', '') == 'sim']),
-                    "items_nok": len([item for item in exec_items if getattr(item, 'status', '') == 'nao']),
-                    "observacoes": exec_item.observacoes
+            items_ok = len(
+                [
+                    it
+                    for it in exec_items
+                    if str(getattr(it, "status", "")).strip().lower() == "sim"
+                ]
+            )
+            items_nok = len(
+                [
+                    it
+                    for it in exec_items
+                    if str(getattr(it, "status", "")).strip().lower() == "nao"
+                ]
+            )
+            started_at = getattr(exec_item, "started_at", None)
+            finished_at = getattr(exec_item, "finished_at", None)
+            timeline.append(
+                {
+                    "timestamp": _iso(started_at),
+                    "type": "checklist",
+                    "event": "Execução de Checklist",
+                    "details": {
+                        "template_id": getattr(exec_item, "template_id", None),
+                        "bench_id": getattr(exec_item, "bench_id", None),
+                        "operador": getattr(exec_item, "operador", None),
+                        "started_at": _iso(started_at),
+                        "finished_at": _iso(finished_at),
+                        "result": getattr(exec_item, "result", None),
+                        "total_items": len(exec_items),
+                        "items_ok": items_ok,
+                        "items_nok": items_nok,
+                        "observacoes": getattr(exec_item, "observacoes", None),
+                    },
                 }
-            })
-        
-        # 3. HiPot Runs
+            )
+
         hipot_runs = db.session.scalars(
             select(GPHipotRun)
-            .where(GPHipotRun.order_id == work_order.id)
-            .order_by(GPHipotRun.started_at)
+            .where(getattr(GPHipotRun, "serial") == getattr(work_order, "serial"))
+            .order_by(getattr(GPHipotRun, "started_at"))
         ).all()
-        
+
         for hipot in hipot_runs:
-            timeline.append({
-                "timestamp": hipot.started_at.isoformat() if hipot.started_at else None,
-                "type": "hipot",
-                "event": "Teste HiPot",
-                "details": {
-                    "bench_id": hipot.bench_id,
-                    "operador": hipot.operador,
-                    "started_at": hipot.started_at.isoformat() if hipot.started_at else None,
-                    "finished_at": hipot.finished_at.isoformat() if hipot.finished_at else None,
-                    "hp_v": hipot.hp_v,
-                    "hp_t_s": hipot.hp_t_s,
-                    "final_ok": hipot.final_ok,
-                    "observacoes": hipot.observacoes
+            started_at = getattr(hipot, "started_at", None)
+            finished_at = getattr(hipot, "finished_at", None)
+            timeline.append(
+                {
+                    "timestamp": _iso(started_at),
+                    "type": "hipot",
+                    "event": "Teste HiPot",
+                    "details": {
+                        "bench_id": getattr(hipot, "bench_id", None),
+                        "operador": getattr(hipot, "operador", None),
+                        "started_at": _iso(started_at),
+                        "finished_at": _iso(finished_at),
+                        "hp_v_obs_v": getattr(
+                            hipot, "hp_v_obs_v", getattr(hipot, "hp_v", None)
+                        ),
+                        "hp_t_s": getattr(hipot, "hp_t_s", None),
+                        "final_ok": getattr(hipot, "final_ok", None),
+                        "observacoes": getattr(hipot, "observacoes", None),
+                    },
                 }
-            })
-        
-        # Ordenar timeline por timestamp
-        timeline.sort(key=lambda x: x["timestamp"] or "1900-01-01T00:00:00")
-        
-        # Informações gerais da ordem
+            )
+
+        timeline.sort(key=lambda ev: ev.get("timestamp") or "1900-01-01T00:00:00")
+
         order_info = {
-            "serial": work_order.serial,
-            "modelo": work_order.modelo,
-            "current_bench": work_order.current_bench,
-            "status": work_order.status,
-            "created_at": work_order.created_at.isoformat() if work_order.created_at else None,
-            "updated_at": work_order.updated_at.isoformat() if work_order.updated_at else None,
-            "finished_at": getattr(work_order, 'finished_at', None),
-            "hipot_flag": work_order.hipot_flag,
-            "hipot_status": work_order.hipot_status,
-            "hipot_last_at": work_order.hipot_last_at.isoformat() if work_order.hipot_last_at else None
+            "serial": getattr(work_order, "serial", None),
+            "modelo": getattr(work_order, "modelo", None),
+            "current_bench": getattr(work_order, "current_bench", None),
+            "status": getattr(work_order, "status", None),
+            "created_at": _iso(getattr(work_order, "created_at", None)),
+            "updated_at": _iso(getattr(work_order, "updated_at", None)),
+            "finished_at": _iso(getattr(work_order, "finished_at", None)),
+            "hipot_flag": getattr(work_order, "hipot_flag", None),
+            "hipot_status": getattr(work_order, "hipot_status", None),
+            "hipot_last_at": _iso(getattr(work_order, "hipot_last_at", None)),
         }
-        
-        if order_info["finished_at"]:
-            order_info["finished_at"] = order_info["finished_at"].isoformat()
-        
-        return jsonify({
-            "order": order_info,
-            "timeline": timeline,
-            "summary": {
-                "total_events": len(timeline),
-                "work_stages": len(work_stages),
-                "checklist_executions": len(checklist_execs),
-                "hipot_runs": len(hipot_runs)
+
+        return jsonify(
+            {
+                "order": order_info,
+                "timeline": timeline,
+                "summary": {
+                    "total_events": len(timeline),
+                    "work_stages": len(work_stages),
+                    "checklist_executions": len(checklist_execs),
+                    "hipot_runs": len(hipot_runs),
+                },
             }
-        })
-        
+        )
+
     except Exception as e:
         return jsonify({"error": f"Erro interno: {str(e)}"}), 500
 
+
 @trace_api_bp.route("/trace/<serial>/summary", methods=["GET"])
 def get_trace_summary(serial):
-    """
-    Retorna um resumo consolidado da rastreabilidade para um número de série.
-    """
     try:
         work_order = db.session.scalars(
-            select(GPWorkOrder).where(GPWorkOrder.serial == serial)
+            select(GPWorkOrder).where(GPWorkOrder.serial == str(serial))
         ).first()
-        
         if not work_order:
             return jsonify({"error": f"Número de série {serial} não encontrado"}), 404
-        
-        # Contar eventos por tipo
+
         work_stages_count = db.session.scalars(
-            select(GPWorkStage)
-            .where(GPWorkStage.order_id == work_order.id)
+            select(GPWorkStage).where(
+                getattr(GPWorkStage, "order_id") == getattr(work_order, "id")
+            )
         ).all()
-        
         checklist_count = db.session.scalars(
-            select(GPChecklistExecution)
-            .where(GPChecklistExecution.order_id == work_order.id)
+            select(GPChecklistExecution).where(
+                getattr(GPChecklistExecution, "serial") == getattr(work_order, "serial")
+            )
         ).all()
-        
         hipot_count = db.session.scalars(
-            select(GPHipotRun)
-            .where(GPHipotRun.order_id == work_order.id)
+            select(GPHipotRun).where(
+                getattr(GPHipotRun, "serial") == getattr(work_order, "serial")
+            )
         ).all()
-        
-        # Último evento
         last_stage = db.session.scalars(
             select(GPWorkStage)
-            .where(GPWorkStage.order_id == work_order.id)
-            .order_by(desc(GPWorkStage.started_at))
+            .where(getattr(GPWorkStage, "order_id") == getattr(work_order, "id"))
+            .order_by(desc(getattr(GPWorkStage, "started_at")))
         ).first()
-        
-        return jsonify({
-            "serial": work_order.serial,
-            "modelo": work_order.modelo,
-            "status": work_order.status,
-            "current_bench": work_order.current_bench,
-            "summary": {
-                "work_stages": len(work_stages_count),
-                "checklist_executions": len(checklist_count),
-                "hipot_runs": len(hipot_count),
-                "last_activity": {
-                    "bench_id": last_stage.bench_id if last_stage else None,
-                    "timestamp": last_stage.started_at.isoformat() if last_stage and last_stage.started_at else None,
-                    "operador": last_stage.operador if last_stage else None
-                }
+
+        return jsonify(
+            {
+                "serial": getattr(work_order, "serial", None),
+                "modelo": getattr(work_order, "modelo", None),
+                "status": getattr(work_order, "status", None),
+                "current_bench": getattr(work_order, "current_bench", None),
+                "summary": {
+                    "work_stages": len(work_stages_count),
+                    "checklist_executions": len(checklist_count),
+                    "hipot_runs": len(hipot_count),
+                    "last_activity": {
+                        "bench_id": (
+                            getattr(last_stage, "bench_id", None)
+                            if last_stage
+                            else None
+                        ),
+                        "timestamp": (
+                            _iso(getattr(last_stage, "started_at", None))
+                            if last_stage
+                            else None
+                        ),
+                        "operador": (
+                            getattr(last_stage, "operador", None)
+                            if last_stage
+                            else None
+                        ),
+                    },
+                },
             }
-        })
-        
+        )
     except Exception as e:
         return jsonify({"error": f"Erro interno: {str(e)}"}), 500

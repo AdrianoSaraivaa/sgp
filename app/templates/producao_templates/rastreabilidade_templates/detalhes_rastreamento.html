@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 
+
 {% block title %}Rastreabilidade • {{ serial }}{% endblock %}
 {% block module_name %}Rastreabilidade{% endblock %}
 
@@ -8,12 +9,13 @@
 
   <!-- Breadcrumb -->
   <nav aria-label="breadcrumb" style="margin:-6px 0 14px 0; font-size:14px;">
-    <a href="{{ url_for('gp_setup_bp.page_setup_home') }}">Home</a>
-    <span class="muted">›</span>
-    <a href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">Produção · Rastreabilidade</a>
-    <span class="muted">›</span>
-    <span class="muted">Serial {{ serial }}</span>
+  <a href="{{ url_for('gp_setup_bp.page_setup_home') }}">Home</a>
+  <span class="muted">›</span>
+  <a href="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_home') }}">Produção · Rastreabilidade</a>
+  <span class="muted">›</span>
+  <span class="muted">Serial {{ serial }}</span>
   </nav>
+
 
   <!-- Cabeçalho -->
   <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
@@ -33,6 +35,11 @@
   <hr style="margin:16px 0 20px;opacity:.15;">
 
   <!-- Blocos -->
+  <section style="margin-bottom:18px;">
+    <h3 style="margin:0 0 8px;">Dados gerais</h3>
+    <div id="dadosGerais" class="muted">Carregando...</div>
+  </section>
+
   <section style="margin-bottom:18px;">
     <h3 style="margin:0 0 8px;">Linha do tempo (bancadas)</h3>
     <div id="bancadasBox" class="muted">Carregando...</div>
@@ -54,6 +61,7 @@
 (function(){
   const serial = "{{ serial }}";
   const headMeta = document.getElementById('headMeta');
+  const dadosGerais = document.getElementById('dadosGerais');
   const bancadasBox = document.getElementById('bancadasBox');
   const hipotBox = document.getElementById('hipotBox');
   const checklistBox = document.getElementById('checklistBox');
@@ -74,86 +82,100 @@
 
   function statusLabel(st){
     const s = (st||'').toLowerCase();
-    if(s==='ok' || s==='done' || s==='aprovado') return chip('Aprovado','success');
+    if(s==='done') return chip('Aprovado','success');
     if(s==='in_progress') return chip('Em andamento','warning');
     if(s==='queued') return chip('Em fila','');
-    if(s==='fail' || s==='reprovado' || s==='rejected') return chip('Reprovado','danger');
+    if(s==='reprovado' || s==='rejected') return chip('Reprovado','danger');
     return chip(st||'-','');
   }
 
   async function load(){
     try{
-      // NOVO endpoint consolidado
-      const resp = await fetch(`/producao/gp/trace/${encodeURIComponent(serial)}`);
+      const resp = await fetch(`/producao/gp/rastreabilidade/api/${encodeURIComponent(serial)}`);
       const json = await resp.json();
       if(!json.ok) throw new Error(json.error || 'Erro na API');
 
-      // ---- Cabeçalho meta
-      const ws = json.work_stages || [];
-      const last = ws.length ? ws[ws.length-1] : null;
+      const d = json.data || {};
+
+      // Cabeçalho meta
       headMeta.innerHTML = `
-        Última bancada: <code>${(last && last.bench_id) || '-'}</code>
-        · Início: ${fmt(last && last.started_at)}
-        · Fim: ${fmt(last && last.finished_at)}
+        Modelo: <strong>${d.modelo||'-'}</strong> ·
+        Status: ${statusLabel(d.status_atual)}
+        · Bancada atual: <code>${d.current_bench||'-'}</code>
+        · Última atualização: ${fmt(d.ultima_atualizacao)}
       `;
 
-      // ---- Bancadas (timeline simples)
-      if(!ws.length){
-        bancadasBox.innerHTML = `<div class="muted">Sem registros de bancadas para este serial.</div>`;
-      } else {
-        bancadasBox.innerHTML = ws.map(s => {
-          const dur = s.elapsed_s!=null ? ` · Total: ${Math.round(s.elapsed_s/60)} min` : '';
+      // Dados gerais
+      dadosGerais.innerHTML = `
+        <div>Ordem de Produção: <strong>${d.ordem_producao ?? '-'}</strong></div>
+        <div>Lote: <strong>${d.lote ?? '-'}</strong></div>
+        <div>Criado em: ${fmt(d.criado_em)} · Responsável: <strong>${d.criado_por || '-'}</strong></div>
+        <div style="margin-top:6px;">Separação: início ${fmt(d.separacao?.inicio)} · fim ${fmt(d.separacao?.fim)} · duração ${d.separacao?.duracao_min ?? '-'} min · resp. <strong>${d.separacao?.responsavel || '-'}</strong></div>
+      `;
+
+      // Bancadas
+      if(!d.bancadas || d.bancadas.length===0){
+        bancadasBox.innerHTML = `<div class="muted">Sem registros de bancadas (ainda) para este serial.</div>`;
+      }else{
+        const list = d.bancadas.map(b => {
+          const oc = (b.ocorrencias||[]).length ? ` · Ocorrências: ${b.ocorrencias.length}` : '';
+          const habil = b.habilitada===false ? chip('Não habilitada','') : '';
           return `
             <div style="padding:10px 12px;border:1px solid #e4e6eb;border-radius:10px;margin-bottom:8px;">
               <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <strong>${(s.bench_id || '').toUpperCase()}</strong>
-                <span class="muted">${s.operador || '-'}</span>
+                <strong>${b.nome || ('Bancada ' + (b.bench_id||''))}</strong>
+                ${habil}
               </div>
               <div class="muted" style="margin-top:4px;">
-                Início: ${fmt(s.started_at)} · Fim: ${fmt(s.finished_at)}${dur}
+                Início: ${fmt(b.inicio)} · Fim: ${fmt(b.fim)} · Total: ${b.duracao_min ?? '-'} min · Resp.: <strong>${b.responsavel || '-'}</strong>${oc}
               </div>
             </div>
           `;
         }).join('');
+        bancadasBox.innerHTML = list;
       }
 
-      // ---- HiPot
-      const h = json.hipot || {};
-      if(Object.keys(h).length === 0){
+      // HiPot
+      if(!d.hipot || d.hipot.executado===false){
         hipotBox.innerHTML = `<div class="muted">Sem execução registrada.</div>`;
-      } else {
+      }else{
+        const h = d.hipot;
         hipotBox.innerHTML = `
-          <div>Status: ${statusLabel(h.status)}</div>
-          <div class="muted" style="margin-top:4px;">Atualizado: ${fmt(h.hipot_last_at)} ${h.hipot_flag ? '· REP' : ''}</div>
+          <div>Equipamento: <strong>${h.equipamento?.patrimonio || '-'}</strong></div>
+          <div>Calibração: validade ${h.calibracao?.validade || '-'} · certificado ${h.calibracao?.certificado || '-'}</div>
+          <div style="margin-top:6px;">
+            Continuidade (GB1): <strong>${h.gb1?.valor || '-'}</strong> ${statusLabel(h.gb1?.status)}
+            · Tensão suportável (HP1): <strong>${h.hp1?.valor || '-'}</strong> ${statusLabel(h.hp1?.status)}
+            · Resultado: ${statusLabel(h.resultado_final)}
+          </div>
+          ${h.observacao_reprovacao ? `<div class="muted" style="margin-top:6px;">Obs. reprovação: ${h.observacao_reprovacao}</div>` : ''}
         `;
       }
 
-      // ---- Checklist
-      const chk = json.checklist;
-      if(!chk){
+      // Checklist
+      if(!d.checklist || d.checklist.executado===false){
         checklistBox.innerHTML = `<div class="muted">Sem execução registrada.</div>`;
-      } else {
-        const items = (chk.itens||[]).map(it => {
+      }else{
+        const items = (d.checklist.itens||[]).map(it => {
           const res = (it.resultado||'').toLowerCase()==='ok' ? chip('OK','success') : chip('Não conforme','danger');
-          const pin = it.pin_used ? ` · PIN: ${it.pin_reason || ''}` : '';
-          const nota = it.nota ? ` · Nota: ${it.nota}` : '';
-          const dur = it.elapsed_s!=null ? ` · ${Math.round(it.elapsed_s)}s` : '';
-          return `<li style="margin:2px 0;"><strong>${it.ordem||''}.</strong> ${it.descricao||'-'} — ${res}${dur}${pin}${nota}</li>`;
+          const occ = (it.ocorrencias||[]).length ? ` · Ocorrências: ${it.ocorrencias.length}` : '';
+          const blq = it.bloqueante ? chip('Bloqueante','danger') : '';
+          return `<li style="margin:2px 0;">${blq} <strong>${it.ordem||''}.</strong> ${it.descricao||'-'} — ${res} · Resp.: <strong>${it.responsavel||'-'}</strong>${occ}</li>`;
         }).join('');
         checklistBox.innerHTML = `
-          <div style="margin-bottom:6px;">Status: ${statusLabel(chk.status)}</div>
-          <div class="muted">Início: ${fmt(chk.started_at)} · Fim: ${fmt(chk.finished_at)}</div>
-          <ol style="padding-left:18px;margin:8px 0 0;">${items || '<li class="muted">Sem itens.</li>'}</ol>
+          <div style="margin-bottom:6px;">Resultado: ${statusLabel(d.checklist.resultado_final)}</div>
+          <ol style="padding-left:18px;margin:0;">${items || '<li class="muted">Sem itens.</li>'}</ol>
         `;
       }
 
-      // Habilita botão de relatório (placeholder)
+      // Habilita botão de relatório (em breve)
       btnReport.disabled = false;
       btnReport.title = "Abrir relatório de rastreabilidade (em breve)";
 
     }catch(err){
       const msg = `Falha ao carregar detalhes: ${err.message}`;
       headMeta.textContent = msg;
+      dadosGerais.textContent = msg;
       bancadasBox.textContent = msg;
       hipotBox.textContent = msg;
       checklistBox.textContent = msg;
@@ -164,3 +186,5 @@
 })();
 </script>
 {% endblock %}
+
+

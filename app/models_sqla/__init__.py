@@ -244,7 +244,34 @@ class GPHipotRun(db.Model):
     hp_ileak_ma = db.Column(db.Float, nullable=True)
     hp_v_obs_v = db.Column(db.Float, nullable=True)
     hp_t_s = db.Column(db.Float, nullable=True)
+    # Resultado final (True = aprovado, False = reprovado).  Esta coluna
+    # existe na base de dados mas não era declarada no modelo gerado
+    # automaticamente.  A inclusão explícita aqui garante que o
+    # atributo ``final_ok`` esteja disponível, e que ele seja
+    # persistido corretamente.
     final_ok = db.Column(db.Boolean, nullable=True)
+
+    def finalize(self) -> bool:
+        """Define o resultado final com base nos testes GB e HP.
+
+        Quando ambos os testes de continuação de aterramento (GB) e
+        tensão suportável (HP) retornarem ``True``, o resultado final
+        será marcado como aprovado (``True``).  Caso qualquer um
+        seja ``False`` ou nulo, o resultado final será reprovado
+        (``False``).  O valor calculado é atribuído ao atributo
+        ``final_ok`` e também retornado para conveniência.
+
+        Returns:
+            bool: ``True`` se ambos os testes foram aprovados,
+            ``False`` caso contrário.
+        """
+        # Coerce valores para booleanos para evitar problemas com
+        # strings ou ``None``.  Por padrão, considera ``None`` como
+        # reprovação.
+        gb_ok = bool(getattr(self, "gb_ok", False))
+        hp_ok = bool(getattr(self, "hp_ok", False))
+        self.final_ok = gb_ok and hp_ok
+        return self.final_ok
 
 
 class GPWorkOrder(db.Model):

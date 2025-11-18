@@ -65,7 +65,7 @@
     <div class="row">
       <div>
         <label for="serial">Serial</label>
-        <input id="serial" type="text" placeholder="Escaneie ou digite o nº de série" autocomplete="off">
+        <input id="serial" type="text" placeholder="Escaneie ou digite o nº de série" autocomplete="off" value="{{ serial|default('') }}">
       </div>
       <div>
         <label for="operador">Operador (opcional)</label>

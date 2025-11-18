@@ -1,0 +1,298 @@
+{% extends "_base.html" %}
+{% block title %}Rastreabilidade • Lista de Seriais{% endblock %}
+{% block module_name %}Rastreabilidade{% endblock %}
+
+{% block content %}
+<div class="card" style="padding:24px;margin:20px auto;max-width:1300px;">
+  <style>
+    :root {
+      --color-primary:#1d4ed8;
+      --color-primary-weak:#eff6ff;
+      --color-text:#0f172a;
+      --color-muted:#64748b;
+      --color-bg:#f8fafc;
+      --color-border:#e2e8f0;
+      --ok:#10b981; --warn:#f59e0b; --danger:#ef4444; --info:#3b82f6;
+    }
+    body{background:var(--color-bg);}
+    .filter-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;padding:10px;background:#fff;border:1px solid var(--color-border);border-radius:12px}
+    .input,.select{padding:12px 14px;border:1px solid var(--color-border);border-radius:10px;min-width:220px;flex:1;font-size:16px;background:#fff;color:var(--color-text)}
+    .select{min-width:170px;flex:0}
+    .btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--color-primary);background:var(--color-primary);color:#fff;font-weight:700;cursor:pointer}
+    .btn.ghost{background:#fff;color:var(--color-text);border-color:var(--color-border)}
+    .btn.small{height:34px;font-size:.9rem}
+    .table{width:100%;min-width:860px;border-collapse:separate;border-spacing:0 6px}
+    thead th{padding:12px 14px;text-align:left;font-size:.8rem;color:var(--color-muted);text-transform:uppercase;border-bottom:1px solid var(--color-border)}
+    tbody td{background:#fff;border:1px solid var(--color-border);padding:14px;vertical-align:top}
+    tbody tr td:first-child{border-radius:10px 0 0 10px}
+    tbody tr td:last-child{border-radius:0 10px 10px 0}
+    .clickable-row{cursor:pointer}
+    .clickable-row:hover td{background:var(--color-primary-weak)}
+    .model{font-size:17px;font-weight:800;color:var(--color-text)}
+    .meta{font-size:13px;color:var(--color-muted);margin-top:4px}
+    .meta code{font-weight:800;color:var(--color-primary);background:var(--color-primary-weak);padding:2px 8px;border-radius:8px}
+    .date-main{font-weight:800}
+    .time-detail{font-size:12px;color:var(--color-muted)}
+    .chip{display:inline-block;padding:6px 12px;border-radius:999px;font-weight:800;font-size:12px;border:1px solid}
+    .chip.ok{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
+    .chip.warn{background:#fffbeb;color:#92400e;border-color:#fde68a}
+    .chip.danger{background:#fee2e2;color:#7f1d1d;border-color:#fecaca}
+    .chip.queue{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+    .chip.info{background:#e2e8f0;color:#1f2937;border-color:#cbd5e1}
+    .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid var(--color-border)}
+    .statusbar{font-size:14px;color:var(--color-muted);font-weight:600}
+    /* skeleton */
+    @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    .skeleton{height:70px;border:1px solid var(--color-border);border-radius:10px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 37%,#f1f5f9 63%);background-size:800px 100%;animation:shimmer 1.4s infinite}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+  </style>
+
+  <!-- FILTROS -->
+  <div class="filter-bar" role="region" aria-label="Filtros de rastreabilidade">
+    <label for="searchInput" class="sr-only">Buscar por Série ou Modelo</label>
+    <input id="searchInput" class="input" type="search" placeholder="Buscar (Nº Série, Modelo)… [ENTER] para abrir detalhes" autocomplete="off">
+    <label for="statusFilter" class="sr-only">Filtrar por Status</label>
+    <select id="statusFilter" class="select">
+      <option value="">Todos os Status</option>
+      <option value="in_progress">Em Andamento</option>
+      <option value="queued">Em Fila</option>
+      <option value="done">Aprovado</option>
+      <option value="reprovado">Reprovado</option>
+    </select>
+    <button id="resetBtn" class="btn ghost" title="Limpar filtros">Limpar</button>
+  </div>
+
+  <!-- LISTA -->
+  <div style="overflow-x:auto">
+    <table class="table" aria-describedby="statusbar">
+      <thead>
+        <tr>
+          <th style="width:30%">Modelo / Série</th>
+          <th style="width:18%">Status</th>
+          <th style="width:32%">Última Atualização</th>
+          <th style="width:20%;text-align:right">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div id="skeletonBox" style="margin-top:8px;display:none">
+      {% for _ in range(6) %}<div class="skeleton"></div>{% endfor %}
+    </div>
+  </div>
+
+  <!-- PAGINAÇÃO -->
+  <div class="pagination">
+    <div id="statusbar" class="statusbar">Carregando…</div>
+    <div>
+      <button id="prevBtn" class="btn small ghost" disabled>← Anterior</button>
+      <span id="pageInfo" style="display:inline-block;min-width:130px;text-align:center;font-weight:800">Página 1</span>
+      <button id="nextBtn" class="btn small" disabled>Próxima →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const rows = document.getElementById('rows');
+  const searchInput = document.getElementById('searchInput');
+  const statusFilter = document.getElementById('statusFilter');
+  const skeletonBox = document.getElementById('skeletonBox');
+  const statusbar = document.getElementById('statusbar');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const pageInfo = document.getElementById('pageInfo');
+  const resetBtn = document.getElementById('resetBtn');
+
+  const initial = { page:1, pageSize:20, search:'', status:'' };
+  const state = loadFromURL();
+
+  function loadFromURL(){
+    const p = new URLSearchParams(location.search);
+    return {
+      page: +(p.get('page')||1),
+      pageSize: 20,
+      search: p.get('search') || '',
+      status: p.get('status') || ''
+    };
+  }
+
+  const Status = {
+    map(s){
+      switch((s||'').toLowerCase()){
+        case 'done': return {label:'Aprovado', cls:'ok'};
+        case 'in_progress': return {label:'Em Andamento', cls:'warn'};
+        case 'queued': return {label:'Em Fila', cls:'queue'};
+        case 'reprovado':
+        case 'rejected': return {label:'Reprovado', cls:'danger'};
+        default: return {label:(s||'Desconhecido'), cls:'info'};
+      }
+    },
+    chip(s){ const m=this.map(s); return `<span class="chip ${m.cls}">${m.label}</span>`; }
+  };
+
+  function fmtDT(iso){
+    if(!iso) return {d:'—', t:''};
+    try{
+      const d = new Date(iso);
+      const pad = n=> String(n).padStart(2,'0');
+      return { d:`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`, t:`${pad(d.getHours())}:${pad(d.getMinutes())}` };
+    }catch(e){ return {d:'—', t:''}; }
+  }
+
+  function setSkeleton(v){ skeletonBox.style.display = v ? 'block':'none'; rows.style.opacity = v? .3 : 1; }
+
+  function rowHTML(it){
+    const dt = fmtDT(it.ultima_atualizacao);
+    const toDetails = `{{ url_for('gp_rastreabilidade_bp.rastreabilidade_detalhes', serial='__SER__') }}`.replace('__SER__', encodeURIComponent(it.serial));
+    const openTimeline = `Rastreio.openTimeline('${encodeURIComponent(it.serial)}')`;
+    const reportUrl = (window.RASTREIO_REPORT_URL_TEMPLATE || '').replace('__SER__', encodeURIComponent(it.serial));
+
+    const actions = `
+      <a class="btn small ghost" href="${toDetails}">Detalhes</a>
+      <a class="btn small" href="javascript:void(0)" onclick="${openTimeline}" style="margin-left:8px">Timeline</a>
+      ${ reportUrl ? `<a class="btn small" href="${reportUrl}" target="_blank" rel="noopener" style="margin-left:8px;background:#10b981;border-color:#10b981">Relatório</a>` : ''}
+    `;
+
+    return `
+      <tr class="clickable-row" onclick="location.href='${toDetails}'" tabindex="0" onkeydown="if(event.key==='Enter'){location.href='${toDetails}'}">
+        <td>
+          <div class="model">${it.modelo || 'MODELO INDEFINIDO'}</div>
+          <div class="meta">Nº Série: <code>${it.serial||'-'}</code></div>
+        </td>
+        <td>${Status.chip(it.status)}</td>
+        <td>
+          <div class="date-main">${dt.d}</div>
+          <div class="time-detail">${dt.t}</div>
+        </td>
+        <td style="text-align:right">${actions}</td>
+      </tr>
+    `;
+  }
+
+  const Rastreio = {
+    async load(){
+      setSkeleton(true);
+      try{
+        const params = new URLSearchParams();
+        params.set('page', state.page);
+        params.set('page_size', state.pageSize);
+        if(state.search) params.set('search', state.search);
+        if(state.status) params.set('status', state.status);
+
+        const resp = await fetch(`/producao/gp/rastreabilidade/api/search?${params.toString()}`);
+        const data = await resp.json();
+
+        if(!resp.ok || !data.ok){
+          throw new Error(data.error || 'Erro na API');
+        }
+        const items = data.items || [];
+        const meta  = data.meta  || {};
+        rows.innerHTML = items.length
+          ? items.map(rowHTML).join('')
+          : `<tr><td colspan="4" class="meta" style="text-align:center;padding:24px">Nenhum registro encontrado.</td></tr>`;
+
+        const totalPages = +(meta.total_pages || 1);
+        statusbar.textContent = `Exibindo ${items.length} itens • Total: ${meta.total_results || items.length}`;
+        prevBtn.disabled = state.page<=1;
+        nextBtn.disabled = state.page>=totalPages;
+        pageInfo.textContent = `Página ${state.page} de ${totalPages}`;
+
+        // espelha filtros na URL
+        const p = new URLSearchParams();
+        p.set('page', state.page);
+        if(state.search) p.set('search', state.search);
+        if(state.status) p.set('status', state.status);
+        history.replaceState(null, '', `${location.pathname}?${p.toString()}`);
+      }catch(e){
+        rows.innerHTML = `<tr><td colspan="4" style="padding:24px;color:#b91c1c">Falha ao carregar dados. ${e.message||e}</td></tr>`;
+        statusbar.textContent = 'Erro ao carregar.';
+      }finally{
+        setSkeleton(false);
+      }
+    },
+    async openTimeline(serial){
+      try{
+        const resp = await fetch(`/producao/gp/trace/${serial}`);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        this.showTimelineModal(data);
+      }catch(e){
+        alert('Falha ao carregar timeline: ' + (e.message||e));
+      }
+    },
+    getEventColor(type){
+      switch(type){
+        case 'work_stage': return '#3b82f6';
+        case 'checklist':  return '#10b981';
+        case 'hipot':      return '#f59e0b';
+        default:           return '#64748b';
+      }
+    },
+    showTimelineModal(trace){
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:10px;max-width:860px;width:92%;max-height:85vh;overflow:auto;padding:18px;border:1px solid #e5e7eb';
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0">Timeline — ${trace.order.serial}</h3>
+          <button class="btn small ghost" onclick="this.closest('.modal-wrap').remove()">Fechar</button>
+        </div>
+        <div style="margin-bottom:10px;color:#475569"><b>Modelo:</b> ${trace.order.modelo} • <b>Status:</b> ${trace.order.status} • <b>Bancada:</b> ${trace.order.current_bench}</div>
+        <div>
+          ${(trace.timeline||[]).map(ev => `
+            <div style="margin:10px 0;padding:10px;border-left:3px solid ${Rastreio.getEventColor(ev.type)};background:#f8fafc">
+              <div style="font-weight:800;color:#0f172a">${ev.event}</div>
+              <div style="font-size:13px;color:#64748b;margin:4px 0">${new Date(ev.timestamp).toLocaleString()}</div>
+              <div style="font-size:14px">
+                ${ev.type==='work_stage' ? `Bancada: ${ev.details.bench_id} • Operador: ${ev.details.operador||'—'}` : ''}
+                ${ev.type==='checklist'  ? `Checklist • Itens OK: ${ev.details.items_ok}/${ev.details.total_items}` : ''}
+                ${ev.type==='hipot'      ? `HiPot • Corrente Fuga: ${ev.details.hp_ileak_ma || '—'} mA • Resultado: ${(ev.details.final_ok ? 'OK' : 'NOK')}` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      wrap.className = 'modal-wrap';
+      wrap.appendChild(box);
+      wrap.addEventListener('click', e => { if(e.target===wrap) wrap.remove(); });
+      document.body.appendChild(wrap);
+    }
+  };
+
+  // listeners
+  let t=null;
+  searchInput.value = state.search;
+  statusFilter.value = state.status;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(() => { state.search = searchInput.value.trim(); state.page=1; Rastreio.load(); }, 300);
+  });
+  searchInput.addEventListener('keyup', (e)=>{
+    const v = searchInput.value.trim();
+    if(e.key==='Enter'){
+      if(/^[A-Za-z0-9\-]{6,}$/.test(v)){
+        const toDetails = `{{ url_for('gp_rastreabilidade_bp.rastreabilidade_detalhes', serial='__SER__') }}`.replace('__SER__', encodeURIComponent(v));
+        location.href = toDetails;
+      }else{
+        clearTimeout(t); state.search=v; state.page=1; Rastreio.load();
+      }
+    }
+  });
+  statusFilter.addEventListener('change', ()=>{ state.status = statusFilter.value; state.page=1; Rastreio.load(); });
+  resetBtn.addEventListener('click', ()=>{ state.search=''; state.status=''; state.page=1; searchInput.value=''; statusFilter.value=''; Rastreio.load(); });
+  prevBtn.addEventListener('click', ()=>{ if(state.page>1){ state.page--; Rastreio.load(); }});
+  nextBtn.addEventListener('click', ()=>{ state.page++; Rastreio.load(); });
+  window.addEventListener('popstate', ()=>{ Object.assign(state, loadFromURL()); searchInput.value=state.search; statusFilter.value=state.status; Rastreio.load(); });
+
+  // URL opcional para abrir relatório: defina em alguma <script> global
+  // window.RASTREIO_REPORT_URL_TEMPLATE = "{{ url_for('gp_rastreabilidade_bp.rastreabilidade_relatorio', serial='__SER__') }}";
+
+  // start
+  Rastreio.load();
+  window.Rastreio = Rastreio; // para timeline modal
+})();
+</script>
+{% endblock %}

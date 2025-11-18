@@ -1,11 +1,10 @@
 # app/routes/producao_routes/painel_routes/board_api.py
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from app import db
 from sqlalchemy import inspect, or_
-from datetime import timezone
+from datetime import timezone, timedelta, datetime, date
 from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 from app.models.producao_models.gp_modelos import GPModel, GPBenchConfig
-from datetime import timezone, timedelta
 from app.routes.producao_routes.painel_routes.rop_service import list_rop_needs
 
 gp_painel_api_bp = Blueprint(
@@ -83,7 +82,7 @@ def board_data():
     expected_cache = {}
 
     def expected_for(modelo, bench_id):
-        if bench_id not in {"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"}:
+        if bench_id not in EXPECTED_FALLBACK:
             return None
         if modelo not in expected_cache:
             expected_cache[modelo] = {}
@@ -117,7 +116,6 @@ def board_data():
         seq = _enabled_seq_for_model(o.modelo)
         idx = {b: i for i, b in enumerate(seq)}
 
-        # since: SOMENTE com etapa ABERTA na bancada atual
         if col_id == "sep":
             since_iso = None
         elif col_id == "final":
@@ -145,13 +143,11 @@ def board_data():
                 dt = st_open.started_at
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
-                    # converte UTC → Brasília (-3h) e formata
                 dt_local = dt.astimezone(timezone(timedelta(hours=-3)))
                 since_iso = dt_local.strftime("%d/%m/%Y %H:%M:%S")
             else:
-                since_iso = None  # sem etapa aberta → sem cronômetro
+                since_iso = None
 
-        # flag de retorno (rework): já passou por bancada mais à frente e voltou
         returned = False
         try:
             max_idx = -1
@@ -174,14 +170,12 @@ def board_data():
             "expected_s": expected_for(o.modelo, col_id),
             "hipot_flag": bool(getattr(o, "hipot_flag", False)),
             "returned": returned,
-            # Novos campos Onda1
             "result": None,
             "rework_flag": False,
             "workstation": None,
             "finished_at": None,
         }
 
-        # Tenta pegar estágio atual ou último finalizado
         try:
             if col_id not in ("sep", "final"):
                 st_open = (
@@ -215,15 +209,14 @@ def board_data():
         columns[cid]
         for cid in ["sep", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "final"]
     ]
-    # === ROP Needs (quantas montar) ===
+
     needs = []
     needs_banner = ""
     try:
         needs = list_rop_needs(db.session) or []
-        # Banner estilo: "Montar: PM2100 +3 • PM2200 +1"
         parts = []
         for row in needs:
-            sug = int(row.get("sugerida") or 0)
+            sug = int(row.get("sugerido") or 0)  # corrigido aqui
             mc = (
                 row.get("model_code")
                 or row.get("modelo")
@@ -234,7 +227,7 @@ def board_data():
                 parts.append(f"{mc} +{sug}")
         if parts:
             needs_banner = "Montar: " + " • ".join(parts)
-    except Exception as e:
+    except Exception:
         needs = []
         needs_banner = ""
 
@@ -247,16 +240,8 @@ def board_data():
     return jsonify(payload)
 
 
-# ============================================================
-# Nova rota: KPIs diários
-# ============================================================
-from datetime import date
-from flask import request
-
-
 @gp_painel_api_bp.get("/kpis/dia")
 def kpis_dia():
-    """Retorna indicadores de produção do dia."""
     data_str = request.args.get("data")
     modelo = request.args.get("modelo")
 
@@ -279,14 +264,10 @@ def kpis_dia():
     orders = q.all()
 
     throughput = len([o for o in orders if getattr(o, "finished_at", None)])
-
-    # FPY e retrabalho: contar ordens com stages rework_flag
-    order_ids = [o.id for o in orders]
     fpy_count = 0
     rework_count = 0
     hipot_total = 0
     hipot_ok = 0
-
     avg_cycle_times = {}
 
     for o in orders:
@@ -326,14 +307,10 @@ def kpis_dia():
     return jsonify(result)
 
 
-# ============================================================
-# Rota: Needs (quantas montar)
-# ============================================================
 @gp_painel_api_bp.get("/needs")
 def needs_data():
     try:
         needs = list_rop_needs(db.session) or []
         return jsonify(needs), 200
-    except Exception as e:
-        # Em caso de falha do serviço, retornar lista vazia (painel segue funcionando)
+    except Exception:
         return jsonify([]), 200

@@ -7,17 +7,14 @@ from typing import Any, Dict, List, Optional
 from app import db
 
 # ⚠️ Usar sempre os MODELOS ORM (SQLAlchemy)
-# Peca vem de models_sqla (não do dataclass).
 try:
     from app.models_sqla import Peca  # type: ignore
-except Exception:  # pragma: no cover
+except Exception:
     Peca = None  # type: ignore
 
-# Deduplicação de alertas (historiza entradas/saídas do alerta)
 try:
-    # Corrigido para usar models_sqla
     from app.models_sqla import GPROPAlert as GPRopAlert  # type: ignore
-except Exception:  # pragma: no cover
+except Exception:
     GPRopAlert = None  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -35,13 +32,7 @@ def _coalesce_int(value: Optional[int], default: int = 0) -> int:
 
 
 def _infer_model_code_from_peca(peca: "Peca") -> str:
-    """
-    Tenta inferir o model_code a partir da peça "conjunto".
-    Preferimos usar um mapeamento central (capacidade_service), se existir.
-    Fallback: usa o próprio código_pneumark.
-    """
     code = getattr(peca, "codigo_pneumark", None) or ""
-    # Tenta buscar via capacidade_service (fonte única, se implementado)
     try:
         from app.services.producao.capacidade_service import model_code_from_conjunto  # type: ignore
 
@@ -54,27 +45,19 @@ def _infer_model_code_from_peca(peca: "Peca") -> str:
 
 
 def _get_capacidade(model_code: str) -> Optional[int]:
-    """Retorna uma capacidade inteira (unidades/periodo) se o serviço existir; caso contrário, None."""
     try:
         from app.services.producao.capacidade_service import calcular_capacidade_modelo  # type: ignore
 
         cap = calcular_capacidade_modelo(model_code)
-        if cap is None:
-            return None
-        try:
-            return int(cap)
-        except Exception:
-            return None
+        return int(cap) if cap is not None else None
     except Exception:
         return None
 
 
 def _eval_rop_for_conjunto(peca: "Peca") -> Dict[str, Any]:
-    """Calcula o estado ROP para uma peça do tipo 'conjunto'."""
     atual = _coalesce_int(getattr(peca, "estoque_atual", 0), 0)
-    min_ = _coalesce_int(getattr(peca, "estoque_minimo", 0), 0)  # Corrigido nome do campo
-    max_ = _coalesce_int(getattr(peca, "estoque_maximo", 0), 0)  # Corrigido nome do campo
-
+    min_ = _coalesce_int(getattr(peca, "estoque_minimo", 0), 0)
+    max_ = _coalesce_int(getattr(peca, "estoque_maximo", 0), 0)
     ponto_pedido = _coalesce_int(getattr(peca, "ponto_pedido", 0), 0)
     in_alert = atual <= ponto_pedido
     sugerido = max(0, max_ - atual) if in_alert else 0
@@ -100,18 +83,11 @@ def _eval_rop_for_conjunto(peca: "Peca") -> Dict[str, Any]:
 
 
 def list_rop_needs(session) -> List[Dict[str, Any]]:
-    """
-    Retorna necessidades de produção por modelo (quantas montar), no formato:
-        [ {model_code, atual, min, max, sugerido, codigo_conjunto, descricao} ]
-    Regra: se estoque_atual <= estoque_min -> sugerido = max(0, estoque_max - estoque_atual); senão 0.
-    """
     needs: List[Dict[str, Any]] = []
-
     if Peca is None:
         logger.warning("[ROP] Model Peca indisponível; retornando lista vazia.")
         return needs
 
-    # Consulta somente peças do tipo 'conjunto' (máquinas acabadas)
     conjuntos: List[Peca] = (
         session.query(Peca)
         .filter(Peca.tipo == "conjunto")  # type: ignore[attr-defined]
@@ -133,27 +109,37 @@ def list_rop_needs(session) -> List[Dict[str, Any]]:
                 }
             )
 
-    # Ordena por maior necessidade primeiro
     needs.sort(key=lambda x: int(x.get("sugerido") or 0), reverse=True)
     return needs
+
+
+def build_needs_banner(needs: List[Dict[str, Any]]) -> str:
+    if not needs:
+        return ""
+    parts = []
+    for row in needs:
+        model = row.get("model_code") or row.get("codigo_conjunto")
+        qtd = row.get("sugerido") or 0
+        if model and qtd:
+            parts.append(f"{model} +{qtd}")
+    return f"Montar: {' • '.join(parts)}" if parts else ""
+
+
+def get_rop_needs_and_banner(session) -> Dict[str, Any]:
+    needs = list_rop_needs(session)
+    banner = build_needs_banner(needs)
+    return {"needs": needs, "needs_banner": banner}
 
 
 def handle_rop_on_change(
     peca_conjunto: "Peca", session, force_email: bool = False
 ) -> None:
-    """
-    Deve ser chamado sempre que o estoque de um CONJUNTO mudar (ex.: após montar máquinas).
-    - Atualiza/Cria registro em gp_rop_alerts para deduplicação.
-    - Dispara e-mail ao entrar em alerta (estoque_atual <= estoque_min) — 1 vez por entrada, ou se force_email=True.
-    - Ao sair do alerta (estoque_atual > estoque_min), zera a flag in_alert.
-    """
     if GPRopAlert is None:
         logger.warning(
-            "[ROP] GPRopAlert indisponível; enviando e-mail sem deduplicação, se necessário."
+            "[ROP] GPRopAlert indisponível; enviando e-mail sem deduplicacao."
         )
     st = _eval_rop_for_conjunto(peca_conjunto)
 
-    # Se não está em alerta e não existe histórico, nada a fazer além de garantir limpeza se já houve alerta
     try:
         alert_obj = None
         if GPRopAlert:
@@ -170,7 +156,6 @@ def handle_rop_on_change(
                 session.flush()
     except Exception as e:
         logger.exception(f"[ROP] Falha ao consultar/criar GPRopAlert: {e}")
-        # Prossegue sem deduplicação
         alert_obj = None
 
     try:
@@ -178,24 +163,19 @@ def handle_rop_on_change(
         should_email = False
 
         if alert_obj is not None:
-            # Transições
             if entered_alert and not bool(getattr(alert_obj, "in_alert", False)):
-                # Entrou em alerta agora
                 alert_obj.in_alert = True
                 alert_obj.updated_at = datetime.utcnow()
                 should_email = True
             elif entered_alert and force_email:
-                # Já estava em alerta mas queremos forçar reenvio
                 should_email = True
             elif not entered_alert and bool(getattr(alert_obj, "in_alert", False)):
-                # Saiu do alerta
                 alert_obj.in_alert = False
                 alert_obj.updated_at = datetime.utcnow()
-                should_email = False  # não envia e-mail ao sair
+                should_email = False
 
             session.commit()
         else:
-            # Sem objeto de deduplicação: decide e-mail baseado apenas no estado atual
             should_email = entered_alert or force_email
 
         if should_email:
@@ -211,10 +191,9 @@ def handle_rop_on_change(
 
 
 def _send_rop_email(peca_conjunto: "Peca", st: Dict[str, Any]) -> None:
-    """Envia e-mail de alerta de ponto de pedido para CONJUNTO."""
     try:
         from app.services.montagem.notifications.email_service import send_email  # type: ignore
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         logger.error(f"[ROP][EMAIL] Serviço de e-mail indisponível: {e}")
         return
 
@@ -238,7 +217,6 @@ def _send_rop_email(peca_conjunto: "Peca", st: Dict[str, Any]) -> None:
         "\nAcione o PCP para programar a montagem."
     )
 
-    # Destinatário padrão; pode ser tornado configurável via ENV
     to = "producao@pneumark.com.br"
     try:
         send_email(to=to, subject=assunto, body=corpo)

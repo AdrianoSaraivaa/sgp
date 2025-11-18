@@ -32,6 +32,13 @@ class WorkOrder(BaseModel):
     hipot_status: str = field(default="")
     hipot_last_at: Optional[datetime] = field(default=None)
 
+    #: Timestamp quando a ordem foi concluída.  Só é preenchido quando
+    #: todas as etapas obrigatórias foram finalizadas e o produto passa
+    #: para o estado final.  Este campo foi adicionado na Onda 2 para
+    #: permitir que o painel mostre a data/hora de conclusão na coluna
+    #: "Final".
+    finished_at: Optional[datetime] = field(default=None)
+
     def __repr__(self) -> str:
         return f"<WorkOrder serial={self.serial} bench={self.current_bench} status={self.status}>"
 
@@ -49,6 +56,24 @@ class WorkStage(BaseModel):
     finished_at: Optional[datetime] = field(default=None)
     operador: Optional[str] = field(default=None)
     observacoes: Optional[str] = field(default=None)
+
+    #: Resultado registrado para a etapa.  Valores esperados incluem
+    #: "OK" (aprovado), "FAIL" ou "NG" (não conforme), "APR" (aprovado
+    #: em reteste) e "REP" (reprovação que requer retrabalho).  O
+    #: resultado só é definido quando a etapa é finalizada, mas o
+    #: atributo existe desde a criação para manter compatibilidade com
+    #: versões anteriores.
+    result: Optional[str] = field(default=None)
+
+    #: Flag indicando se houve retrabalho nesta etapa.  Quando
+    #: ``True``, significa que a peça voltou a uma bancada anterior
+    #: depois de ter avançado no fluxo.  Valor padrão ``False``.
+    rework_flag: bool = field(default=False)
+
+    #: Identificador da estação de trabalho onde a etapa foi executada.
+    #: Pode ser usado pelo painel para diferenciar múltiplas bancadas
+    #: físicas ou operadores.  Opcional.
+    workstation: Optional[str] = field(default=None)
 
     def __repr__(self) -> str:
         return f"<WorkStage order_id={self.order_id} bench={self.bench_id}>"

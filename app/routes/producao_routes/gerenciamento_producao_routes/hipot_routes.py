@@ -2,8 +2,10 @@ from flask import Blueprint, render_template, request, jsonify
 from app import db
 # ⬇️ ajuste o import para o caminho REAL do seu modelo
 from app.models.producao_models.gp_models.gp_hipot import GPHipotRun
-from sqlalchemy import inspect
+# ``inspect`` é importado sob demanda nas rotas de depuração para reduzir
+# dependências globais.  Importamos aqui apenas o serviço e os modelos
 from app.services.producao.hipot_service import aplicar_resultado_hipot
+from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 
 
 
@@ -19,7 +21,12 @@ def perfil_editor():
 # --- já existia ---
 @gp_hipot_bp.route("/exec-manual", methods=["GET"])
 def exec_manual():
-    return render_template("gp_templates/hipot/exec_manual.html")
+    # Opcionalmente aceita 'serial' na query string para pré-preencher o campo
+    serial_param = (request.args.get("serial") or "").strip()
+    return render_template(
+        "gp_templates/hipot/exec_manual.html",
+        serial=serial_param
+    )
 
 # --- NOVO: salvar execução manual ---
 @gp_hipot_bp.route("/api/save", methods=["POST"])
@@ -68,19 +75,36 @@ def save_execucao():
         hp_v_obs_v=float(hp_v_obs_v) if hp_v_obs_v not in (None, "",) else None,
         hp_t_s=float(hp_t_s) if hp_t_s not in (None, "",) else None,
     )
+    # Calcula e atribui ``final_ok`` com base nos testes GB/HP
     run.finalize()
     db.session.add(run)
     db.session.commit()
 
-    from sqlalchemy import inspect
-
-
+    # Após salvar o registro da execução manual, aplicar o resultado na etapa B5 e na ordem
+    try:
+        status = "APR" if run.final_ok else "REP"
+        # Atualiza etapa B5 (result e rework_flag) se existir etapa em aberto
+        order = GPWorkOrder.query.filter_by(serial=serial).first()
+        if order:
+            stage_b5 = GPWorkStage.query.filter_by(order_id=order.id, bench_id="b5", finished_at=None).first()
+            if stage_b5:
+                stage_b5.result = status
+                stage_b5.rework_flag = (status == "REP")
+                db.session.add(stage_b5)
+        # Aplica o resultado global no sistema (atualiza hiPot_status e avança o fluxo)
+        aplicar_resultado_hipot({"serial": serial, "status": status})
+        db.session.commit()
+    except Exception:
+        # Em caso de erro, reverte alterações parciais
+        db.session.rollback()
 
     return jsonify({"ok": True, "id": run.id, "final_ok": run.final_ok})
 
 
 @gp_hipot_bp.route("/api/debug/status", methods=["GET"])
 def hipot_debug_status():
+    # Importa ``inspect`` localmente para evitar importações desnecessárias
+    from sqlalchemy import inspect  # noqa: F401
     insp = inspect(db.engine)
     return jsonify({
         "ok": True,
@@ -120,4 +144,104 @@ def hipot_result_apply():
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+
+# ============================================================
+# Rotas para execução manual integrada (B5 no painel)
+# ============================================================
+@gp_hipot_bp.route("/<serial>", methods=["GET"])
+def hipot_manual(serial: str):
+    """Exibe um formulário simples para registrar o resultado HiPot.
+
+    Esta rota é usada pelo Painel ou por operadores ao clicarem no
+    cartão de uma máquina na B5.  O template renderizado mostra um
+    campo para o valor medido do ensaio elétrico e um seletor para
+    indicar se o teste foi aprovado ou reprovado.
+
+    Args:
+        serial (str): número de série da máquina.
+
+    Returns:
+        str: HTML do formulário.
+    """
+    return render_template(
+        "gp_templates/hipot/manual_form.html",
+        serial=serial,
+    )
+
+
+@gp_hipot_bp.route("/<serial>/submit", methods=["POST"])
+def hipot_manual_submit(serial: str):
+    """Processa o envio manual do resultado HiPot para uma máquina.
+
+    O formulário deve enviar os campos ``valor`` (float) e
+    ``resultado`` ("aprovado" ou "reprovado").  A função cria um
+    registro em ``GPHipotRun``, calcula o resultado final, atualiza a
+    etapa B5 em aberto com o resultado e chama o serviço
+    ``aplicar_resultado_hipot`` para atualizar a ordem de produção e
+    avançar o fluxo.
+
+    Args:
+        serial (str): número de série da máquina.
+
+    Returns:
+        Response: JSON indicando se a operação foi bem-sucedida.
+    """
+    # Lê os dados enviados pelo formulário (campos simples de texto)
+    valor_str = (request.form.get("valor") or "").strip()
+    resultado = (request.form.get("resultado") or "").strip().lower()
+
+    # Converte o valor medido para float ou None
+    try:
+        valor = float(valor_str) if valor_str else None
+    except Exception:
+        valor = None
+
+    if resultado not in {"aprovado", "reprovado"}:
+        return jsonify({"ok": False, "error": "resultado invalido"}), 400
+
+    # Determina flags de aprovação
+    final_ok = resultado == "aprovado"
+    gb_ok = final_ok
+    hp_ok = final_ok
+
+    # Cria novo registro GPHipotRun com as medições mínimas necessárias
+    run = GPHipotRun(
+        serial=serial,
+        modelo=None,
+        operador=None,
+        responsavel=None,
+        ordem=None,
+        obs=None,
+        gb_ok=gb_ok,
+        gb_r_mohm=valor,
+        gb_i_a=None,
+        gb_t_s=None,
+        hp_ok=hp_ok,
+        hp_ileak_ma=valor,
+        hp_v_obs_v=None,
+        hp_t_s=None,
+    )
+    run.finalize()
+    db.session.add(run)
+    db.session.commit()
+
+    try:
+        # Atualiza etapa B5 em aberto com resultado e flag de retrabalho
+        status = "APR" if run.final_ok else "REP"
+        order = GPWorkOrder.query.filter_by(serial=serial).first()
+        if order:
+            stage_b5 = GPWorkStage.query.filter_by(order_id=order.id, bench_id="b5", finished_at=None).first()
+            if stage_b5:
+                stage_b5.result = status
+                stage_b5.rework_flag = (status == "REP")
+                db.session.add(stage_b5)
+        # Aplica o resultado global usando o serviço, que fecha a etapa e avança
+        aplicar_resultado_hipot({"serial": serial, "status": status})
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "falha ao aplicar resultado"}), 500
+
+    return jsonify({"ok": True, "final_ok": run.final_ok})
 
