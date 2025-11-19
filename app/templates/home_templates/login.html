@@ -55,6 +55,23 @@
   .auth-btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 28px rgba(230,0,0,.36); filter:saturate(1.05) }
   .auth-btn:active{ transform: none }
 
+  /* Link de cadastro estilizado */
+  .auth-register-link {
+    text-align: center;
+    margin: 20px 0;
+  }
+  .auth-register-link a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    border-bottom: 1px dashed var(--muted);
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .auth-register-link a:hover {
+    color: var(--text);
+    border-bottom-color: var(--text);
+  }
+
   .auth-foot{
     margin-top:12px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:12px;
   }
@@ -88,11 +105,16 @@
         <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> &nbsp;Entrar
       </button>
 
-      <!-- Mostra erro via variável simples OU via flash global -->
       {% if erro %}
         <div class="flash danger auth-err">{{ erro }}</div>
       {% endif %}
     </form>
+
+    <div class="auth-register-link">
+      <a href="{{ url_for('login_bp.registro') }}">
+        Não tem uma conta? <strong>Cadastre-se aqui</strong>
+      </a>
+    </div>
 
     <div class="auth-foot">
       <span>&copy; {{ 2025 }} Pneumark</span>

@@ -1,30 +1,29 @@
 from __future__ import annotations
 
 """
-gp_painel_scan_api.py (v5-fix – robusta, com realinhamento por roteiro)
+gp_painel_scan_api.py (v6.1 – Revisado)
 
 - Garante que TODO scan siga o roteiro salvo em gp_bench_config (campo `ativo`).
 - Realinha automaticamente quando a bancada lida não está no roteiro (sem bloquear).
-- Evita etapa duplicada; fecha outras abertas ao iniciar nova bancada.
+- Pula etapas desativadas (Ex: se B7 inativa, vai de B6 -> B8).
 - Mantém debounce da B5; trata station/workstation e result/rework_flag.
-- Usa fallback se bench_flow_service não estiver disponível.
-- [v6] Chama estoque_service.update_stock_after_finish() ao finalizar.
+- Chama estoque_service.update_stock_after_finish() ao finalizar produção.
 """
 
 # ============================================================
 # BLOCO 1 — Imports e Blueprint
 # ============================================================
 import re
+import logging
 from typing import Optional, Tuple, List, Dict
 from datetime import datetime, timedelta
-import logging
 
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)  # habilite se quiser forçar nível aqui
+# logger.setLevel(logging.INFO)
 
 gp_painel_scan_api_bp = Blueprint(
     "gp_painel_scan_api_bp",
@@ -93,12 +92,12 @@ def _parse_scan(text: str) -> Tuple[Optional[str], Optional[str]]:
 
 
 # ============================================================
-# BLOCO 5 — Roteiro (forçando rota central)
+# BLOCO 5 — Roteiro (forçando rota central e pulando inativos)
 # ============================================================
 def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
     """
-    Retorna a sequência de bancadas habilitadas para o modelo da ordem,
-    sempre priorizando a rota central (bench_flow_service.route_for_model).
+    Retorna a sequência de bancadas habilitadas para o modelo da ordem.
+    Lê GPBenchConfig para saber quais etapas (b1..b8) estão ativas.
     """
     # 1) Tenta usar a rota central (fonte única e confiável)
     try:
@@ -120,18 +119,14 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
     except Exception:
         pass
 
-    # 2) Fallback local (só se a importação/rota central falhar MESMO)
+    # 2) Fallback local (Query manual no GPBenchConfig se o serviço falhar)
     fallback_seq = [f"b{i}" for i in range(1, 9)]
     try:
         from app import db as _db
-        from app.models.producao_models.gp_modelos import GPBenchConfig, GPModel  # noqa
+        from app.models.producao_models.gp_modelos import GPBenchConfig, GPModel
     except Exception:
         # último recurso: todas
         seq = fallback_seq
-        if "b5" not in seq:
-            seq.append("b5")
-        if "b8" not in seq:
-            seq.append("b8")
         return sorted(set(seq), key=lambda k: int(k[1:]) if k[1:].isdigit() else 999)
 
     model_code = (
@@ -159,9 +154,9 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
                 )
         if q is None and hasattr(GPBenchConfig, "model_code") and model_code:
             q = GPBenchConfig.query.filter_by(model_code=model_code)
+
         if q is None:
-            # ⚠️ Importante: se não conseguimos filtrar por modelo, NÃO traga a tabela inteira.
-            # Em vez disso, volte para o fallback-seguro: b5/b8 e fim.
+            # Se não achou configuração, assume padrão B5 e B8 mínimas
             return ["b5", "b8"]
 
         if hasattr(GPBenchConfig, "bench_num"):
@@ -177,6 +172,7 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
 
     enabled: List[str] = []
     for c in configs:
+        # Normaliza chave da bancada (b1, b2...)
         key = None
         if hasattr(c, "bench_id") and getattr(c, "bench_id"):
             key = str(getattr(c, "bench_id")).lower()
@@ -185,21 +181,23 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
             key = f"b{int(b)}" if f"{b}".isdigit() else f"b{str(b).lower().lstrip('b')}"
         elif hasattr(c, "bench_num"):
             key = f"b{getattr(c, 'bench_num')}"
+
         if not key:
             continue
 
+        # Verifica se está ativo/habilitado
+        is_enabled = True
         if hasattr(c, "ativo"):
             is_enabled = bool(getattr(c, "ativo"))
         elif hasattr(c, "enabled"):
             is_enabled = bool(getattr(c, "enabled"))
         elif hasattr(c, "habilitar"):
             is_enabled = bool(getattr(c, "habilitar"))
-        else:
-            is_enabled = True
 
         if is_enabled and key.startswith("b") and key[1:].isdigit():
             enabled.append(f"b{int(key[1:])}")
 
+    # Garante etapas criticas
     if "b5" not in enabled:
         enabled.append("b5")
     if "b8" not in enabled:
@@ -209,14 +207,27 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
 
 
 def _next_bench_for_order(order: GPWorkOrder, from_bench: Optional[str]) -> str:
+    """
+    Calcula a PRÓXIMA bancada baseada APENAS nas bancadas ativas.
+    Se from_bench=B6 e B7 está desativada, retorna B8.
+    """
     seq = _benches_enabled_for_order(order)
     if not seq:
         return "final"
+
     if not from_bench or from_bench in TECH_COLUMNS:
         return seq[0]
+
+    # Se a bancada atual não está na sequencia (ex: foi desativada depois),
+    # tenta achar a mais próxima ou reinicia
     if from_bench not in seq:
+        # Tenta achar onde ela se encaixaria numericamente?
+        # Por segurança, joga para a primeira ou 'final' se já passou.
+        # Simplificação: retorna a primeira habilitada para realinhar.
         return seq[0]
+
     idx = seq.index(from_bench)
+    # Se existe um próximo no array, retorna ele. Se não, é final.
     return seq[idx + 1] if idx + 1 < len(seq) else "final"
 
 
@@ -264,22 +275,31 @@ def _finish_stage(order: GPWorkOrder, stage: GPWorkStage) -> str:
 # BLOCO 7 — B5 (debounce)
 # ============================================================
 def _b5_is_locked(order: GPWorkOrder) -> Tuple[bool, Optional[dict]]:
+    """
+    Impede reabertura imediata da B5 (HiPot) se aprovada recentemente.
+    """
     ultimo_status = (order.hipot_status or "").upper()
     if ultimo_status not in ("OK", "APR"):
         return False, None
+
     last_b5 = _get_last_b5_stage(order.id)
     if not (last_b5 and last_b5.finished_at):
         return False, None
+
     finished_at = last_b5.finished_at
     if getattr(finished_at, "tzinfo", None) is not None:
         finished_at = finished_at.replace(tzinfo=None)
+
     now = datetime.utcnow()
     delta = now - finished_at
+
     if delta >= timedelta(minutes=REOPEN_LOCK_MIN):
         return False, None
+
     remaining = timedelta(minutes=REOPEN_LOCK_MIN) - delta
     rem_min = int(remaining.total_seconds() // 60) + 1
     passed_min = max(0, int(delta.total_seconds() // 60))
+
     resp = {
         "serial": order.serial,
         "bench": "b5",
@@ -313,9 +333,12 @@ def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[st
         order = GPWorkOrder.query.filter_by(serial=serial).first()
         if not order:
             return {"ok": "false", "error": "order_not_found", "hint": str(e)}
+
         seq = _benches_enabled_for_order(order)
+        # Se bancada não está no roteiro (e não é técnica), realinha
         if bench not in seq and bench not in TECH_COLUMNS:
             bench = seq[0] if seq else "final"
+
         order.current_bench = bench
         if bench not in TECH_COLUMNS:
             stg = _find_open_stage(order.id, bench)
@@ -339,6 +362,8 @@ def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
         order = GPWorkOrder.query.filter_by(serial=serial).first()
         if not order:
             return {"ok": "false", "error": "order_not_found", "hint": str(e)}
+
+        # Aqui ele usa _next_bench_for_order que já pula as inativas
         nxt = _next_bench_for_order(order, order.current_bench)
         order.current_bench = nxt
         session.commit()
@@ -358,12 +383,9 @@ def scan_b5():
 def scan_generic():
     """
     Rota generica para scan de qualquer bancada (usada pelo board.html).
-
     Regras (toggle):
-      - 1o scan na bancada: abre etapa e seta current_bench.
-      - 2o scan na mesma bancada: fecha etapa e avanca para a proxima pelo roteiro.
-
-    Tambem aceita action explicito: "start" / "finish".
+      - 1o scan: abre etapa e seta current_bench.
+      - 2o scan: fecha etapa, avanca (pulando inativas) e checa estoque se finalizou.
     """
     try:
         if not request.is_json:
@@ -382,6 +404,7 @@ def scan_generic():
         station = (data.get("station") or data.get("workstation") or "").strip()
         say = ""
 
+        # Parser de scan (B5-123 ou 123)
         if raw_scan:
             parsed_bench, parsed_serial = _parse_scan(raw_scan)
             if parsed_serial:
@@ -390,8 +413,7 @@ def scan_generic():
                 bench_id = parsed_bench
 
         logger.info(
-            f"[scan] payload raw_scan='{raw_scan}' serial_in='{data.get('serial')}' bench_in='{data.get('bench') or data.get('bench_id')}' "
-            f"parsed_serial='{serial}' parsed_bench='{bench_id}' action_in='{action}' operador='{operador}' station='{station}'"
+            f"[scan] input: raw='{raw_scan}' s='{serial}' b='{bench_id}' act='{action}'"
         )
 
         if not serial:
@@ -405,65 +427,41 @@ def scan_generic():
                 message=f"Serial {serial} nao encontrado.",
             )
 
-        logger.info(
-            f"[scan] order_id={order.id} current_bench='{order.current_bench}' status='{order.status}'"
-        )
+        # Roteiro ativo do modelo
+        seq = _benches_enabled_for_order(order) or []
 
-        # Roteiro ativo do modelo — preferir serviço central
-        try:
-            from app.services.producao.bench_flow_service import (
-                route_for_model as _route_for_model,
-            )
-
-            model_code = getattr(order, "modelo", "") or getattr(
-                order, "model_code", ""
-            )
-            seq = _route_for_model(model_code) or []
-        except Exception:
-            seq = _benches_enabled_for_order(order) or []
-
+        # Determina bancada alvo (se não veio no scan, usa a atual da ordem)
         bench = (
             bench_id or order.current_bench or (seq[0] if seq else "final")
         ).lower()
 
-        logger.info(
-            f"[scan] seq={seq} bench_pre='{bench_id or order.current_bench}' resolved_bench='{bench}'"
-        )
-
-        # Realinhamento automatico se fora do roteiro
+        # Realinhamento automatico se fora do roteiro (e não for técnica)
         original_bench = bench
         if bench not in seq and bench not in TECH_COLUMNS:
             bench = seq[0] if seq else "final"
             logger.warning(
-                f"[scan] realinhado bench de '{original_bench}' para '{bench}' (fora do roteiro). seq={seq}"
+                f"[scan] realinhado bench de '{original_bench}' para '{bench}' (fora do roteiro)."
             )
             say = f"Lido {original_bench.upper()} fora do roteiro. Redirecionado para {bench.upper()}."
 
-        # Status
+        # Inicializa status se necessário
         if order.status not in ("in_progress", "queued"):
             order.status = "in_progress"
 
-        # Toggle
+        # Lógica de Toggle (Start/Finish)
         open_stage = _find_open_stage(order.id, bench)
-        logger.info(
-            f"[scan] open_stage={'yes' if open_stage else 'no'} for bench='{bench}'"
-        )
         if action not in ("start", "finish"):
             action = "finish" if open_stage else "start"
-
-        logger.info(f"[scan] resolved_action='{action}'")
 
         did_start = False
         did_finish = False
         bench_done = None
 
         if action == "start":
+            # Debounce da B5
             if bench == "b5":
                 locked, resp_locked = _b5_is_locked(order)
                 if locked:
-                    logger.info(
-                        f"[scan] B5 locked for serial={serial}; returning debounce"
-                    )
                     return _json_ok(**resp_locked)
 
             # Colunas tecnicas nao recebem etapas
@@ -481,7 +479,7 @@ def scan_generic():
                     say=say.strip(),
                 )
 
-            # Fecha outras etapas abertas (consistencia)
+            # Fecha outras etapas "esquecidas" abertas em outras bancadas
             others = GPWorkStage.query.filter(
                 GPWorkStage.order_id == order.id,
                 GPWorkStage.finished_at.is_(None),
@@ -490,32 +488,28 @@ def scan_generic():
             for st in others:
                 st.finished_at = datetime.utcnow()
 
-            # Integra com servico (ou fallback)
+            # Sincroniza com BenchFlowService
             rv_flow = _flow_set_current_bench_on_scan(db.session, serial, bench)
             if rv_flow.get("ok") != "true":
                 db.session.rollback()
                 return jsonify(rv_flow), 400
+
             bench = rv_flow.get("current_bench") or bench
 
-            # Recheca para evitar duplicidade
+            # Abre etapa se não existir
             open_stage = _find_open_stage(order.id, bench)
             if not open_stage:
                 new_stage = _open_stage(order, bench, operador)
                 if station:
-                    try:
-                        new_stage.workstation = station
-                        db.session.add(new_stage)
-                    except Exception as e:
-                        logger.debug(f"[scan] could not set workstation: {e}")
+                    new_stage.workstation = station
+                    db.session.add(new_stage)
 
             did_start = True
             say += f" Inicio registrado na {bench.upper()}."
-            logger.info(
-                f"[scan] START bench='{bench}' order_id={order.id} operador='{operador}' station='{station}'"
-            )
+            logger.info(f"[scan] START bench='{bench}' serial={serial}")
 
         elif action == "finish":
-            # Realinha antes de finalizar
+            # Realinha antes de finalizar (caso tenha mudado algo no roteiro)
             if bench not in seq and bench not in TECH_COLUMNS:
                 bench = order.current_bench or (seq[0] if seq else "final")
 
@@ -524,30 +518,28 @@ def scan_generic():
                 result = (data.get("result") or "OK").strip().upper()
                 if result not in ("OK", "FAIL", "APR", "REP"):
                     result = "OK"
-                try:
-                    open_stage.result = result
-                    open_stage.rework_flag = bool(data.get("rework") or False)
-                    if station:
-                        open_stage.workstation = station
-                    db.session.add(open_stage)
-                except Exception as e:
-                    logger.debug(f"[scan] set result/rework/ws failed: {e}")
 
+                open_stage.result = result
+                open_stage.rework_flag = bool(data.get("rework") or False)
+                if station:
+                    open_stage.workstation = station
+
+                db.session.add(open_stage)
+
+                # Finaliza e calcula próxima (pulando inativas)
                 _finish_stage(order, open_stage)
                 _flow_advance_after_finish(db.session, serial)
                 next_b = order.current_bench
 
-                # --- INÍCIO DA MODIFICAÇÃO ---
-                # Lógica de finalização (antes do commit)
+                # ========================================================
+                # VERIFICAÇÃO DE FIM DE PROCESSO E BAIXA DE ESTOQUE
+                # ========================================================
                 if order.current_bench == "final":
-                    # 1. Seta finished_at na ORDEM
-                    try:
-                        if getattr(order, "finished_at", None) is None:
-                            order.finished_at = datetime.utcnow()
-                    except Exception as e:
-                        logger.debug(f"[scan] could not set finished_at: {e}")
+                    # 1. Marca hora final na ordem
+                    if getattr(order, "finished_at", None) is None:
+                        order.finished_at = datetime.utcnow()
 
-                    # 2. ATUALIZA ESTOQUE (NOVO)
+                    # 2. Aciona serviço de estoque
                     try:
                         from app.services.estoque_service import (
                             update_stock_after_finish,
@@ -559,24 +551,21 @@ def scan_generic():
                         )
                     except ImportError:
                         logger.error(
-                            "[scan] Failed to import update_stock_after_finish. Stock NOT updated."
+                            "[scan] Failed to import update_stock_after_finish."
                         )
                     except Exception as e:
                         logger.error(f"[scan] update_stock_after_finish failed: {e}")
-                # --- FIM DA MODIFICAÇÃO ---
 
                 did_finish = True
                 bench_done = bench
                 say += f" Etapa finalizada na {bench.upper()}. Mover para {next_b.upper()}."
                 logger.info(
-                    f"[scan] FINISH bench='{bench}' order_id={order.id} result='{result}' moved_to='{next_b}'"
+                    f"[scan] FINISH bench='{bench}' serial={serial} next='{next_b}'"
                 )
             else:
+                # Tentou finalizar sem abrir
                 if not order.current_bench:
                     order.current_bench = bench
-                logger.warning(
-                    f"[scan] FINISH solicitado sem etapa aberta: serial={serial} bench='{bench}' order_id={order.id}"
-                )
                 say += f" Nao havia etapa aberta na {bench.upper()}. Faca o scan para iniciar."
 
         db.session.add(order)
@@ -590,13 +579,13 @@ def scan_generic():
             "finished": did_finish,
             "say": say.strip(),
         }
+
         if did_finish:
             resp["bench_done"] = bench_done
             resp["moved_to"] = order.current_bench
             resp["modelo"] = getattr(order, "modelo", "")
             resp["operador"] = operador
 
-            # A lógica de 'finished_at' e estoque foi movida para ANTES do commit
             if order.current_bench == "final":
                 resp["final_message"] = {
                     "titulo": "Montagem concluida",
@@ -616,9 +605,8 @@ def scan_generic():
         return _json_error(
             500,
             error="exception_scan",
-            message="Falha interna ao processar o scan na rota /scan.",
+            message="Falha interna ao processar o scan.",
             hint=str(e),
-            context={"route": "/producao/gp/painel/api/scan"},
         )
 
 

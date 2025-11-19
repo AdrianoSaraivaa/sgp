@@ -4,12 +4,10 @@ app/services/producao/bench_flow_service.py
 
 Serviço responsável por fazer o Painel respeitar o fluxo definido no Setup (gp_bench_config).
 Expõe 4 funções públicas:
-- route_for_model(modelo)            → lista de bancadas ATIVAS em ordem (b1..b8), sempre garantindo b5 e b8.
-- next_bench_for_order(order)        → próxima bancada pela rota considerando etapas já finalizadas.
-- set_current_bench_on_scan(session, serial, bench_id) → normaliza/realinha a bancada, seta current_bench e abre etapa se necessário.
-- advance_after_finish(session, serial)               → avança current_bench para a próxima bancada do roteiro após finalizar.
-
-Compatível com schemas que usem: bench_id | bench (int/str) | bench_num  e flags ativo|enabled|habilitar.
+- route_for_model(modelo)             → lista de bancadas ATIVAS em ordem (b1..b8), sempre garantindo b5 e b8.
+- next_bench_for_order(order)         → próxima bancada pela rota considerando etapas já finalizadas.
+- set_current_bench_on_scan(...)      → normaliza/realinha a bancada, seta current_bench e abre etapa se necessário.
+- advance_after_finish(...)           → avança current_bench para a próxima bancada do roteiro após finalizar.
 """
 from __future__ import annotations
 
@@ -86,6 +84,10 @@ def _cfg_is_enabled(cfg: GPBenchConfig) -> bool:
 
 
 def route_for_model(modelo: str) -> List[str]:
+    """
+    Retorna lista de bancadas ATIVAS para o modelo.
+    Ex: ['b5', 'b6', 'b8'] (se b7 estiver desativada).
+    """
     model = _find_model_by_name_or_code(modelo)
     if not model:
         logger.warning(
@@ -103,12 +105,17 @@ def route_for_model(modelo: str) -> List[str]:
             active.add(bid)
 
     active.update(MANDATORY)
+    # Ordena baseado na lista fixa b1..b8 para garantir sequencia logica
     rota = [b for b in ROUTE_ORDER if b in active]
     logger.debug(f"[bench_flow] Rota para modelo={modelo}: {rota}")
     return rota
 
 
 def next_bench_for_order(order: GPWorkOrder) -> str:
+    """
+    Retorna a primeira bancada da rota que ainda não foi finalizada.
+    Se todas finalizadas, retorna 'final'.
+    """
     rota = route_for_model(
         getattr(order, "modelo", "") or getattr(order, "model_code", "")
     )
@@ -120,6 +127,10 @@ def next_bench_for_order(order: GPWorkOrder) -> str:
 
 
 def set_current_bench_on_scan(session, serial: str, bench_id: str) -> Dict[str, str]:
+    """
+    Chamado quando o usuario scaneia uma bancada especifica.
+    Se a bancada nao estiver no roteiro, realinha para a primeira valida.
+    """
     bench_id = _norm_bench_id(bench_id)
     order = GPWorkOrder.query.filter_by(serial=serial).first()
     if not order:
@@ -128,11 +139,12 @@ def set_current_bench_on_scan(session, serial: str, bench_id: str) -> Dict[str, 
     rota = route_for_model(
         getattr(order, "modelo", "") or getattr(order, "model_code", "")
     )
-    if bench_id not in rota:
-        logger.info(
-            f"[bench_flow] Bench {bench_id} fora do roteiro. Realinhando para {rota[0] if rota else FINAL}."
-        )
-        bench_id = rota[0] if rota else FINAL
+
+    # Se tentou scanear algo fora do roteiro (ex: B7 inativa), joga para o inicio ou proxima valida
+    if bench_id not in rota and bench_id not in (ESTOQUE, FINAL):
+        logger.info(f"[bench_flow] Bench {bench_id} fora do roteiro. Realinhando.")
+        # Tenta achar a proxima logica, senao volta pro inicio
+        bench_id = next_bench_for_order(order)
 
     order.current_bench = bench_id
 
@@ -153,6 +165,9 @@ def set_current_bench_on_scan(session, serial: str, bench_id: str) -> Dict[str, 
 
 
 def advance_after_finish(session, serial: str) -> Dict[str, str]:
+    """
+    Chamado ao finalizar uma etapa. Calcula a proxima e atualiza a ordem.
+    """
     order = GPWorkOrder.query.filter_by(serial=serial).first()
     if not order:
         return {"ok": "false", "error": "order_not_found"}

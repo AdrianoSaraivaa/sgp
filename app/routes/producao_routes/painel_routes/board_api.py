@@ -5,7 +5,11 @@ from sqlalchemy import inspect, or_
 from datetime import timezone, timedelta, datetime, date
 from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 from app.models.producao_models.gp_modelos import GPModel, GPBenchConfig
-from app.routes.producao_routes.painel_routes.rop_service import list_rop_needs
+
+# Importa o serviço de ROP corrigido
+from app.routes.producao_routes.painel_routes.rop_service import (
+    get_rop_needs_and_banner,
+)
 
 gp_painel_api_bp = Blueprint(
     "gp_painel_api_bp", __name__, url_prefix="/producao/gp/painel/api"
@@ -39,13 +43,25 @@ def _enabled_seq_for_model(modelo: str):
                 bid = getattr(r, "bench_id", None) or (
                     f"b{getattr(r, 'bench_num', '')}".lower()
                 )
-                if bid and getattr(r, "enabled", getattr(r, "habilitar", True)):
+                # LÊ A CONFIGURAÇÃO 'ATIVO' CORRETAMENTE
+                is_active = getattr(
+                    r, "ativo", getattr(r, "enabled", getattr(r, "habilitar", True))
+                )
+                if bid and is_active:
                     seq.append(bid)
     except Exception:
         pass
+
+    # Fallback e garantias
     if not seq:
         seq = [f"b{i}" for i in range(1, 9)]
-    return seq
+
+    if "b5" not in seq:
+        seq.append("b5")
+    if "b8" not in seq:
+        seq.append("b8")
+
+    return sorted(list(set(seq)), key=lambda x: int(x[1:]) if x[1:].isdigit() else 99)
 
 
 @gp_painel_api_bp.get("/board")
@@ -82,7 +98,7 @@ def board_data():
     expected_cache = {}
 
     def expected_for(modelo, bench_id):
-        if bench_id not in EXPECTED_FALLBACK:
+        if bench_id not in {"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"}:
             return None
         if modelo not in expected_cache:
             expected_cache[modelo] = {}
@@ -116,6 +132,7 @@ def board_data():
         seq = _enabled_seq_for_model(o.modelo)
         idx = {b: i for i, b in enumerate(seq)}
 
+        # since: SOMENTE com etapa ABERTA na bancada atual
         if col_id == "sep":
             since_iso = None
         elif col_id == "final":
@@ -210,23 +227,11 @@ def board_data():
         for cid in ["sep", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "final"]
     ]
 
-    needs = []
-    needs_banner = ""
+    # === ROP Needs (USANDO A NOVA FUNÇÃO UNIFICADA) ===
     try:
-        needs = list_rop_needs(db.session) or []
-        parts = []
-        for row in needs:
-            sug = int(row.get("sugerido") or 0)  # corrigido aqui
-            mc = (
-                row.get("model_code")
-                or row.get("modelo")
-                or row.get("codigo")
-                or row.get("code")
-            )
-            if sug > 0 and mc:
-                parts.append(f"{mc} +{sug}")
-        if parts:
-            needs_banner = "Montar: " + " • ".join(parts)
+        rop_data = get_rop_needs_and_banner(db.session)
+        needs = rop_data["needs"]
+        needs_banner = rop_data["needs_banner"]
     except Exception:
         needs = []
         needs_banner = ""
@@ -310,7 +315,7 @@ def kpis_dia():
 @gp_painel_api_bp.get("/needs")
 def needs_data():
     try:
-        needs = list_rop_needs(db.session) or []
-        return jsonify(needs), 200
+        rop_data = get_rop_needs_and_banner(db.session)
+        return jsonify(rop_data["needs"]), 200
     except Exception:
         return jsonify([]), 200

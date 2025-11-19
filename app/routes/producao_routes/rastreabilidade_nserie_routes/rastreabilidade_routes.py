@@ -168,8 +168,9 @@ def _safe_int_minutes(
 def rastreabilidade_home():
     if (redir := _require_auth_redirect()) is not None:
         return redir
+    # CORREÇÃO: Apontando para o arquivo correto e atualizado
     return render_template(
-        "producao_templates/rastreabilidade_templates/rastreamento.html"
+        "producao_templates/rastreabilidade_templates/relatorio_rastreamento.html"
     )
 
 
