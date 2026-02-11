@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Editar Conjunto — {{ conjunto.descricao }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --brand:#e60000;
+      --brand-dark:#b30000;
+      --ink:#0f172a;
+      --muted:#667085;
+      --bg:#f4f6f8;
+      --card:#ffffff;
+      --border:#e5e7eb;
+      --ok:#10b981;
+      --warn:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      margin:0; padding:24px;
+    }
+    .shell{max-width:1100px;margin:0 auto}
+    .hero{
+      background:linear-gradient(135deg,#fff,#fff 40%, #ffecec 100%);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:20px 22px;
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      box-shadow:0 6px 20px rgba(0,0,0,.06)
+    }
+    .hero h1{font-size:20px;margin:0;color:var(--ink);font-weight:700}
+    .hero small{color:var(--muted)}
+    .tag{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fff
+    }
+    .tag .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 0 rgba(230,0,0,.6);animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(230,0,0,.5)}70%{box-shadow:0 0 0 14px rgba(230,0,0,0)}100%{box-shadow:0 0 0 0 rgba(230,0,0,0)}}
+
+    .grid{display:grid;gap:16px;margin-top:18px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media (max-width:980px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:18px;
+      box-shadow:0 4px 14px rgba(0,0,0,.05)
+    }
+    .card h3{margin:0 0 12px 0;font-size:16px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type="text"],input[type="number"]{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;outline:none
+    }
+    input[type="text"]:focus,input[type="number"]:focus{border-color:var(--brand)}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .btn{
+      border:1px solid var(--border);background:#fff;color:var(--ink);
+      padding:10px 14px;border-radius:10px;cursor:pointer
+    }
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.primary:hover{background:var(--brand-dark)}
+    .btn.ghost{background:#fff}
+    .btn.muted{background:#f3f4f6}
+    .btn.warn{background:#fff3cd;border-color:#ffe69c}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+    thead th{font-size:12px;color:var(--muted);font-weight:600}
+    tbody tr:hover{background:#fafafa}
+
+    .inline{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+    .grow{flex:1}
+    .right{margin-left:auto}
+    .muted{color:var(--muted)}
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+    /* Autocomplete popover */
+    .sugestoes{
+      position:absolute;inset:auto auto auto 0;
+      background:#fff;border:1px solid var(--border);border-radius:10px;
+      max-height:220px;overflow:auto;z-index:9999;min-width:320px;box-shadow:0 10px 24px rgba(0,0,0,.08)
+    }
+    .sugestoes div{padding:10px 12px;cursor:pointer}
+    .sugestoes div:hover{background:#f6f6f6}
+    .rel{position:relative}
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <!-- Cabeçalho -->
+    <div class="hero">
+      <div>
+        <h1>Editar Conjunto <small class="muted">• {{ conjunto.codigo_pneumark }}</small></h1>
+        <small class="muted">Descrição atual: <strong>{{ conjunto.descricao }}</strong></small>
+      </div>
+      <div class="tag" title="Conjunto">
+        <span class="dot"></span>
+        <span>Conjunto • Ponto de Pedido & Estoques</span>
+      </div>
+    </div>
+
+    <!-- 1) Parâmetros do Conjunto -->
+    <form class="card" method="POST" action="{{ url_for('editar_peca_bp.editar_peca', peca_id=conjunto.id) }}">
+      <h3>Parâmetros do conjunto</h3>
+      <div class="grid grid-3">
+        <div>
+          <label>Código Pneumark</label>
+          <input type="text" name="codigo_pneumark" value="{{ conjunto.codigo_pneumark or '' }}" />
+          <div class="hint">Ex.: 7-000, 2-000, PM0025…</div>
+        </div>
+        <div class="grow">
+          <label>Descrição</label>
+          <input type="text" name="descricao" value="{{ conjunto.descricao or '' }}" />
+        </div>
+        <div>
+          <label>Código OMIE (opcional)</label>
+          <input type="text" name="codigo_omie" value="{{ conjunto.codigo_omie or '' }}" />
+        </div>
+
+        <div>
+          <label>Estoque Atual</label>
+          <input type="number" name="estoque_atual" value="{{ conjunto.estoque_atual or 0 }}" />
+        </div>
+        <div>
+          <label>Estoque Mínimo</label>
+          <input type="number" name="estoque_minimo" value="{{ conjunto.estoque_minimo or 0 }}" />
+        </div>
+        <div>
+          <label>Ponto de Pedido</label>
+          <input type="number" name="ponto_pedido" value="{{ conjunto.ponto_pedido or 0 }}" />
+        </div>
+
+        <div>
+          <label>Estoque Máximo</label>
+          <input type="number" name="estoque_maximo" value="{{ conjunto.estoque_maximo or 0 }}" />
+        </div>
+        <div>
+          <label>Margem (%)</label>
+          <input type="number" step="0.01" name="margem" value="{{ conjunto.margem or 0 }}" />
+        </div>
+        <div>
+          <label>Custo (R$)</label>
+          <input type="number" step="0.01" name="custo" value="{{ conjunto.custo or 0 }}" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" type="submit">Salvar parâmetros</button>
+        <a href="{{ url_for('listar_pecas_bp.listar_pecas') }}" class="btn ghost">Voltar à lista</a>
+        <span class="muted">Os parâmetros acima são gravados diretamente no cadastro desta peça do tipo <em>conjunto</em>.</span>
+      </div>
+    </form>
+
+    <!-- 2) Estrutura (BOM) -->
+    <form class="card" method="POST" action="{{ url_for('editar_peca_bp.salvar_estrutura_conjunto', peca_id=conjunto.id) }}">
+      <h3>Estrutura do conjunto (BOM)</h3>
+
+      <div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:12px">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">Código da Peça</th>
+              <th>Descrição</th>
+              <th style="width:16%">Quantidade</th>
+              <th style="width:12%">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-bom">
+            {% for item in estrutura %}
+            <tr>
+              <td>
+                <input type="hidden" name="codigo_peca[]" value="{{ item.codigo_peca }}" />
+                {{ item.codigo_peca }}
+              </td>
+              <td>{{ item.descricao }}</td>
+              <td><input type="number" name="quantidade[]" value="{{ item.quantidade }}" required /></td>
+              <td><button class="btn muted" type="button" onclick="removerLinha(this)">Remover</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="inline" style="margin-top:12px">
+        <div class="rel grow">
+          <label>Pesquisar peça por descrição</label>
+          <input type="text" id="nova_descricao" placeholder="Digite para buscar..." autocomplete="off" />
+          <div id="sugestoes_autocomplete" class="sugestoes" style="display:none"></div>
+        </div>
+        <div style="width:220px">
+          <label>Código</label>
+          <input type="text" id="novo_codigo" readonly />
+        </div>
+        <div style="width:160px">
+          <label>Quantidade</label>
+          <input type="number" id="nova_quantidade" />
+        </div>
+        <div>
+          <button class="btn" type="button" onclick="adicionarPeca()">Adicionar à estrutura</button>
+        </div>
+        <div class="right muted">Use a busca para preencher código automaticamente.</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" type="submit">Salvar estrutura</button>
+        <a href="{{ url_for('listar_pecas_bp.listar_pecas') }}" class="btn ghost">Cancelar</a>
+        <span class="muted">Ao salvar, a estrutura antiga é substituída pela lista atual.</span>
+      </div>
+    </form>
+
+  </div>
+
+  <script>
+    // ====== AUTOCOMPLETE POR DESCRIÇÃO ======
+    const boxSugestoes = document.getElementById('sugestoes_autocomplete');
+    const inputDesc = document.getElementById('nova_descricao');
+    const inputCod = document.getElementById('novo_codigo');
+    const inputQtd = document.getElementById('nova_quantidade');
+    const tbody = document.getElementById('tbody-bom');
+
+    let cacheBusca = [];
+    let debounceT;
+
+    inputDesc.addEventListener('input', () => {
+      clearTimeout(debounceT);
+      const termo = inputDesc.value.trim();
+      if (termo.length < 1){
+        boxSugestoes.style.display = 'none';
+        boxSugestoes.innerHTML = '';
+        return;
+      }
+      debounceT = setTimeout(()=> consultarAutocomplete(termo), 180);
+    });
+
+    inputDesc.addEventListener('focus', () => {
+      if (boxSugestoes.innerHTML.trim() !== '') boxSugestoes.style.display = 'block';
+    });
+    document.addEventListener('click', (e)=>{
+      if (!boxSugestoes.contains(e.target) && e.target !== inputDesc){
+        boxSugestoes.style.display = 'none';
+      }
+    });
+
+    function consultarAutocomplete(termo){
+      fetch(`/api/pecas_autocomplete?termo=${encodeURIComponent(termo)}`)
+        .then(r => r.json())
+        .then(dados => {
+          cacheBusca = dados || [];
+          renderSugestoes(cacheBusca);
+        })
+        .catch(()=>{ cacheBusca=[]; renderSugestoes([]); });
+    }
+
+    function renderSugestoes(lista){
+      if (!lista.length){
+        boxSugestoes.style.display = 'none';
+        boxSugestoes.innerHTML = '';
+        return;
+      }
+      boxSugestoes.innerHTML = lista.map(p => `
+        <div onclick="selecionarPeca('${escapeHtml(p.descricao)}','${escapeHtml(p.codigo || p.codigo_pneumark || '')}')">
+          ${escapeHtml(p.descricao)}
+        </div>
+      `).join('');
+      boxSugestoes.style.display = 'block';
+    }
+
+    function selecionarPeca(desc, cod){
+      inputDesc.value = unescapeHtml(desc);
+      inputCod.value = unescapeHtml(cod);
+      boxSugestoes.innerHTML = '';
+      boxSugestoes.style.display = 'none';
+      inputQtd.focus();
+    }
+
+    // ====== MANIPULAÇÃO DA TABELA ======
+    function removerLinha(btn){
+      const tr = btn.closest('tr');
+      tr?.remove();
+    }
+
+    function adicionarPeca(){
+      const desc = inputDesc.value.trim();
+      const cod  = inputCod.value.trim();
+      const qtd  = inputQtd.value.trim();
+
+      if (!desc || !cod || !qtd){
+        alert('Preencha descrição, código e quantidade.');
+        return;
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="hidden" name="codigo_peca[]" value="${escapeAttr(cod)}" />${escapeHtml(cod)}</td>
+        <td>${escapeHtml(desc)}</td>
+        <td><input type="number" name="quantidade[]" value="${escapeAttr(qtd)}" required /></td>
+        <td><button class="btn muted" type="button" onclick="removerLinha(this)">Remover</button></td>
+      `;
+      tbody.appendChild(tr);
+
+      inputDesc.value = '';
+      inputCod.value = '';
+      inputQtd.value = '';
+      inputDesc.focus();
+    }
+
+    // ====== HELPERS DE ESCAPE ======
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function unescapeHtml(s){ const t=document.createElement('textarea'); t.innerHTML=s; return t.value; }
+    function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+  </script>
+</body>
+</html>

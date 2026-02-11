@@ -1,0 +1,71 @@
+{% extends "_base.html" %}
+{% block title %}Bancada 8 — Checklist (Builder){% endblock %}
+{% block subtitle %}Defina até 10 itens de verificação por modelo{% endblock %}
+
+{% block head_extra %}
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 12px; color: #e60000; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar select, .toolbar button { height: 36px; }
+  .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; }
+  .toolbar button { padding: 0 12px; border: 1px solid #ccc; background: #fafafa; border-radius: 6px; cursor: pointer; }
+  .toolbar button.primary { background: #e60000; color: #fff; border-color: #e60000; }
+  .table { width: 100%; border-collapse: collapse; }
+  .table th, .table td { border-bottom: 1px solid #eee; padding: 6px; vertical-align: middle; font-size: 14px; }
+  .table th { text-align: left; color: #444; font-weight: 600; }
+  .ordem { width: 40px; text-align: center; }
+  .tempo { width: 100px; }
+  .check { text-align: center; width: 80px; }
+  textarea.desc { width: 100%; resize: none; border: 1px solid #ccc; border-radius: 6px; padding: 6px; line-height: 1.3; }
+  input.num { width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 4px; text-align: right; }
+  input.chk { transform: scale(1.2); }
+  .footer-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+
+  <div class="card no-hover"
+    style="display:flex; justify-content:center; align-items:center;">
+    <div class="toolbar" style="display:flex; align-items:center; gap:8px;">
+      <label for="modeloSel"><b>Selecione o modelo:</b></label>
+
+      <select id="modeloSel">
+        <option value="PM700">PM700</option>
+        <option value="PM2100">PM2100</option>
+        <option value="PM2200">PM2200</option>
+      </select>
+      
+    </div>
+  </div>
+
+  <div class="card no-hover">
+    <h3>Itens do checklist</h3>
+    <table class="table" id="tbl">
+      <thead>
+        <tr>
+          <th class="ordem">#</th>
+          <th>Descrição</th>
+          <th class="tempo">Tempo alvo (s)</th>
+          <th class="tempo">Mín (s)</th>
+          <th class="tempo">Máx (s)</th>
+          <th class="check">Bloq.</th>
+          <th class="check">Nota se NÃO</th>
+          <th class="check">Ativo</th>
+          <th>Remover</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="toolbar footer-actions">
+      <button id="btnAddItem2">+ Item</button>
+      <button id="btnSalvar2" class="primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/gp_checklist/builder.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,281 @@
+{% extends "_base.html" %}
+{% block title %}Comunicação OMIE — Pneumark SGP{% endblock %}
+{% block module_name %}Comunicação com o OMIE{% endblock %}
+{% block subtitle %}Requisições automáticas por Ponto de Pedido + Exportações{% endblock %}
+
+{# ============================ ESTILOS ESPECÍFICOS ============================ #}
+{% block head_extra %}
+<style>
+  .omie-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .card{background:#fff;border:1px solid var(--border,#e6e6e6);border-radius:14px;padding:16px}
+  .card h3{margin:0 0 8px 0;font-size:18px}
+  .muted{color:#666}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .toolbar input,.toolbar select,.toolbar button{
+    padding:8px 10px;border:1px solid var(--border,#e6e6e6);border-radius:10px;background:#fff
+  }
+  .toolbar .spacer{flex:1}
+  .table-wrap{overflow:auto;border:1px solid var(--border,#e6e6e6);border-radius:12px}
+  table{width:100%;border-collapse:separate;border-spacing:0}
+  th,td{padding:10px 12px;border-bottom:1px solid #eee;vertical-align:middle;white-space:nowrap}
+  th{background:#fafafa;text-align:left;position:sticky;top:0;z-index:1}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid #ddd}
+  .badge.ok{background:#f0fff5;border-color:#d6f5df}
+  .badge.err{background:#fff5f5;border-color:#ffd6d6}
+  .badge.pend{background:#f8f9ff;border-color:#dfe3ff}
+  .actions{display:flex;gap:8px;align-items:center}
+  .btn{cursor:pointer}
+  .btn.primary{background:#0f62fe;color:#fff;border:1px solid #0f62fe}
+  .btn.ghost{background:#fff}
+  .btn.icon{display:inline-flex;align-items:center;gap:6px}
+  .empty{padding:20px;text-align:center;color:#666}
+  /* Modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;z-index:1000}
+  .modal{width:min(900px,95vw);background:#fff;border-radius:14px;border:1px solid #e6e6e6;box-shadow:0 10px 30px rgba(0,0,0,.2);overflow:hidden}
+  .modal header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #eee}
+  .modal .content{padding:16px}
+  .close{border:none;background:transparent;font-size:22px;cursor:pointer}
+  /* Toast */
+  .toast{position:fixed;right:16px;bottom:16px;display:none;gap:10px;align-items:center;background:#111;color:#fff;padding:12px 14px;border-radius:12px}
+  @media (max-width: 1100px){ .omie-grid{grid-template-columns:1fr} }
+</style>
+{% endblock %}
+
+{# ============================ CONTEÚDO DA PÁGINA ============================ #}
+{% block content %}
+<div class="omie-grid">
+
+  <!-- Card 1: Últimas Requisições -->
+  <section class="card" style="grid-column: span 12;">
+    <h3>Últimas Requisições</h3>
+    <p class="muted">Criadas automaticamente quando peças atingem o <b>Ponto de Pedido</b>. Abaixo, apenas consulta e exportação.</p>
+
+    <div class="toolbar">
+      <input id="busca" type="search" placeholder="Buscar por fornecedor, código interno ou codIntReqCompra…">
+      <select id="filtroStatus">
+        <option value="">Status (todos)</option>
+        <option value="enviado">Enviado</option>
+        <option value="erro">Erro</option>
+        <option value="pendente">Pendente</option>
+      </select>
+      <input id="dataDe" type="date" title="De">
+      <span>—</span>
+      <input id="dataAte" type="date" title="Até">
+      <div class="spacer"></div>
+      <button class="btn ghost icon" id="btnExportCsv">⬇ CSV</button>
+      <button class="btn ghost icon" id="btnExportXlsx">⬇ Excel</button>
+    </div>
+
+    <div id="wrapTabelaReq" class="table-wrap">
+      <table id="tabelaReq">
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Fornecedor</th>
+            <th>codIntReqCompra</th>
+            <th>Itens</th>
+            <th>Qtde total</th>
+            <th>Status</th>
+            <th>E-mail</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="reqBody">
+          <tr class="empty-row">
+            <td colspan="8"><div class="empty">Sem registros para o filtro atual.</div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Card 2: Exportações -->
+  <section class="card" style="grid-column: span 12;">
+    <h3>Comunicação & Cadastros</h3>
+    <p class="muted">Exportações para auditoria/validação.</p>
+    <div class="actions" style="flex-wrap:wrap">
+      <button class="btn ghost icon" id="btnExpProdutos">⬇ Produtos (Excel)</button>
+      <button class="btn ghost icon" id="btnExpFornecedores">⬇ Fornecedores (Excel)</button>
+      <button class="btn ghost icon" id="btnExpProdForn">⬇ Produto × Fornecedor (Excel)</button>
+      <button class="btn ghost icon" id="btnExpSnapshotPP">⬇ Snapshot Ponto de Pedido (Excel)</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- Modal de Detalhes -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <header>
+      <h4 id="modalTitulo">Detalhes da Requisição</h4>
+      <button class="close" id="fecharModal" aria-label="Fechar">×</button>
+    </header>
+    <div class="content">
+      <div class="muted" id="metaReq"></div>
+      <div class="table-wrap" style="margin-top:10px">
+        <table>
+          <thead>
+            <tr>
+              <th>Código Interno</th>
+              <th>Descrição</th>
+              <th>codProd (OMIE)</th>
+              <th>Qtde</th>
+              <th>Obs Item</th>
+            </tr>
+          </thead>
+          <tbody id="itensReq">
+            <tr><td colspan="5" class="muted">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="actions" style="justify-content:flex-end;margin-top:12px">
+        <a id="linkOmie" class="btn ghost" target="_blank" rel="noopener">Abrir no OMIE</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg">Pronto.</span></div>
+{% endblock %}
+
+{# ============================ JS ============================ #}
+{% block scripts_extra %}
+<script>
+  console.log("[OMIE] :: Scripts carregados com sucesso.");
+
+  const elBody = document.getElementById('reqBody');
+  const busca = document.getElementById('busca');
+  const filtroStatus = document.getElementById('filtroStatus');
+  const dataDe = document.getElementById('dataDe');
+  const dataAte = document.getElementById('dataAte');
+
+  const API = {
+    listarRequisicoes: '/estoque/omie/api/requisicoes/listar',
+    detalhesRequisicao: (cod) => `/estoque/omie/api/requisicoes/${encodeURIComponent(cod)}`,
+    exportCsv: '/estoque/omie/api/requisicoes/export.csv',
+    exportXlsx: '/estoque/omie/api/requisicoes/export.xlsx',
+    expProdutos: '/estoque/omie/api/export/produtos.xlsx',
+    expFornecedores: '/estoque/omie/api/export/fornecedores.xlsx',
+    expProdForn: '/estoque/omie/api/export/produto_fornecedor.xlsx',
+    expSnapshotPP: '/estoque/omie/api/export/snapshot_pontopedido.xlsx'
+  };
+
+  function statusBadge(st){
+    if(st === 'enviado') return `<span class="badge ok">enviado</span>`;
+    if(st === 'erro') return `<span class="badge err">erro</span>`;
+    return `<span class="badge pend">pendente</span>`;
+  }
+
+  function renderRow(rec){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${rec.data_hora}</td>
+      <td>${rec.fornecedor}</td>
+      <td>${rec.cod_int}</td>
+      <td>${rec.itens}</td>
+      <td>${rec.qtde_total}</td>
+      <td>${statusBadge(rec.status)}</td>
+      <td>${rec.email_enviado ? '✅' : '—'}</td>
+      <td class="actions"><button class="btn ghost" data-det="${rec.cod_int}">detalhes</button></td>
+    `;
+    return tr;
+  }
+
+  async function carregarLista(){
+    try{
+      console.log("[OMIE] :: Carregar lista requisicoes...");
+      const url = new URL(API.listarRequisicoes, window.location.origin);
+      if(busca.value) url.searchParams.set('q', busca.value.trim());
+      if(filtroStatus.value) url.searchParams.set('status', filtroStatus.value);
+      if(dataDe.value) url.searchParams.set('de', dataDe.value);
+      if(dataAte.value) url.searchParams.set('ate', dataAte.value);
+
+      const res = await fetch(url, { cache: 'no-store' });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      elBody.innerHTML = '';
+      if(!data.items.length){
+        elBody.innerHTML = `<tr><td colspan="8" class="muted">Nenhum registro encontrado.</td></tr>`;
+        return;
+      }
+      for(const rec of data.items) elBody.appendChild(renderRow(rec));
+    }catch(err){
+      console.error("[OMIE] :: Falha carregar lista", err);
+      elBody.innerHTML = `<tr><td colspan="8" class="muted">Erro ao carregar lista.</td></tr>`;
+    }
+  }
+
+  [busca, filtroStatus, dataDe, dataAte].forEach(el=>{
+    el.addEventListener('change', carregarLista);
+    el.addEventListener('keyup', ev=>{ if(ev.key==='Enter') carregarLista(); });
+  });
+
+  carregarLista(); // load inicial
+
+
+// ===== Modal Detalhes =====
+const backdrop = document.getElementById('modalBackdrop');
+const fecharModal = document.getElementById('fecharModal');
+const metaReq = document.getElementById('metaReq');
+const itensReq = document.getElementById('itensReq');
+const linkOmie = document.getElementById('linkOmie');
+
+function abrirModal(){ backdrop.style.display='flex'; backdrop.setAttribute('aria-hidden','false'); }
+function fechar(){ backdrop.style.display='none'; backdrop.setAttribute('aria-hidden','true'); }
+
+fecharModal.addEventListener('click', fechar);
+backdrop.addEventListener('click', (e)=> { if(e.target===backdrop) fechar(); });
+
+// Delegação de evento para todos os botões "detalhes"
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-det]');
+  if(!btn) return;
+
+  const cod = btn.getAttribute('data-det');
+  try{
+    // limpa conteúdo enquanto carrega
+    metaReq.textContent = 'Carregando...';
+    itensReq.innerHTML = `<tr><td colspan="5" class="muted">Carregando…</td></tr>`;
+    abrirModal();
+
+    const res = await fetch(API.detalhesRequisicao(cod), { cache: 'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    metaReq.innerHTML = `
+      <div><b>Fornecedor:</b> ${data.cab.fornecedor}</div>
+      <div><b>codIntReqCompra:</b> ${data.cab.cod}</div>
+      <div><b>Data/Hora:</b> ${data.cab.data_hora}</div>
+      <div><b>Status:</b> ${data.cab.status}</div>
+      <div><b>E-mail:</b> ${data.cab.email_enviado ? 'enviado' : '—'}</div>
+    `;
+    itensReq.innerHTML = data.itens.map(i=>`
+      <tr>
+        <td>${i.codigo_interno}</td>
+        <td>${i.descricao}</td>
+        <td>${i.codProd || '—'}</td>
+        <td>${i.qtde}</td>
+        <td>${i.obs || ''}</td>
+      </tr>
+    `).join('');
+    linkOmie.href = data.cab.link_omie || '#';
+  }catch(err){
+    console.error('Falha ao carregar detalhes:', err);
+    metaReq.textContent = 'Erro ao carregar detalhes.';
+    itensReq.innerHTML = `<tr><td colspan="5" class="muted">Não foi possível carregar os itens.</td></tr>`;
+  }
+});
+
+
+
+
+
+
+
+
+
+
+</script>
+{% endblock %}

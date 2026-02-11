@@ -1,0 +1,23 @@
+{% extends "_base.html" %}
+
+{% block title %}Acesso à Rastreabilidade{% endblock %}
+{% block module_name %}Rastreabilidade — Acesso{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:420px;margin:40px auto;padding:24px;text-align:center;">
+  <h2>Área Restrita</h2>
+  <p>Digite a senha para acessar a rastreabilidade completa das máquinas.</p>
+
+  <form method="POST" action="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_senha') }}" style="margin-top:20px;">
+    <input type="password" name="senha" placeholder="Senha" required
+           style="padding:10px;width:100%;margin-bottom:14px;border:1px solid #ccc;border-radius:8px;">
+    <button type="submit" class="btn primary" style="width:100%;">Entrar</button>
+  </form>
+
+  {% with msgs = get_flashed_messages(category_filter=['error']) %}
+    {% if msgs %}
+      <div class="alert" style="margin-top:15px;color:#c00;">{{ msgs[0] }}</div>
+    {% endif %}
+  {% endwith %}
+</div>
+{% endblock %}

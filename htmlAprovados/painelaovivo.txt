@@ -1,0 +1,679 @@
+{% extends "_base.html" %}
+{% block title %}Painel ao Vivo — Produção{% endblock %}
+{% block module_name %}Painel ao Vivo{% endblock %}
+
+{% block head_extra %}
+<style>
+:root {
+  --bg: #f2f4f8;
+  --panel: #0f1b2a;
+  --border: #1f2d44;
+  --card: #13243a;
+  --text: #eaf2ff;
+  --muted: #b8c7e8;
+
+  --ok: #16a34a;
+  --warn: #f59e0b;
+  --late: #ef4444;
+  --critical: #e11d48;
+
+  --sep: #253249;
+  --final: #1f3a2c;
+
+  --glow-ok: rgba(22,163,74,.45);
+  --glow-warn: rgba(245,158,11,.45);
+  --glow-late: rgba(239,68,68,.55);
+  --glow-critical: rgba(225,29,72,.6);
+
+  --shadow-sm: 0 4px 12px rgba(0,0,0,.25);
+}
+
+/* “puxar” o painel para a esquerda */
+.board-tight .board-toolbar, .board-tight .board-grid { margin-left:-66px; width: calc(90% + 16px); }
+@media (min-width:1600px) { .board-tight .board-toolbar, .board-tight .board-grid { margin-left:-20px; width: calc(100% + 20px); } }
+
+/* toolbar */
+.board-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.board-toolbar .left{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.board-toolbar input,.board-toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+
+/* status chip com contraste */
+.status-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;font-weight:700}
+.status-chip .dot{width:10px;height:10px;border-radius:50%}
+.status--loading{background:#e2e8f0;color:#0f172a}
+.status--loading .dot{background:#64748b}
+.status--ok{background:#d1fae5;color:#065f46}
+.status--ok .dot{background:#10b981}
+.status--error{background:#fee2e2;color:#7f1d1d}
+.status--error .dot{background:#ef4444}
+
+/* board */
+.board-grid{display:grid;grid-template-columns: repeat(10, minmax(120px,1fr));gap:12px;align-items:start}
+.board-col{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px;min-height:420px;box-shadow: var(--shadow-sm)}
+.board-col h3{margin:0 0 10px;letter-spacing:.06em;color:#9fc3ff;font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px}
+.board-col h3 .badge{font-size:11px;padding:2px 6px;border-radius:999px;background:#0b2a4a;color:#a7c7ff;border:1px solid #274064}
+
+/* cards */
+.kitem{position:relative;background:#1b2a41;border:1px solid #274064;border-radius:14px;padding:12px 12px;margin:10px 0;color:#e8f0ff;font-weight:900;font-size:16px;text-align:center;box-shadow: var(--shadow-sm);overflow:hidden}
+.kitem .sub{display:block;font-weight:700;font-size:12px;opacity:.95;margin-top:6px}
+.kitem.sep   { background:var(--sep);   border-color:#3a5075;}
+.kitem.final { background:var(--final); border-color:#345f49;}
+
+/* estados com cores vivas */
+.k-ok{ background:#0d3b23; border-color:#1f7a45;}
+.k-warn{ background:#5b3c0a; border-color:#a87413;}
+.k-late{ background:#5a1313; border-color:#a62c2c;}
+.k-critical{ background:#5a0a1f; border-color:#b41c4f;}
+
+/* glow leve usando pseudo-elemento (perf) */
+.kitem::after{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;opacity:0;transition:opacity .3s}
+.k-ok::after{box-shadow:0 0 0 3px var(--glow-ok), 0 0 18px 4px var(--glow-ok)}
+.k-warn::after{box-shadow:0 0 0 3px var(--glow-warn), 0 0 18px 4px var(--glow-warn)}
+.k-late::after{box-shadow:0 0 0 3px var(--glow-late), 0 0 18px 4px var(--glow-late)}
+.k-critical::after{box-shadow:0 0 0 3px var(--glow-critical), 0 0 22px 6px var(--glow-critical)}
+.k-ok:hover::after,.k-warn:hover::after,.k-late:hover::after,.k-critical:hover::after{opacity:.7}
+
+/* pulsar acessível p/ atrasados */
+@keyframes pulseCard { 0%{transform:scale(1)} 50%{transform:scale(1.02)} 100%{transform:scale(1)} }
+.pulse{ animation: pulseCard 1.75s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .pulse{animation:none} }
+
+/* toast */
+.toast-container{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:9999}
+.toast{min-width:280px;max-width:420px;background:#0f172a;color:#e2e8f0;border:1px solid #26324a;padding:12px 14px;border-radius:12px;box-shadow: var(--shadow-sm);display:flex;gap:10px;align-items:flex-start}
+.toast .title{font-weight:800;margin-bottom:2px}
+.toast.success{border-color:#10b981}
+.toast.error{border-color:#ef4444}
+
+/* modal finalização */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9998}
+.modal{background:#0f172a;color:#e2e8f0;border:1px solid #26324a;border-radius:14px;max-width:520px;width:92%;padding:18px;box-shadow: var(--shadow-sm)}
+.modal h4{margin:0 0 8px;font-size:18px}
+.modal .actions{display:flex;justify-content:flex-end;margin-top:12px}
+.btn{padding:8px 12px;border-radius:10px;border:1px solid #29405f;background:#10243b;color:#e5edff;cursor:pointer}
+.btn.primary{background:#1d4ed8;border-color:#1d4ed8}
+.btn.outline{background:transparent}
+
+/* áudio */
+.audio-ctl{display:flex;align-items:center;gap:8px}
+.audio-ctl button{padding:6px 10px;border-radius:999px;border:1px solid #29405f;background:#0b2440;color:#cfe3ff}
+.audio-ctl input[type="range"]{accent-color:#1d4ed8}
+
+.muted{color:#7c8cab}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="board-tight">
+  <div class="board-toolbar">
+    <div class="left">
+      <span class="muted">Leitura manual (fallback):</span>
+      <input id="scanSerial" placeholder="Serial / código" aria-label="Serial">
+      <select id="scanBench" aria-label="Bancada">
+        <option value="sep">ESTOQUE</option>
+        <option value="b1">BANCADA 01</option>
+        <option value="b2">BANCADA 02</option>
+        <option value="b3">BANCADA 03</option>
+        <option value="b4">BANCADA 04</option>
+        <option value="b5">HI-POT</option>
+        <option value="b6">BANCADA 06</option>
+        <option value="b7">BANCADA 07</option>
+        <option value="b8">CHECKLIST</option>
+      </select>
+      <select id="scanAction" aria-label="Ação">
+        <option value="start">Iniciar</option>
+        <option value="finish">Finalizar</option>
+      </select>
+      <button id="btnScan" class="btn primary" type="button"><i class="fa fa-barcode"></i> Registrar</button>
+    </div>
+    <div class="actions" style="display:flex;align-items:center;gap:10px">
+      <div class="audio-ctl">
+        <button id="btnEnableAudio" title="Ativar áudio">Ativar áudio</button>
+        <button id="btnToggleAudio" title="Ligar/Desligar avisos">🔊</button>
+        <input id="audioVolume" type="range" min="0" max="1" step="0.05" value="0.5" title="Volume">
+      </div>
+      <span id="status" class="status-chip status--loading">
+        <span class="dot"></span><span id="statusText">Carregando…</span>
+      </span>
+    </div>
+  </div>
+
+  <div id="boardGrid" class="board-grid" aria-live="polite"></div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<!-- Modal de finalização -->
+<div class="modal-backdrop" id="finalBackdrop" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+  <div class="modal">
+    <h4 id="finalTitle">Concluído</h4>
+    <div id="finalMsg" class="muted">Mensagem</div>
+    <div class="actions">
+      <button class="btn outline" id="finalClose">OK</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const grid       = document.getElementById('boardGrid');
+  const statusChip = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const scanSerial = document.getElementById('scanSerial');
+  const scanBench  = document.getElementById('scanBench');
+  const scanAction = document.getElementById('scanAction');
+  const btnScan    = document.getElementById('btnScan');
+
+  const toastBox   = document.getElementById('toastContainer');
+  const finalBackdrop = document.getElementById('finalBackdrop');
+  const finalTitle = document.getElementById('finalTitle');
+  const finalMsg   = document.getElementById('finalMsg');
+  const finalClose = document.getElementById('finalClose');
+
+  const btnEnableAudio = document.getElementById('btnEnableAudio');
+  const btnToggleAudio = document.getElementById('btnToggleAudio');
+  const audioVolume    = document.getElementById('audioVolume');
+
+  // ---------- Utils ----------
+  function h(tag, cls, text){
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  function formatMMSS(seconds){
+    const s = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(s/60);
+    const ss = s % 60;
+    return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  }
+  function setStatus(state, text){
+    statusChip.classList.remove('status--loading','status--ok','status--error');
+    statusChip.classList.add(state);
+    statusText.textContent = text;
+  }
+
+  function showToast(title, message, kind='success', ttl=5000){
+    const el = h('div', `toast ${kind}`);
+    const body = h('div');
+    body.appendChild(h('div','title',title));
+    body.appendChild(h('div','',message));
+    el.appendChild(body);
+    toastBox.appendChild(el);
+    setTimeout(()=> {
+      el.style.opacity = '0';
+      setTimeout(()=> el.remove(), 350);
+    }, ttl);
+  }
+
+  // ---------- Modal final (sem botão OK + auto-close) ----------
+  let finalTimer = null;
+
+  function openFinalModal(title, message) {
+    finalTitle.textContent = title || 'Concluído';
+    finalMsg.textContent   = message || '';
+
+    // esconde botão OK se existir
+    if (typeof finalClose !== 'undefined' && finalClose) {
+      finalClose.style.display = 'none';
+    }
+
+    finalBackdrop.style.display = 'flex';
+
+    if (finalTimer) clearTimeout(finalTimer);
+    finalTimer = setTimeout(() => {
+      closeFinalModal();
+    }, 5000); // 5s (ajuste aqui se quiser 3000ms)
+  }
+
+  function closeFinalModal() {
+    if (finalTimer) {
+      clearTimeout(finalTimer);
+      finalTimer = null;
+    }
+    finalBackdrop.style.display = 'none';
+  }
+
+  finalBackdrop.addEventListener('click', (e) => {
+    if (e.target === finalBackdrop) closeFinalModal();
+  });
+
+  // ---------- Áudio (chime + voz) ----------
+  const AudioMgr = (function(){
+    let ctx = null;
+    let enabled = false;
+    let muted = false;
+    let vol = Number(localStorage.getItem('gp.audio.vol') || 0.5);
+    let q = [];
+    let speaking = false;
+
+    function ensureCtx(){
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    function unlock() {
+      ensureCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      g.gain.value = 0.0001; // blip inaudível
+      o.connect(g).connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + 0.02);
+      enabled = true;
+      localStorage.setItem('gp.audio.enabled','1');
+    }
+    function setMuted(flag){
+      muted = flag;
+      localStorage.setItem('gp.audio.muted', muted ? '1':'0');
+      if (btnToggleAudio) btnToggleAudio.textContent = muted ? '🔇' : '🔊';
+    }
+    function setVolume(v){
+      vol = Math.max(0, Math.min(1, Number(v)));
+      localStorage.setItem('gp.audio.vol', vol);
+    }
+
+    // Chime "airplane" (e "airplane_dd" = ding-dong)
+    function chime(preset = 'airplane'){
+      if (!enabled || muted) return;
+      ensureCtx();
+      const now = ctx.currentTime;
+
+      // base
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(3800, now);
+      lp.frequency.exponentialRampToValueAtTime(1800, now + 0.35);
+
+      const o1 = ctx.createOscillator();
+      o1.type = 'triangle';
+      o1.frequency.setValueAtTime(932.33, now); // Bb5
+
+      o1.connect(lp).connect(g).connect(ctx.destination);
+
+      const peak = 0.65 * vol;
+      g.gain.linearRampToValueAtTime(peak, now + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0009, now + 0.60);
+
+      o1.start(now);
+      o1.stop(now + 0.62);
+
+      if (preset === 'airplane_dd'){
+        const t2 = now + 0.18;
+        const g2 = ctx.createGain();
+        g2.gain.setValueAtTime(0, t2);
+
+        const lp2 = ctx.createBiquadFilter();
+        lp2.type = 'lowpass';
+        lp2.frequency.setValueAtTime(3400, t2);
+        lp2.frequency.exponentialRampToValueAtTime(1600, t2 + 0.35);
+
+        const o2 = ctx.createOscillator();
+        o2.type = 'triangle';
+        o2.frequency.setValueAtTime(698.46, t2); // F5
+
+        o2.connect(lp2).connect(g2).connect(ctx.destination);
+
+        const peak2 = 0.55 * vol;
+        g2.gain.linearRampToValueAtTime(peak2, t2 + 0.015);
+        g2.gain.exponentialRampToValueAtTime(0.0009, t2 + 0.60);
+
+        o2.start(t2);
+        o2.stop(t2 + 0.62);
+      }
+    }
+
+    function speak(text){
+      if (!enabled || muted) return;
+      if (!('speechSynthesis' in window)) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'pt-BR';
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+      utter.volume = vol;
+      speaking = true;
+      utter.onend = () => { speaking = false; pump(); };
+      window.speechSynthesis.speak(utter);
+    }
+
+    function queue(text){
+      if (!enabled || muted) return;
+      q.push(text);
+      pump();
+    }
+
+    let lastPlay = 0;
+    function pump(){
+      const now = Date.now();
+      if (speaking) return;
+      if (!q.length) return;
+      if (now - lastPlay < 1500) { setTimeout(pump, 300); return; } // rate-limit
+      const text = q.shift();
+      lastPlay = now;
+      chime('airplane'); // padrão
+      setTimeout(()=> speak(text), 120);
+    }
+
+    // init
+    (function(){
+      const en = localStorage.getItem('gp.audio.enabled') === '1';
+      const m  = localStorage.getItem('gp.audio.muted') === '1';
+      if (en) enabled = true;
+      setMuted(m);
+      setVolume(vol);
+    })();
+
+    return { unlock, setMuted, setVolume, queue, chime, enabled: ()=> enabled, muted: ()=> muted };
+  })();
+
+  // Desbloqueia o áudio na primeira interação (fallback)
+  window.addEventListener('click', function autoUnlock(){
+    try { if (!AudioMgr.enabled()) AudioMgr.unlock(); } catch(e){}
+    window.removeEventListener('click', autoUnlock);
+  }, { once: true });
+
+  if (btnEnableAudio) {
+    btnEnableAudio.addEventListener('click', () => {
+      AudioMgr.unlock();
+      showToast('Áudio ativado', 'Anúncios por voz habilitados.', 'success', 2500);
+    });
+  }
+  if (btnToggleAudio) {
+    btnToggleAudio.addEventListener('click', () => {
+      AudioMgr.setMuted(!AudioMgr.muted());
+      showToast(AudioMgr.muted() ? 'Áudio desativado' : 'Áudio ativado', '', 'success', 1800);
+    });
+  }
+  if (audioVolume) {
+    audioVolume.addEventListener('input', (e) => AudioMgr.setVolume(e.target.value));
+  }
+
+  // ---------- Voz por bancada (personalizável) ----------
+  const BENCH_SAY = {
+    sep:  ({modelo, serial}) => `Montagem de ${modelo}, série ${serial}. Inicio de Montagem.`,
+    b1:   ({modelo}) => `Montagem da ${modelo} na Bancada 1 finalizada.`,
+    b2:   ({modelo}) => `Bancada 2 concluída para a ${modelo}.`,
+    b3:   ({modelo}) => `Bancada 3 concluída. Continuidade autorizada.`,
+    b4:   ({modelo}) => `Bancada 4 finalizada para o modelo ${modelo}.`,
+    b5:   ({modelo}) => `Ensaios elétricos da ${modelo} aprovados no Hi-Pot.`,
+    b6:   ({modelo}) => `Bancada 6 concluída. ${modelo} Continuidade autorizada.`,
+    b7:   ({modelo}) => `Bancada 7 finalizada. Preparar próxima etapa.`,
+    b8:   ({modelo}) => `Checklist da ${modelo} concluído. Liberado.`,
+    final:({modelo, serial, operador}) => `Montagem do ${modelo}, série ${serial}, concluída. Excelente trabalho${operador ? ', ' + operador : ''}!`
+  };
+
+
+
+
+  function announceBenchDone({ bench, modelo, serial, operador }){
+    if (!bench) return;
+    try { AudioMgr.chime('airplane_dd'); } catch(e) {}
+    const sayFn = BENCH_SAY[bench] || ((ctx)=> `${bench} concluída.`);
+    const phrase = sayFn({ bench, modelo, serial, operador });
+    if (phrase) AudioMgr.queue(phrase);
+  }
+
+  // ---------- Board ----------
+  let lastData = null;
+  let lastUpdateAt = null;
+
+  function renderBoard(columns){
+    lastData = columns || [];
+    grid.innerHTML = "";
+
+    lastData.forEach(col => {
+      const colEl = h('div','board-col');
+      colEl.dataset.colId = col.id || '';
+      const title = h('h3','', col.title || col.id || '');
+      if (col.count != null) {
+        const b = h('span','badge', String(col.count));
+        title.appendChild(b);
+      }
+      colEl.appendChild(title);
+
+      (col.items || []).forEach(it => {
+        const el = h('div','kitem', it.serial || '');
+
+        if ((col.id || '') === 'sep')   el.classList.add('sep');
+        if ((col.id || '') === 'final') el.classList.add('final');
+
+        const sub = h('span','sub');
+        sub.dataset.since    = it.since || '';
+        sub.dataset.expected = it.expected_s ?? '';
+        sub.dataset.modelo   = it.modelo || '';
+        sub.textContent = it.modelo || '';
+        el.appendChild(sub);
+
+        // estado inicial pelas proporções (bancadas temporizadas)
+        if (/^b[1-8]$/.test(col.id || '') && it.since && it.expected_s){
+          const elapsed = (Date.now() - Date.parse(it.since)) / 1000;
+          applyStateByRatio(el, elapsed / it.expected_s);
+        }
+
+        el.title = [
+          it.modelo ? `Modelo: ${it.modelo}` : null,
+          it.since  ? `Desde: ${new Date(it.since).toLocaleString()}` : null,
+          it.expected_s ? `Esperado: ${formatMMSS(it.expected_s)}` : null
+        ].filter(Boolean).join(' • ');
+
+        colEl.appendChild(el);
+      });
+
+      grid.appendChild(colEl);
+    });
+  }
+
+  function applyStateByRatio(card, r){
+    const classes = ['k-ok','k-warn','k-late','k-critical','pulse'];
+    card.classList.remove(...classes);
+    if (r <= 1.0) card.classList.add('k-ok');
+    else if (r <= 1.3) card.classList.add('k-warn','pulse');
+    else if (r <= 1.8) card.classList.add('k-late','pulse');
+    else card.classList.add('k-critical','pulse');
+  }
+
+  // Atualiza apenas cronômetros/estados
+  function repaintTimers(){
+    grid.querySelectorAll('.board-col').forEach(colEl => {
+      const colId = colEl.dataset.colId || '';
+      const isTimedBench = /^b[1-8]$/.test(colId);
+
+      colEl.querySelectorAll('.kitem .sub').forEach(sub => {
+        const sinceISO = sub.dataset.since;
+        const expected = Number(sub.dataset.expected || 0);
+        const modelo   = sub.dataset.modelo || '';
+        const card     = sub.parentElement;
+
+        const baseModelo = modelo;
+        if (sinceISO && expected){
+          const elapsed = (Date.now() - Date.parse(sinceISO)) / 1000;
+          sub.textContent = `${baseModelo} • ${formatMMSS(elapsed)}`;
+          if (isTimedBench && card){
+            const ratio = elapsed / expected;
+            applyStateByRatio(card, ratio);
+          }
+        } else {
+          sub.textContent = baseModelo || '';
+        }
+      });
+    });
+  }
+
+  async function loadBoard(){
+    try{
+      setStatus('status--loading','Atualizando…');
+      const r = await fetch(`/producao/gp/painel/api/board`, {cache:'no-store'});
+      if(!r.ok) throw new Error('http');
+      const d = await r.json();
+      if(!d.ok) throw new Error('payload');
+
+      renderBoard(d.columns);
+      lastUpdateAt = Date.now();
+      setStatus('status--ok','Atualizado agora');
+      repaintTimers();
+    }catch{
+      setStatus('status--error','Falha ao atualizar');
+    }
+  }
+
+  // status "há Xs"
+  setInterval(() => {
+    if (!lastUpdateAt) return;
+    const diff = Math.floor((Date.now() - lastUpdateAt)/1000);
+    if (diff <= 1) { statusText.textContent = 'Atualizado agora'; return; }
+    statusText.textContent = `Atualizado há ${diff}s`;
+  }, 1000);
+
+  // ---------- Scan / Wrapper do endpoint ----------
+  async function postScan(payload){
+    try{
+      const resp = await fetch('/producao/gp/painel/api/scan', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json().catch(()=> ({}));
+
+      console.log('[scan] resposta:', data);
+
+      // Fala por bancada (finish) e finalização
+      if (data.ok && data.bench_done) {
+        announceBenchDone({
+          bench: data.bench_done,
+          modelo: data.modelo,
+          serial: data.serial,
+          operador: data.operador
+        });
+      }
+      if (data.final_message) {
+        const { modelo, serial, operador } = data.final_message;
+        announceBenchDone({ bench: 'final', modelo, serial, operador });
+      }
+
+      // UI: toast/modal quando tem final_message
+      if (data.final_message){
+        showToast(data.final_message.titulo || 'Concluído',
+                 data.final_message.mensagem || '',
+                 'success', 2000);
+        openFinalModal(data.final_message.titulo || 'Concluído',
+                       data.final_message.mensagem || '');
+
+        // (opcional) fala genérica adicional — remova se não quiser duplicar
+        try {
+          const phrase = buildAnnouncement(payload, data);
+          if (phrase) AudioMgr.queue(phrase);
+        } catch(e){}
+      }
+
+      return data;
+    }catch(e){
+      return { ok:false, error:'fetch_failed', detail: String(e) };
+    }
+  }
+
+  function buildAnnouncement(payload, data){
+    const benchMap = {
+      sep: 'Separação de Peças',
+      b1: 'Bancada 1',
+      b2: 'Bancada 2',
+      b3: 'Bancada 3',
+      b4: 'Bancada 4',
+      b5: 'Hi-Pot',
+      b6: 'Bancada 6',
+      b7: 'Bancada 7',
+      b8: 'Checklist',
+      final: 'Produto Finalizado'
+    };
+    const modelo = data.final_message?.modelo || '';
+    const b = benchMap[payload?.bench_id] || 'Bancada';
+    const act = (payload?.action === 'finish') ? 'Finalizada' : 'Atualizada';
+    if (!modelo) return `Etapa ${b}. ${act}.`;
+    return `Montagem da ${modelo} na ${b}. ${act}.`;
+  }
+
+  async function sendScan(){
+    const payload = {
+      serial:   (scanSerial.value || '').trim(),
+      bench_id: scanBench.value,
+      action:   scanAction.value,
+      operador: (window.OPERADOR || '').trim()
+    };
+    if (!payload.serial){
+      setStatus('status--error','Informe o serial.');
+      scanSerial.focus(); return;
+    }
+    const data = await postScan(payload);
+
+    if (!data.ok){
+      setStatus('status--error',
+        data.error === 'etapa_em_aberto' ? `Existe etapa em aberto na ${data.aberta_em}. Finalize antes.` :
+        (data.esperado ? `Transição inválida. Esperado: ${data.esperado}.` : 'Falha no scan.')
+      );
+      return;
+    }
+
+    setStatus('status--ok', `Scan OK (${payload.serial} → ${payload.bench_id}/${payload.action})`);
+    scanSerial.value = '';
+    loadBoard();
+  }
+
+  async function undoScan(){
+    const serial = (scanSerial.value || '').trim();
+    if (!serial){ setStatus('status--error','Informe o serial para desfazer.'); return; }
+
+    try{
+      const r = await fetch(`/producao/gp/painel/api/scan/undo`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({serial})
+      });
+      const d = await r.json().catch(()=> ({}));
+      if (!r.ok || !d.ok){ setStatus('status--error','Falha ao desfazer.'); return; }
+
+      setStatus('status--ok', `Desfeito. Voltou para ${d.moved_to}.`);
+      scanSerial.value = '';
+      loadBoard();
+    }catch{
+      setStatus('status--error','Falha ao desfazer.');
+    }
+  }
+
+  // Caso de uso externo: botão com data-attributes
+  async function finalizarEtapa(serial, benchId, operador){
+    const payload = { serial, bench_id: benchId, action: "finish", operador };
+    const data = await postScan(payload);
+    if (data.ok) loadBoard();
+  }
+
+  // Bindings
+  btnScan.addEventListener('click', sendScan);
+  scanSerial.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' && e.shiftKey){ e.preventDefault(); undoScan(); return; }
+    if (e.key === 'Enter'){ e.preventDefault(); sendScan(); }
+  });
+
+  // Delegação para [data-action="finish"] se existirem em outras partes
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="finish"]');
+    if (!btn) return;
+    finalizarEtapa(btn.dataset.serial, btn.dataset.benchId, window.OPERADOR || "");
+  });
+
+  // Kickoff
+  loadBoard();
+  setInterval(repaintTimers, 1000);
+  setInterval(loadBoard, 5000);
+
+  // Util de teste manual no console
+  window.testVoice = () => { try { AudioMgr.chime('airplane_dd'); } catch(e){} AudioMgr.queue('Teste de voz do painel.'); };
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,1869 @@
+{% extends "_base.html" %}
+{% block title %}Painel ao Vivo — Produção{% endblock %}
+{% block module_name %}Painel ao Vivo{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* --- AJUSTE CRÍTICO DE LAYOUT PARA 10 COLUNAS --- */
+  /* Força o container principal a usar quase toda a largura da tela nesta página */
+  .container {
+    max-width: 98vw !important;
+    padding: 0 10px !important;
+  }
+
+  /* Remove as margens negativas antigas que cortavam a tela */
+  .board-tight .board-toolbar,
+  .board-tight .board-grid {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  :root {
+    --bg: #f8f3f2;
+    --panel: #0f1b2a;
+    --card: #13243a;
+    --text: #eaf2ff;
+    --muted: #0552f8;
+
+    --ok: #16a34a;
+    --warn: #f59e0b;
+    --late: #ef4444;
+    --critical: #e11d48;
+
+    --sep: #253249;
+    --final: #1f3a2c;
+
+    --glow-ok: rgba(22, 163, 74, .45);
+    --glow-warn: rgba(245, 158, 11, .45);
+    --glow-late: rgba(239, 68, 68, .55);
+    --glow-critical: rgba(225, 29, 72, .6);
+
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, .25);
+  }
+
+  /* ===== Topbar ===== */
+  .board-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    /* Permite quebrar linha em telas menores */
+  }
+
+  /* grupos */
+  .group {
+    background: #ffffff;
+    border: 1px solid #e6e8ee;
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 16px rgba(15, 27, 42, .06);
+  }
+
+  .group .label {
+    font-size: 12px;
+    color: #55657f;
+    white-space: nowrap
+  }
+
+  /* input-compact */
+  .input,
+  .select,
+  .btn {
+    height: 36px;
+    border: 1px solid #dbe1ea;
+    border-radius: 10px;
+    background: #fff;
+    padding: 0 10px;
+    outline: none;
+  }
+
+  .input {
+    min-width: 220px
+  }
+
+  .select {
+    min-width: 150px
+  }
+
+  .input:focus,
+  .select:focus {
+    border-color: #b7c5de;
+    box-shadow: 0 0 0 2px rgba(47, 123, 255, .12)
+  }
+
+  .btn {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    cursor: pointer
+  }
+
+  .btn:hover {
+    filter: brightness(1.02)
+  }
+
+  .btn.ghost {
+    background: #eff4ff;
+    color: #0f1b2a;
+    border-color: #cfe0ff
+  }
+
+  .input:disabled,
+  .select:disabled,
+  .btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+    filter: grayscale(8%);
+  }
+
+  /* áudio */
+  .audio-ctl {
+    display: flex;
+    align-items: center;
+    gap: 8px
+  }
+
+  .audio-ctl .pill {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid #dbe1ea;
+    border-radius: 999px;
+    background: #fff
+  }
+
+  .audio-ctl button {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid #dbe1ea;
+    background: #0b2440;
+    color: #cfe3ff
+  }
+
+  .audio-ctl input[type="range"] {
+    accent-color: #1d4ed8;
+    width: 140px
+  }
+
+  /* status chip */
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    border: 1px solid #e6e8ee;
+    background: #fff;
+    min-width: 160px;
+    justify-content: center
+  }
+
+  .status-chip .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%
+  }
+
+  .status--loading {
+    color: #0f172a
+  }
+
+  .status--loading .dot {
+    background: #64748b
+  }
+
+  .status--ok {
+    color: #065f46
+  }
+
+  .status--ok .dot {
+    background: #10b981
+  }
+
+  .status--error {
+    color: #7f1d1d
+  }
+
+  .status--error .dot {
+    background: #ef4444
+  }
+
+  /* Banner ROP */
+  .rop-banner {
+    display: none;
+    align-items: center;
+    gap: 15px;
+    margin: 8px 0 14px;
+    background: #fff7f7;
+    border: 1px solid #be0606;
+    color: #ad0c0c;
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  .rop-banner .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #e11d48;
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, .45);
+    animation: pulseDot 1.6s ease-in-out infinite
+  }
+
+  @keyframes pulseDot {
+    0% {
+      box-shadow: 0 0 0 0 rgba(225, 29, 72, .45)
+    }
+
+    70% {
+      box-shadow: 0 0 0 12px rgba(225, 29, 72, 0)
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(225, 29, 72, 0)
+    }
+  }
+
+  .rop-banner #ropMsg {
+    color: #7a1a1a;
+    font-weight: 800;
+    white-space: pre-line;
+  }
+
+  /* BOARD GRID - Garantindo 10 colunas */
+  .board-grid {
+    display: grid;
+    /* 10 colunas de tamanho igual, mínimo 130px para não esmagar */
+    grid-template-columns: repeat(10, minmax(130px, 1fr));
+    gap: 10px;
+    align-items: start;
+    overflow-x: auto;
+    /* Permite rolar se a tela for muito pequena */
+    padding-bottom: 20px;
+  }
+
+  .board-col {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    min-height: 420px;
+    box-shadow: var(--shadow-sm)
+  }
+
+  .board-col h3 {
+    margin: 0 0 10px;
+    letter-spacing: .06em;
+    color: #9fc3ff;
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .board-col h3 .badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #0b2a4a;
+    color: #a7c7ff;
+    border: 1px solid #274064
+  }
+
+  /* Cards */
+  .kitem {
+    position: relative;
+    background: #1b2a41;
+    border: 1px solid #274064;
+    border-radius: 14px;
+    padding: 12px 12px;
+    margin: 10px 0;
+    color: #e8f0ff;
+    font-weight: 900;
+    font-size: 16px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .kitem .sub {
+    display: block;
+    font-weight: 700;
+    font-size: 12px;
+    opacity: .95;
+    margin-top: 6px
+  }
+
+  .kitem.sep {
+    background: var(--sep);
+    border-color: #3a5075;
+  }
+
+  .kitem.final {
+    background: var(--final);
+    border-color: #345f49;
+  }
+
+  .k-ok {
+    background: #0d3b23;
+    border-color: #1f7a45;
+  }
+
+  .k-warn {
+    background: #5b3c0a;
+    border-color: #a87413;
+  }
+
+  .k-late {
+    background: #5a1313;
+    border-color: #a62c2c;
+  }
+
+  .k-critical {
+    background: #5a0a1f;
+    border-color: #b41c4f;
+  }
+
+  /* Glow Effects */
+  .kitem::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s
+  }
+
+  .k-ok::after {
+    box-shadow: 0 0 0 3px var(--glow-ok), 0 0 18px 4px var(--glow-ok)
+  }
+
+  .k-warn::after {
+    box-shadow: 0 0 0 3px var(--glow-warn), 0 0 18px 4px var(--glow-warn)
+  }
+
+  .k-late::after {
+    box-shadow: 0 0 0 3px var(--glow-late), 0 0 18px 4px var(--glow-late)
+  }
+
+  .k-critical::after {
+    box-shadow: 0 0 0 3px var(--glow-critical), 0 0 22px 6px var(--glow-critical)
+  }
+
+  .k-ok:hover::after,
+  .k-warn:hover::after,
+  .k-late:hover::after,
+  .k-critical:hover::after {
+    opacity: .7
+  }
+
+  @keyframes pulseCard {
+    0% {
+      transform: scale(1)
+    }
+
+    50% {
+      transform: scale(1.02)
+    }
+
+    100% {
+      transform: scale(1)
+    }
+  }
+
+  .pulse {
+    animation: pulseCard 1.75s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse {
+      animation: none
+    }
+  }
+
+  /* Danger Pulse (HiPot Fail) */
+  .danger-pulse {
+    border: 2px solid #e53935 !important;
+    box-shadow: 0 0 0 0 rgba(107, 18, 2, 0.6);
+    animation: pulseBorder 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulseBorder {
+    0% {
+      box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.6)
+    }
+
+    70% {
+      box-shadow: 0 0 0 10px rgba(229, 57, 53, 0)
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(229, 57, 53, 0)
+    }
+  }
+
+  .muted {
+    color: #ab937c
+  }
+
+  /* Tags */
+  .kitem .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+    font-weight: 700
+  }
+
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid #2a3a56;
+    background: #0b1a2c;
+    color: #cfe3ff
+  }
+
+  .tag.ok {
+    border-color: #16a34a;
+    color: #16a34a;
+    background: rgba(22, 163, 74, .08)
+  }
+
+  .tag.fail {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: rgba(239, 68, 68, .08)
+  }
+
+  .tag.apr {
+    border-color: #f59e0b;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, .08)
+  }
+
+  .tag.rep {
+    border-color: #0ea5e9;
+    color: #0ea5e9;
+    background: rgba(14, 165, 233, .08)
+  }
+
+  .tag.rework {
+    border-color: #e11d48;
+    color: #e11d48;
+    background: rgba(225, 29, 72, .08)
+  }
+
+  .tag.ws {
+    border-color: #64748b;
+    color: #94a3b8;
+    background: rgba(100, 116, 139, .08)
+  }
+
+  .tag.fin {
+    border-color: #22c55e;
+    color: #86efac;
+    background: rgba(34, 197, 94, .08)
+  }
+
+  /* Toasts */
+  .toast-container {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9999
+  }
+
+  .toast {
+    min-width: 280px;
+    max-width: 420px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #26324a;
+    padding: 12px 14px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start
+  }
+
+  .toast .title {
+    font-weight: 800;
+    margin-bottom: 2px
+  }
+
+  .toast.success {
+    border-color: #10b981
+  }
+
+  .toast.error {
+    border-color: #ef4444
+  }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998
+  }
+
+  .modal {
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #26324a;
+    border-radius: 14px;
+    max-width: 520px;
+    width: 92%;
+    padding: 18px;
+    box-shadow: var(--shadow-sm)
+  }
+
+  .modal h4 {
+    margin: 0 0 8px;
+    font-size: 18px
+  }
+
+  .modal .actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px
+  }
+
+  /* HiPot Modal Inputs */
+  .btn-result {
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    border: 3px solid transparent;
+    transition: all 0.2s;
+    opacity: 0.7;
+  }
+
+  .btn-result:hover {
+    opacity: 0.9;
+  }
+
+  .btn-result.selected {
+    opacity: 1;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+  }
+
+  .input-field {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    background: #13243a;
+    color: var(--text);
+    box-sizing: border-box;
+  }
+
+  /* Estilo do Timer */
+  .status-badge {
+      font-size: 16px; 
+      font-weight: 900;
+      text-transform: uppercase;
+  }
+
+  /* Itens bloqueados na sequência (opacidade baixa) */
+  .item-aguardando {
+      opacity: 0.3;
+      pointer-events: none;
+  }
+
+  /* Botões base: Transparentes com borda colorida */
+  .btn-checklist {
+      display: block;
+      text-align: center;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 900;
+      transition: all 0.3s ease;
+      background: transparent;
+      opacity: 0.1; /* Nasce quase invisível */
+      pointer-events: none;
+      border: 3px solid transparent;
+  }
+
+  /* Quando liberado pelo item anterior ou timer */
+  .btn-checklist.liberado {
+      opacity: 1;
+      pointer-events: auto;
+      cursor: pointer;
+  }
+
+  /* --- SELEÇÃO: O segredo está aqui --- */
+
+  /* Selecionado OK: Fundo Branco, Texto Verde, Borda Verde */
+  input[value="aprovado"]:checked + .btn-checklist {
+      background-color: #FFFFFF !important;
+      color: #22c55e !important; /* Cor var(--ok) */
+      border: 3px solid #22c55e !important;
+  }
+
+  /* Selecionado FALHA: Fundo Branco, Texto Vermelho, Borda Vermelha */
+  input[value="reprovado"]:checked + .btn-checklist {
+      background-color: #FFFFFF !important;
+      color: #ef4444 !important; /* Cor var(--late) */
+      border: 3px solid #ef4444 !important;
+  }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="board-tight">
+
+  <div id="ropBanner" class="rop-banner">
+    <span class="dot"></span>
+    <strong>Ponto de pedido ativo</strong>
+    <span id="ropMsg" class="muted"></span>
+  </div>
+
+  <div class="board-toolbar">
+    <div class="group" role="group" aria-label="Leitura manual">
+
+      <span class="label">Leitura manual:</span>
+
+      <input id="scanSerial" class="input" placeholder="Aguardando leitura do scanner…" aria-label="Serial" enabled>
+
+      <select id="scanBench" class="select" aria-label="Bancada" disabled hidden>
+        <option value="sep">ESTOQUE</option>
+        <option value="b1">BANCADA 01</option>
+        <option value="b2">BANCADA 02</option>
+        <option value="b3">BANCADA 03</option>
+        <option value="b4">BANCADA 04</option>
+        <option value="b5">HI-POT</option>
+        <option value="b6">BANCADA 06</option>
+        <option value="b7">BANCADA 07</option>
+        <option value="b8">CHECKLIST</option>
+      </select>
+
+      <select id="scanAction" class="select" aria-label="Ação" disabled hidden>
+
+        <option value="start">Iniciar</option>
+        <option value="finish">Finalizar</option>
+
+      </select>
+
+      <button id="btnScan" class="btn" type="button" enabled>
+        <i class="fa fa-barcode"></i> Registrar
+      </button>
+
+    </div>
+
+    <div class="group" style="gap:12px">
+
+      <div class="audio-ctl">
+        <div class="pill">
+          <button id="btnEnableAudio" title="Ativar áudio">Ativar áudio</button>
+          <button id="btnToggleAudio" title="Ligar/Desligar avisos">🔊</button>
+          <input id="audioVolume" type="range" min="0" max="1" step="0.05" value="0.5" title="Volume">
+        </div>
+      </div>
+
+      <span id="status" class="status-chip status--loading">
+        <span class="dot"></span><span id="statusText">Carregando…</span>
+      </span>
+
+    </div>
+  </div>
+
+  <div id="boardGrid" class="board-grid" aria-live="polite"></div>
+
+</div>
+
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<div class="modal-backdrop" id="finalBackdrop" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+
+  <div class="modal">
+    <h4 id="finalTitle">Concluído</h4>
+    <div id="finalMsg" class="muted">Mensagem</div>
+    <div class="actions"></div>
+  </div>
+
+</div>
+
+<div class="modal-backdrop" id="hipotModalBackdrop" role="dialog" aria-modal="true" aria-labelledby="hipotModalTitle">
+
+  <div class="modal" id="hipotModal">
+
+    <h4 id="hipotModalTitle">Teste Elétrico Hi-Pot (N/S: <span id="hipotSerialDisplay"></span>)</h4>
+
+    <form id="hipotForm">
+      <input type="hidden" id="hipotSerialInput" name="serial">
+
+      <div style="margin-bottom: 12px;">
+        <label for="operadorId" style="display: block; margin-bottom: 5px; font-size: 14px;">Operador/ID:</label>
+        <input type="text" id="operadorId" name="operadorId" required class="input-field" placeholder="ID do Operador"
+          autocomplete="off">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+        <div>
+          <label for="tensaoSuportavel" style="display: block; margin-bottom: 5px; font-size: 14px;">1. Tensão
+            Suportável (V):</label>
+          <input type="number" step="any" id="tensaoSuportavel" name="tensao_suportavel" placeholder="Ex: 1500" required
+            class="input-field">
+        </div>
+        <div>
+          <label for="continuidadeAterramento" style="display: block; margin-bottom: 5px; font-size: 14px;">2.
+            Continuidade Aterramento (mΩ):</label>
+          <input type="number" step="any" id="continuidadeAterramento" name="continuidade_aterramento"
+            placeholder="Ex: 0.05" required class="input-field">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <button type="button" class="btn-result" data-result="aprovado"
+          style="flex: 1; background: var(--ok); border-color: var(--ok);">
+          ✅ APROVADO
+        </button>
+        <button type="button" class="btn-result" data-result="reprovado"
+          style="flex: 1; background: var(--late); border-color: var(--late);">
+          ❌ REPROVADO
+        </button>
+      </div>
+
+      <p style="color: var(--warn); font-size: 12px; margin: 0 0 10px;">
+        *É obrigatório selecionar APROVADO ou REPROVADO antes de salvar.
+      </p>
+
+      <div class="actions">
+
+        <button type="button" class="btn ghost" onclick="closeHipotModal()">Cancelar</button>
+
+        <button type="submit" id="hipotSubmitBtn" class="btn"
+          style="background:#22c55e; border-color:#22c55e; margin-left:10px;" disabled>
+          💾 Salvar e Fechar
+        </button>
+
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop"
+     id="checklistBackdrop"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="hipotModalTitle"
+     style="display:none;">
+
+  <div class="modal" id="hipotModal">
+
+    <h4 id="hipotModalTitle">
+      Check List de Testes (N/S: <span id="checkListSerialDisplay"></span>)
+    </h4>
+
+    <form id="checklistForm">
+
+      <!-- SERIAL -->
+      <input type="hidden"
+             id="hipotSerialInput"
+             name="serial">
+
+      <!-- OPERADOR -->
+      <div style="margin-bottom: 12px;">
+        <label for="operadorId"
+               style="display:block;margin-bottom:5px;font-size:14px;">
+          Operador / ID:
+        </label>
+
+        <input type="text"
+               id="operadorId"
+               name="operadorId"
+               required
+               class="input-field"
+               placeholder="ID do Operador"
+               autocomplete="off">
+      </div>
+
+      <!-- CHECKLIST DINÂMICO -->
+      <div id="checklistItems"
+           style="margin-top:15px;">
+        <!-- ITENS GERADOS VIA JS -->
+      </div>
+
+      <!-- APROVAÇÃO FINAL
+      <div style="display:flex;gap:10px;margin:20px 0;">
+        <button type="button"
+                class="btn-result"
+                data-result="aprovado"
+                style="flex:1;background:var(--ok);border-color:var(--ok);">
+          ✅ APROVADO
+        </button>
+
+        <button type="button"
+                class="btn-result"
+                data-result="reprovado"
+                style="flex:1;background:var(--late);border-color:var(--late);">
+          ❌ REPROVADO
+        </button>
+      </div>
+
+      <p style="color:var(--warn);font-size:12px;margin-bottom:10px;">
+        *É obrigatório concluir todos os itens do checklist.
+      </p> -->
+
+      <!-- AÇÕES -->
+      <!-- <div class="actions">
+        <button type="button"
+                class="btn ghost"
+                onclick="closeChecklist()">
+          Cancelar
+        </button>
+
+        <button type="submit"
+                id="hipotSubmitBtn"
+                class="btn"
+                style="background:#22c55e;border-color:#22c55e;margin-left:10px;"
+                disabled>
+          💾 Salvar e Fechar
+        </button>
+      </div> -->
+
+    </form>
+  </div>
+</div>
+
+
+</div>
+
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Refs Principais
+    const grid = document.getElementById('boardGrid');
+    const statusChip = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const scanSerial = document.getElementById('scanSerial');
+    const scanBench = document.getElementById('scanBench');
+    const scanAction = document.getElementById('scanAction');
+    const btnScan = document.getElementById('btnScan');
+
+    const toastBox = document.getElementById('toastContainer');
+    const finalBackdrop = document.getElementById('finalBackdrop');
+    const finalTitle = document.getElementById('finalTitle');
+    const finalMsg = document.getElementById('finalMsg');
+
+    const btnEnableAudio = document.getElementById('btnEnableAudio');
+    const btnToggleAudio = document.getElementById('btnToggleAudio');
+    const audioVolume = document.getElementById('audioVolume');
+
+    const ropBanner = document.getElementById('ropBanner');
+    const ropMsg = document.getElementById('ropMsg');
+
+    // === CHECKLIST ===
+    let checklistItems = [];
+    let checklistIndex = 0;
+    let checklistTimer = null;
+
+    const checklistItemsContainer = document.getElementById('checklistItems');
+    const checklistSubmitBtn = document.querySelector('#checklistForm #hipotSubmitBtn');
+
+    // Refs Hi-Pot
+    const hipotModalBackdrop = document.getElementById('hipotModalBackdrop');
+    const checklistBackdrop = document.getElementById('checklistBackdrop');
+    const checkListSerialDisplay = document.getElementById('checkListSerialDisplay');
+    const hipotSerialDisplay = document.getElementById('hipotSerialDisplay');
+    const hipotSerialInput = document.getElementById('hipotSerialInput');
+    const hipotForm = document.getElementById('hipotForm');
+    const hipotSubmitBtn = document.getElementById('hipotSubmitBtn');
+    const operadorIdInput = document.getElementById('operadorId');
+    const tensaoInput = document.getElementById('tensaoSuportavel');
+    const aterramentoInput = document.getElementById('continuidadeAterramento');
+    const resultButtons = document.querySelectorAll('#hipotModal .btn-result');
+
+    let selectedResult = null;
+    let lastData = null;
+    let lastUpdateAt = null;
+    let lastBoardData = null;
+
+    // === TABELA DE TRADUÇÃO (CÓDIGO -> NOME) ===
+    const MODEL_NAMES = {
+      "28-000": "PM700",
+      "2-000": "PM2200",
+      "7-000": "PM2100",
+      "PM0025": "PM25"
+    };
+
+    // Helpers
+    function h(tag, cls, text) {
+      const el = document.createElement(tag);
+      if (cls) el.className = cls;
+      if (text != null) el.textContent = text;
+      return el;
+    }
+
+    function formatMMSS(seconds) {
+      const s = Math.max(0, Math.floor(seconds));
+      const m = Math.floor(s / 60);
+      const ss = s % 60;
+      return `${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
+    function setStatus(state, text) {
+      statusChip.classList.remove('status--loading', 'status--ok', 'status--error');
+      statusChip.classList.add(state);
+      statusText.textContent = text;
+    }
+
+    // === Parser robusto pt-BR + ISO ===
+    function parseSinceToMs(since) {
+      if (!since) return NaN;
+      if (/^\d{4}-\d{2}-\d{2}T/.test(since)) return Date.parse(since);
+      const m = /^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(since);
+      if (m) {
+        const dd = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10) - 1;
+        const yyyy = parseInt(m[3], 10);
+        const HH = parseInt(m[4] || "0", 10);
+        const MM = parseInt(m[5] || "0", 10);
+        const SS = parseInt(m[6] || "0", 10);
+        return new Date(yyyy, mm, dd, HH, MM, SS).getTime();
+      }
+      return Date.parse(since);
+    }
+
+    // === Config da coluna FINALIZADO (FIFO) ===
+    const FINAL_CFG = { max_items: 10 };
+
+    function getFinishTimestamp(it) {
+      const s = it.finished_at || it.since || null;
+      return parseSinceToMs(s);
+    }
+
+    // --- LISTENER DE SCANNER ---
+    (function ScannerWithoutFocus() {
+      let buffer = '';
+      let timer = null;
+      const GAP_MS = 120;
+
+      function flush() {
+        const raw = buffer.trim();
+        buffer = '';
+        if (!raw) return;
+        const upper = raw.toUpperCase();
+        let payload;
+        if (upper.startsWith('B') || upper.startsWith('SEP') || raw.includes('-') || raw.includes(':')) {
+          payload = { raw_scan: raw, operador: (window.OPERADOR || '').trim() };
+        } else {
+          payload = {
+            serial: raw,
+            bench_id: (scanBench?.value || 'sep'),
+            action: (scanAction?.value || 'start'),
+            operador: (window.OPERADOR || '').trim()
+          };
+        }
+        postScan(payload);
+      }
+
+      document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        const isTyping = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+        if (isTyping) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          clearTimeout(timer);
+          flush();
+          return;
+        }
+        if (e.key.length === 1) {
+          buffer += e.key;
+          clearTimeout(timer);
+          timer = setTimeout(flush, GAP_MS);
+        }
+      });
+    })();
+
+    // Banner ROP
+    async function checkROPAlert() {
+      if (!lastBoardData || !lastBoardData.needs_banner) {
+        ropBanner.style.display = "none";
+        return;
+      }
+      ropMsg.textContent = '';
+      const rawText = lastBoardData.needs_banner;
+      // Tradução de códigos no texto
+      let translated = rawText;
+      for (const [code, name] of Object.entries(MODEL_NAMES)) {
+        if (translated.includes(code)) {
+          translated = translated.replace(new RegExp(code, 'g'), name);
+        }
+      }
+      ropMsg.textContent = translated;
+      ropBanner.style.display = "flex";
+    }
+
+    // Toasts / Modal
+    function showToast(title, message, kind = 'success', ttl = 5000) {
+      const el = h('div', `toast ${kind}`);
+      const body = h('div');
+      body.appendChild(h('div', 'title', title));
+      body.appendChild(h('div', '', message));
+      el.appendChild(body);
+      toastBox.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0'; setTimeout(() => el.remove(), 350);
+      }, ttl);
+    }
+
+    let finalTimer = null;
+
+    function openFinalModal(title, message) {
+      finalTitle.textContent = title || 'Concluído';
+      finalMsg.textContent = message || '';
+      finalBackdrop.style.display = 'flex';
+      if (finalTimer) clearTimeout(finalTimer);
+      finalTimer = setTimeout(() => { closeFinalModal(); }, 3000);
+    }
+
+    function closeFinalModal() {
+      if (finalTimer) { clearTimeout(finalTimer); finalTimer = null; }
+      finalBackdrop.style.display = 'none';
+    }
+
+    finalBackdrop.addEventListener('click', (e) => { if (e.target === finalBackdrop) closeFinalModal(); });
+
+    // --- Hi-Pot Modal Logic ---
+    function openHipotModal(serial) {
+      hipotSerialInput.value = serial;
+      hipotSerialDisplay.textContent = serial;
+      tensaoInput.value = '';
+      aterramentoInput.value = '';
+
+      const lastOperator = localStorage.getItem('gp.hipot.operador');
+      operadorIdInput.value = lastOperator || '';
+
+      selectedResult = null;
+      hipotSubmitBtn.disabled = true;
+      resultButtons.forEach(btn => btn.classList.remove('selected'));
+
+      hipotModalBackdrop.style.display = 'flex';
+      operadorIdInput.focus();
+    }
+
+    function closeHipotModal() {
+      hipotModalBackdrop.style.display = 'none';
+    }
+
+    // --- Hi-Pot Modal Logic ---
+    //function openChecklist(serial) {
+    //   hipotSerialInput.value = serial;
+    //   hipotSerialDisplay.textContent = serial;
+    //   tensaoInput.value = '';
+    //   aterramentoInput.value = '';
+
+    //   const lastOperator = localStorage.getItem('gp.hipot.operador');
+    //   operadorIdInput.value = lastOperator || '';
+
+    //   selectedResult = null;
+    //   hipotSubmitBtn.disabled = true;
+    //   resultButtons.forEach(btn => btn.classList.remove('selected'));
+
+    //   checklistBackdrop.style.display = 'flex';
+    //   operadorIdInput.focus();
+    // }
+
+    // Selecionamos o container que contém as colunas (ou o document)
+    document.addEventListener('click', (event) => {
+      // Verifica se o clique foi em um .kitem ou dentro de um
+      const card = event.target.closest('.kitem');
+      
+      if (card) {
+        const serial = card.dataset.serial;
+        // Buscamos o span .sub dentro do card clicado
+        const elementoSub = card.querySelector('.sub');
+        
+        // Pegamos o modelo. Se elementoSub não existir, modelo será ""
+        const modelo = elementoSub ? elementoSub.dataset.modelo : "";
+
+        if (modelo) {
+          openChecklist(serial, modelo);
+        } else {
+          console.error("Erro: Atributo data-modelo não encontrado no span .sub");
+        }
+      }
+    });
+
+    async function openChecklist(serial, modelo) {
+      const hipotSerialInput = document.getElementById('hipotSerialInput');
+      const checklistSerialDisplay = document.getElementById('checkListSerialDisplay');
+      const checklistItemsContainer = document.getElementById('checklistItems');
+      const checklistBackdrop = document.getElementById('checklistBackdrop');
+
+      hipotSerialInput.value = serial;
+      checklistSerialDisplay.textContent = serial;
+      checklistItemsContainer.innerHTML = 'Carregando itens...';
+      checklistBackdrop.style.display = 'flex';
+
+      try {
+        // Chamada ao seu endpoint no Flask
+        const r = await fetch(`/api/gp/checklist/items?modelo=${modelo}`);
+        if (!r.ok) throw new Error("Erro ao buscar itens");
+        
+        const d = await r.json();
+        
+        // Verificação: o dado pode vir em d.items ou direto em d
+        const itensParaRenderizar = d.items || d;
+
+        if (Array.isArray(itensParaRenderizar)) {
+          renderChecklist(itensParaRenderizar);
+        } else {
+          checklistItemsContainer.innerHTML = 'Nenhum item encontrado para este modelo.';
+        }
+
+      } catch (e) {
+        console.error("Erro no fetch:", e);
+        checklistItemsContainer.innerHTML = 'Erro ao carregar checklist.';
+      }
+    }
+
+  let listaItensGlobal = [];
+  let itensProcessados = new Set(); // Trava para não repetir cronômetro no mesmo item
+
+  function renderChecklist(itens) {
+      listaItensGlobal = itens;
+      itensProcessados.clear(); // Limpa a trava ao abrir novo checklist
+      const container = document.getElementById('checklistItems');
+      container.innerHTML = '';
+
+      itens.forEach((item, index) => {
+          const row = document.createElement('div');
+          row.id = `row_${index}`;
+          row.className = 'checklist-item-row' + (index > 0 ? ' item-aguardando' : '');
+          row.style = "margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 12px; border: 1px solid #333;";
+          
+          row.innerHTML = `
+              <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
+                  <span style="font-size: 15px; color: #fff; font-weight: 600;">${item.ordem}. ${item.descricao}</span>
+                  <span id="display_status_${index}" class="status-badge" style="color:#666; font-weight:900;">BLOQUEADO</span>
+              </div>
+              
+              <div style="display:flex; gap:10px;">
+                  <input type="radio" name="status_${item.id}" id="ok_${index}" value="aprovado" class="check-opt" style="display:none;">
+                  <label for="ok_${index}" id="l_ok_${index}" class="btn-checklist" style="flex:1; border: 2px solid #22c55e; color: #22c55e;">✅ APROVADO</label>
+
+                  <input type="radio" name="status_${item.id}" id="fail_${index}" value="reprovado" class="check-opt" style="display:none;">
+                  <label for="fail_${index}" id="l_fail_${index}" class="btn-checklist" style="flex:1; border: 2px solid #ef4444; color: #ef4444;">❌ REPROVADO</label>
+              </div>
+          `;
+          container.appendChild(row);
+
+          const radios = row.querySelectorAll('input[type="radio"]');
+          radios.forEach(radio => {
+              radio.addEventListener('change', () => {
+                  // Só chama o próximo se o atual foi finalizado
+                  ativarProximo(index + 1);
+              });
+          });
+      });
+
+      ativarProximo(0); 
+  }
+
+  function ativarProximo(index) {
+      // 1. Verifica se o item existe ou se já foi iniciado para evitar bug do contador duplo
+      if (index >= listaItensGlobal.length || itensProcessados.has(index)) {
+          verificarBotaoSalvar();
+          return;
+      }
+
+      itensProcessados.add(index); // Marca que este item já iniciou o processo
+
+      const item = listaItensGlobal[index];
+      const row = document.getElementById(`row_${index}`);
+      const display = document.getElementById(`display_status_${index}`);
+      const bOk = document.getElementById(`l_ok_${index}`);
+      const bFail = document.getElementById(`l_fail_${index}`);
+
+      row.classList.remove('item-aguardando');
+      row.style.opacity = "1";
+
+      if (item.bloqueante && item.min_s > 0) {
+          let seg = item.min_s;
+          display.style.color = "#fccf7e";
+          
+          // Limpa qualquer intervalo que pudesse existir (segurança extra)
+          if (row.dataset.intervalId) clearInterval(row.dataset.intervalId);
+
+          const crono = setInterval(() => {
+              if (seg <= 0) {
+                  clearInterval(crono);
+                  display.textContent = "LIBERADO";
+                  display.style.color = "#22c55e";
+                  display.style.fontSize = "18px";
+                  bOk.classList.add('liberado');
+                  bFail.classList.add('liberado');
+              } else {
+                  display.textContent = `ESPERE ${seg}s`;
+                  seg--;
+              }
+          }, 1000);
+          
+          row.dataset.intervalId = crono; // Guarda o ID no elemento
+      } else {
+          display.textContent = "LIBERADO";
+          display.style.color = "#22c55e";
+          bOk.classList.add('liberado');
+          bFail.classList.add('liberado');
+      }
+
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function liberarChecklistItem(index) {
+      const item = checklistItems[index];
+      const div = document.querySelector(`.check-item[data-index="${index}"]`);
+      const input = div.querySelector('input');
+      const timerLabel = div.querySelector('small');
+
+      div.style.opacity = '1';
+      input.disabled = true;
+
+      let restante = item.tempo_seg;
+
+      timerLabel.textContent = `Aguardando ${restante}s...`;
+
+      checklistTimer = setInterval(() => {
+        restante--;
+        timerLabel.textContent = `Aguardando ${restante}s...`;
+
+        if (restante <= 0) {
+          clearInterval(checklistTimer);
+          input.disabled = false;
+          input.focus();
+          timerLabel.textContent = 'Campo liberado';
+        }
+      }, 1000);
+
+      input.addEventListener('change', () => {
+        validarChecklistItem(index, Number(input.value));
+      }, { once: true });
+    }
+
+    function validarChecklistItem(index, valor) {
+      const item = checklistItems[index];
+
+      if (valor < item.min_s || valor > item.max_s) {
+        showToast(
+          'Valor fora do limite',
+          `Permitido: ${item.min_s} – ${item.max_s}`,
+          'warn',
+          4000
+        );
+
+        if (item.bloqueante) {
+          showToast('Checklist bloqueado', 'Item bloqueante inválido.', 'error', 6000);
+          return;
+        }
+      }
+
+      // Próximo item
+      if (index + 1 < checklistItems.length) {
+        liberarChecklistItem(index + 1);
+      } else {
+        checklistSubmitBtn.disabled = false;
+        showToast('Checklist concluído', 'Todos os itens preenchidos.', 'success');
+      }
+    }
+
+
+    document.getElementById('checklistForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        serial: hipotSerialInput.value,
+        operador: operadorIdInput.value,
+        respostas: checklistItems.map((item, idx) => {
+          const input = document.querySelector(`.check-item[data-index="${idx}"] input`);
+          return {
+            item_id: item.id,
+            valor: input.value
+          };
+        })
+      };
+
+      try {
+        const r = await fetch('/producao/gp/checklist/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const d = await r.json();
+        if (d.ok) {
+          showToast('Checklist salvo', 'Registro concluído.', 'success');
+          closeChecklist();
+          loadBoard();
+        } else {
+          showToast('Erro', d.error || 'Falha ao salvar.', 'error');
+        }
+      } catch {
+        showToast('Erro de rede', 'Servidor indisponível.', 'error');
+      }
+    });
+
+
+
+    function closeChecklist() {
+      checklistBackdrop.style.display = 'none';
+    }
+
+    resultButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        resultButtons.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedResult = btn.dataset.result;
+        hipotSubmitBtn.disabled = false;
+      });
+    });
+
+    hipotForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedResult) {
+        showToast('Atenção', 'Selecione APROVADO ou REPROVADO.', 'warn', 3000);
+        return;
+      }
+      const serial = hipotSerialInput.value;
+      const operadorId = operadorIdInput.value.trim();
+      const tensao = tensaoInput.value;
+      const aterramento = aterramentoInput.value;
+
+      if (!operadorId) {
+        showToast('Atenção', 'O ID do Operador é obrigatório.', 'warn', 3000);
+        operadorIdInput.focus();
+        return;
+      }
+      if (tensao === '' || aterramento === '') {
+        showToast('Atenção', 'Ambos os valores de medição são obrigatórios.', 'warn', 3000);
+        return;
+      }
+
+      hipotSubmitBtn.textContent = 'Salvando...';
+      hipotSubmitBtn.disabled = true;
+      localStorage.setItem('gp.hipot.operador', operadorId);
+
+      const payload = {
+        serial: serial,
+        tensao_suportavel: tensao,
+        continuidade_aterramento: aterramento,
+        resultado: selectedResult,
+        operador_id: operadorId
+      };
+
+      try {
+        const r = await fetch(`/producao/gp/hipot/api/painel-submit-result`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.ok) {
+          showToast('Hi-Pot Salvo', `N/S ${serial} registrado.`, 'success');
+          closeHipotModal();
+          loadBoard();
+        } else {
+          showToast('Falha', d.error || 'Erro ao salvar Hi-Pot.', 'error', 7000);
+        }
+      } catch (e) {
+        showToast('Erro de Rede', 'Não foi possível conectar ao servidor.', 'error', 7000);
+      } finally {
+        hipotSubmitBtn.textContent = '💾 Salvar e Fechar';
+        hipotSubmitBtn.disabled = false;
+      }
+    });
+
+    hipotModalBackdrop.addEventListener('click', (e) => {
+      if (e.target === hipotModalBackdrop) closeHipotModal();
+    });
+
+    window.closeHipotModal = closeHipotModal;
+    window.openHipotModal = openHipotModal;
+
+    checklistBackdrop.addEventListener('click', (e) => {
+      if (e.target === checklistBackdrop) closeChecklist();
+    });
+
+    window.closeChecklist = closeChecklist;
+    window.openChecklist = openChecklist;
+
+    // Audio Manager
+    const AudioMgr = (function () {
+      let ctx = null; let enabled = false; let muted = false;
+      let vol = Number(localStorage.getItem('gp.audio.vol') || 0.5);
+      let q = []; let speaking = false;
+      function ensureCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      function unlock() {
+        ensureCtx();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        g.gain.value = 0.0001; o.connect(g).connect(ctx.destination);
+        o.start(); o.stop(ctx.currentTime + 0.02);
+        enabled = true; localStorage.setItem('gp.audio.enabled', '1');
+        if (btnEnableAudio) btnEnableAudio.classList.add('active');
+      }
+      function setMuted(flag) {
+        muted = flag; localStorage.setItem('gp.audio.muted', muted ? '1' : '0');
+        if (btnToggleAudio) btnToggleAudio.textContent = muted ? '🔇' : '🔊';
+      }
+      function setVolume(v) { vol = Math.max(0, Math.min(1, Number(v))); localStorage.setItem('gp.audio.vol', vol); }
+      function chime(preset = 'airplane') {
+        if (!enabled || muted) return;
+        ensureCtx(); const now = ctx.currentTime;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0, now);
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(3800, now); lp.frequency.exponentialRampToValueAtTime(1800, now + 0.35);
+        const o1 = ctx.createOscillator(); o1.type = 'triangle';
+        o1.frequency.setValueAtTime(932.33, now); o1.connect(lp).connect(g).connect(ctx.destination);
+        const peak = 0.65 * vol;
+        g.gain.linearRampToValueAtTime(peak, now + 0.015); g.gain.exponentialRampToValueAtTime(0.0009, now + 0.60);
+        o1.start(now); o1.stop(now + 0.62);
+      }
+      function speak(text) {
+        if (!enabled || muted) return; if (!('speechSynthesis' in window)) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'pt-BR'; utter.rate = 1.0; utter.pitch = 1.0; utter.volume = vol;
+        speaking = true; utter.onend = () => { speaking = false; pump(); };
+        window.speechSynthesis.speak(utter);
+      }
+      function queue(text) { if (!enabled || muted) return; q.push(text); pump(); }
+      let lastPlay = 0;
+      function pump() {
+        const now = Date.now(); if (speaking) return; if (!q.length) return;
+        if (now - lastPlay < 1500) { setTimeout(pump, 300); return; }
+        const text = q.shift(); lastPlay = now;
+        chime('airplane'); setTimeout(() => speak(text), 120);
+      }
+      (function () {
+        const en = localStorage.getItem('gp.audio.enabled') === '1';
+        const m = localStorage.getItem('gp.audio.muted') === '1';
+        if (en) { enabled = true; if (btnEnableAudio) btnEnableAudio.classList.add('active'); }
+        setMuted(m); setVolume(vol);
+      })();
+      return { unlock, setMuted, setVolume, queue, chime, enabled: () => enabled, muted: () => muted };
+    })();
+
+    window.addEventListener('click', function autoUnlock() {
+      try { if (!AudioMgr.enabled()) AudioMgr.unlock(); } catch (e) { }
+      window.removeEventListener('click', autoUnlock);
+    }, { once: true });
+
+    if (btnEnableAudio) btnEnableAudio.addEventListener('click', () => {
+      AudioMgr.unlock(); showToast('Áudio ativado', 'Anúncios por voz habilitados.', 'success', 2500);
+    });
+    
+    if (btnToggleAudio) btnToggleAudio.addEventListener('click', () => {
+      AudioMgr.setMuted(!AudioMgr.muted());
+      showToast(AudioMgr.muted() ? 'Áudio desativado' : 'Áudio ativado', '', 'success', 1800);
+    });
+    
+    if (audioVolume) audioVolume.addEventListener('input', (e) => AudioMgr.setVolume(e.target.value));
+
+    // Render Board
+    function applyStateByRatio(card, r) {
+      const classes = ['k-ok', 'k-warn', 'k-late', 'k-critical', 'pulse'];
+      card.classList.remove(...classes);
+      if (r <= 1.0) card.classList.add('k-ok');
+      else if (r <= 1.3) card.classList.add('k-warn', 'pulse');
+      else if (r <= 1.8) card.classList.add('k-late', 'pulse');
+      else card.classList.add('k-critical', 'pulse');
+    }
+
+    function renderBoard(columns) {
+      
+      lastData = columns || [];
+      
+      grid.innerHTML = "";
+      
+      lastData.forEach(col => {
+        
+        const colEl = h('div', 'board-col');
+        
+        colEl.dataset.colId = col.id || '';
+        
+        const title = h('h3', '', col.title || col.id || '');
+        
+        if (col.count != null) {
+          const b = h('span', 'badge', String(col.count));
+          title.appendChild(b);
+        }
+        
+        colEl.appendChild(title);
+        
+        let colItems = col.items || [];
+        
+        if ((col.id || '') === 'final') {
+          colItems = colItems.slice().sort((a, b) => getFinishTimestamp(b) - getFinishTimestamp(a));
+          if (FINAL_CFG.max_items != null && colItems.length > FINAL_CFG.max_items) {
+            colItems = colItems.slice(0, FINAL_CFG.max_items);
+          }
+        }
+
+        colItems.forEach(it => {
+          const el = h('div', 'kitem', it.serial || '');
+          el.dataset.serial = it.serial || '';
+
+          // Evento de clique para modal Hi-Pot
+          const colId = (col.id || '').toLowerCase();
+          if (colId === 'hipot' || colId === 'hi pot' || colId === 'b5') {
+
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', () => {
+              openHipotModal(it.serial);
+            });
+
+          }
+          else if (colId === 'checklist' || colId === 'b8') {
+
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', () => {
+              openChecklist(it.serial);
+            });
+
+          }
+
+          if ((col.id || '') === 'sep') el.classList.add('sep');
+          if ((col.id || '') === 'final') el.classList.add('final');
+          if (it.hipot_flag) { el.classList.add('danger-pulse'); el.title = "⚠ Reprovado no Hi-Pot"; }
+
+          const sub = h('span', 'sub');
+          sub.dataset.since = it.since || '';
+          sub.dataset.expected = it.expected_s ?? '';
+          sub.dataset.modelo = it.modelo || '';
+          sub.textContent = it.modelo || '';
+          el.appendChild(sub);
+
+          if (/^b[1-8]$/.test(col.id || '') && it.since && it.expected_s) {
+            const elapsed = (Date.now() - parseSinceToMs(it.since)) / 1000;
+            applyStateByRatio(el, elapsed / it.expected_s);
+          }
+          
+          const meta = h('div', 'meta');
+          const res = (it.result || '').toString().toUpperCase();
+          
+          if (res) {
+            let label = res, cls = 'tag';
+            if (res === 'OK') { label = '✅ OK'; cls += ' ok'; }
+            else if (res === 'FAIL' || res === 'NG') { label = '❌ FAIL'; cls += ' fail'; }
+            else if (res === 'APR') { label = '⚠ APR'; cls += ' apr'; }
+            else if (res === 'REP') { label = '🔄 REP'; cls += ' rep'; }
+            meta.appendChild(h('span', cls, label));
+          }
+
+          if (it.rework_flag) meta.appendChild(h('span', 'tag rework', 'Retrabalho'));
+          if (it.workstation) meta.appendChild(h('span', 'tag ws', `WS ${it.workstation}`));
+          
+          if ((col.id || '') === 'final' && it.finished_at) {
+            const d = new Date(it.finished_at);
+            const txt = isNaN(d.getTime()) ? it.finished_at : d.toLocaleString();
+            meta.appendChild(h('span', 'tag fin', `Concluído: ${txt}`));
+          }
+          
+          if (meta.children.length) el.appendChild(meta);
+
+          // Tooltip
+          el.title = [
+            it.modelo ? `Modelo: ${it.modelo}` : null,
+            it.since ? `Desde: ${new Date(it.since).toLocaleString()}` : null,
+            it.expected_s ? `Esperado: ${formatMMSS(it.expected_s)}` : null,
+            it.hipot_flag ? `⚠ Reprovado no Hi-Pot` : null,
+            it.workstation ? `Estação: ${it.workstation}` : null,
+            it.result ? `Resultado: ${it.result}` : null,
+            it.rework_flag ? `Retrabalho: sim` : null,
+            (col.id || '') === 'final' && it.finished_at ? `Finalizado em: ${new Date(it.finished_at).toLocaleString()}` : null
+          ].filter(Boolean).join(' • ');
+
+          colEl.appendChild(el);
+        });
+        grid.appendChild(colEl);
+      });
+    }
+
+    function repaintTimers() {
+      
+      if (!lastData) return;
+      
+      const subs = document.querySelectorAll('.kitem .sub');
+      subs.forEach(sub => {
+        
+        const since = sub.dataset.since; const expected_s = sub.dataset.expected;
+        const parentCard = sub.closest('.kitem'); const colEl = sub.closest('.board-col');
+        
+        if (!since || !expected_s || !parentCard || !colEl) return;
+        
+        const colId = colEl.dataset.colId || '';
+        
+        if (!/^b[1-8]$/.test(colId)) return;
+        
+        const start = parseSinceToMs(since); const expected = Number(expected_s);
+        
+        if (isNaN(start) || isNaN(expected)) return;
+        
+        const elapsed_s = (Date.now() - start) / 1000;
+        const ratio = elapsed_s / expected;
+        sub.textContent = `${sub.dataset.modelo} (${formatMMSS(elapsed_s)})`;
+        applyStateByRatio(parentCard, ratio);
+      });
+    }
+
+    // API Calls
+    function buildAnnouncement(payload, data) {
+      
+      const benchMap = {
+        sep: 'Separação de Peças',
+        b1: 'Bancada 1', b2: 'Bancada 2', b3: 'Bancada 3', b4: 'Bancada 4',
+        b5: 'Hi-Pot', b6: 'Bancada 6', b7: 'Bancada 7', b8: 'Checklist',
+        final: 'Produto Finalizado'
+      };
+      
+      const modelo = data.final_message?.modelo || '';
+      const b = benchMap[payload?.bench_id] || 'Bancada';
+      const act = (payload?.action === 'finish') ? 'Finalizada' : 'Atualizada';
+      
+      if (!modelo) return `Etapa ${b}. ${act}.`;
+      
+      return `Montagem da ${modelo} na ${b}. ${act}.`;
+    }
+
+    function announceBenchDone({ bench, modelo, serial, operador }) {
+      
+      if (!bench) return;
+      
+      try { AudioMgr.chime('airplane_dd'); } catch (e) { }
+      
+      const phrase = `Montagem do ${modelo} na etapa ${bench} concluída.`;
+      
+      if (phrase) AudioMgr.queue(phrase);
+    }
+
+    async function postScan(payload) {
+      
+      try {
+        const resp = await fetch('/producao/gp/painel/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        let data = {};
+        
+        try { data = await resp.json(); } catch { data = { ok: false, error: 'fetch_failed' }; }
+
+        if (!resp.ok || !data.ok) {
+          const msg = friendlyErrorText(data);
+          setStatus('status--error', msg || 'Falha no scan.');
+          showToast('Atenção', msg || 'Falha no scan.', 'error', 4500);
+          return (data.ok ? data : { ok: false, ...data });
+        }
+
+        if (data.bench_done) {
+
+          announceBenchDone({
+            bench: data.bench_done,
+            modelo: data.modelo,
+            serial: data.serial,
+            operador: data.operador
+          });
+        
+        }
+
+        if (data.final_message) {
+          
+          const { titulo, mensagem, modelo, serial, operador } = data.final_message;
+          showToast(titulo || 'Concluído', mensagem || '', 'success', 2500);
+          openFinalModal(titulo || 'Concluído', mensagem || '');
+          
+          try {
+            const phrase = buildAnnouncement(payload, data);
+            if (phrase) AudioMgr.queue(phrase);
+          } 
+          
+          catch (e) { }
+        }
+
+        if (data.serial && data.moved_to) {
+          
+          setStatus('status--ok', `Scan OK (${data.serial} → ${data.moved_to})`);
+        
+        } 
+        else {
+          
+          setStatus('status--ok', 'Scan OK');
+        
+        }
+
+        loadBoard();
+        return data;
+
+      } 
+      
+      catch (e) {
+        
+        const msg = friendlyErrorText({ error: 'fetch_failed', hint: String(e) });
+        setStatus('status--error', msg);
+        showToast('Atenção', msg, 'error', 4500);
+        return { ok: false, error: 'fetch_failed', detail: String(e) };
+      
+      }
+    }
+
+    async function undoScanAPI(serial) {
+      
+      try {
+        
+        const r = await fetch(`/producao/gp/painel/api/scan/undo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ serial })
+        });
+        
+        const d = await r.json().catch(() => ({}));
+        
+        if (!r.ok || !d.ok) { return { ok: false }; }
+        
+        return d;
+      } 
+      
+      catch {
+        return { ok: false };
+      }
+    }
+
+    // Manual controls (buttons)
+    async function sendScan() {
+      
+      const raw = (scanSerial?.value || '').trim();
+      
+      if (!raw) {
+        setStatus('status--error', 'Informe o serial.');
+        scanSerial?.focus(); return;
+      }
+      
+      let payload;
+      const upper = raw.toUpperCase();
+      
+      if (upper.startsWith('B') || upper.startsWith('SEP') || raw.includes('-') || raw.includes(':')) {
+        payload = { raw_scan: raw, operador: (window.OPERADOR || '').trim() };
+      } 
+      
+      else {
+        payload = {
+          serial: raw,
+          bench_id: scanBench?.value || 'sep',
+          action: scanAction?.value || 'start',
+          operador: (window.OPERADOR || '').trim()
+        };
+      }
+
+      const data = await postScan(payload);
+      
+      if (data?.ok) {
+        if (scanSerial) scanSerial.value = '';
+      }
+    
+    }
+
+    async function undoScan() {
+      
+      const serial = (scanSerial?.value || '').trim();
+      
+      if (!serial) { setStatus('status--error', 'Informe o serial para desfazer.'); return; }
+      
+      const d = await undoScanAPI(serial);
+      
+      if (!d.ok) { setStatus('status--error', 'Falha ao desfazer.'); return; }
+      
+      setStatus('status--ok', `Desfeito. Voltou para ${d.moved_to}.`);
+      
+      if (scanSerial) scanSerial.value = '';
+      
+      loadBoard();
+    }
+
+    if (btnScan) btnScan.addEventListener('click', sendScan);
+
+    if (scanSerial) scanSerial.addEventListener('keydown', (e) => {
+      
+      if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); undoScan(); return; }
+      
+      if (e.key === 'Enter') { e.preventDefault(); sendScan(); }
+    
+    });
+
+    // Init
+    async function loadBoard() {
+      try {
+        
+        setStatus('status--loading', 'Atualizando…');
+        
+        const r = await fetch(`/producao/gp/painel/api/board`, { cache: 'no-store' });
+        
+        if (!r.ok) throw new Error('http');
+        
+        const d = await r.json();
+        
+        if (!d.ok) throw new Error('payload');
+        
+        lastBoardData = d;
+        checkROPAlert();
+        renderBoard(d.columns);
+        lastUpdateAt = Date.now();
+        setStatus('status--ok', 'Atualizado agora');
+        repaintTimers();
+      
+      } 
+      catch {
+        setStatus('status--error', 'Falha ao atualizar');
+      }
+    }
+
+    setInterval(() => {
+      
+      if (!lastUpdateAt) return;
+      
+      const diff = Math.floor((Date.now() - lastUpdateAt) / 1000);
+      
+      if (diff <= 1) { statusText.textContent = 'Atualizado agora'; return; }
+      
+      statusText.textContent = `Atualizado há ${diff}s`;
+    }, 1000);
+    
+    setInterval(repaintTimers, 1000);
+    setInterval(loadBoard, 4000);
+    loadBoard();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel de Montagem — Pneumark</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --text: #222;
+      --sub: #6b7280;           /* cinza discreto */
+      --brand: #e60000;
+      --ok: #1e9e52;
+      --warn: #ff9800;
+      --soft: #e9e9e9;
+      --shadow: 0 6px 18px rgba(0,0,0,0.07);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: #222;
+      color: #fff;
+      padding: 16px 20px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    }
+    header h1 { margin: 0; font-size: 24px; color: var(--brand) }
+    main { padding: 20px; max-width: 1100px; margin: 0 auto }
+
+    /* GRID mais fluido e cards menores */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--soft);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      transition: transform .12s ease;
+    }
+    .card:hover { transform: translateY(-2px) }
+
+    .modelo-title {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .modelo-badge {
+      background: var(--brand);
+      color: #fff; font-weight: bold; padding: 6px 10px; border-radius: 999px; letter-spacing: .6px;
+    }
+
+    /* CAPACIDADE com super-destaque */
+    .capacidade {
+      display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;
+    }
+    .capacidade .valor {
+      font-size: 44px; line-height: 1; font-weight: 800; color: #111;
+      letter-spacing: -0.5px;
+    }
+    .capacidade .tag {
+      font-size: 11px; color: #fff; background: #111; padding: 3px 8px; border-radius: 999px;
+      opacity: .9;
+    }
+    .hint-cap { font-size: 12px; color: var(--sub); margin-bottom: 8px; }
+
+    /* Gargalos mais discretos */
+    .gargalos {
+      margin-top: 4px;
+      border-top: 1px dashed var(--soft);
+      padding-top: 6px;
+      font-size: 12px;
+      color: var(--sub);
+    }
+    .gargalos-toggle {
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+      padding: 4px 8px; border-radius: 8px; border: 1px dashed var(--soft); background: #fafafa;
+    }
+    .gargalos-list {
+      margin-top: 8px;
+      max-height: 120px;       /* compacta */
+      overflow: auto;          /* rolagem se passar */
+      border-radius: 8px;
+      border: 1px dashed var(--soft);
+      background: #fdfdfd;
+      display: none;           /* começa recolhido */
+    }
+    .gargalos .linha {
+      display: grid;
+      grid-template-columns: 110px 1fr 68px 68px;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #f3f3f3;
+    }
+    .gargalos .linha:last-child { border-bottom: 0 }
+
+    /* Controles e ação dentro do card */
+    .controle {
+      display: grid;
+      grid-template-columns: auto 90px auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .controle button.step {
+      border: 1px solid var(--soft); border-radius: 10px; background: #fff; padding: 6px 10px; cursor: pointer;
+    }
+    .controle input[type="number"] {
+      width: 90px; padding: 8px 10px; border: 1px solid var(--soft); border-radius: 10px; font-size: 16px; text-align: center;
+    }
+    .btn-montar {
+      justify-self: end;
+      background: var(--brand); color: #fff; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: bold;
+    }
+    .erro { color: var(--brand); font-size: 12px; margin-top: 4px; display:none }
+
+    /* Box do plano otimizado mais limpo e curto */
+    .card-wide { grid-column: 1 / -1; }
+    .otimizacao {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
+    }
+    .otimizacao .box {
+      background: #fafafa; border: 1px dashed var(--soft); border-radius: 12px; padding: 10px;
+    }
+    .otimizacao .qty { font-size: 28px; font-weight: bold }
+    .otimizacao .crit { color: var(--sub); font-size: 12px; margin-top: 6px }
+
+    .actions { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-secondary {
+      background: #fff; border: 1px solid var(--soft); border-radius: 10px; padding: 10px 16px; cursor: pointer;
+    }
+
+    /* Tabela de máquinas montadas (rodapé) */
+    .montadas {
+      margin-top: 18px;
+      background: var(--card);
+      border: 1px solid var(--soft);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .montadas-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+    }
+    .montadas h2 { margin: 0; font-size: 18px; }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .table th, .table td {
+      border-bottom: 1px solid #f1f1f1;
+      padding: 8px 6px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .table th { color: var(--sub); font-weight: 600; }
+    .empty { color: var(--sub); font-size: 13px; padding: 8px 0; }
+
+    .toast {
+      position: fixed; bottom: 16px; right: 16px; background: #111; color: #fff; padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow); display: none;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Painel de Montagem <span style="color:#fff">—</span> <span style="color:#fff">Capacidades & Gargalos</span></h1>
+</header>
+<main>
+  <!-- CARDS POR MODELO -->
+  <section class="grid" id="cards-modelos"></section>
+
+  <!-- PLANO OTIMIZADO (opcional, mantém) -->
+  <section class="card card-wide" style="margin-top:14px">
+    <h2 style="margin-bottom:8px">Plano Otimizado (Quantidade Ideal por Modelo)</h2>
+    <div class="otimizacao" id="otimizacao-boxes"></div>
+    <div class="actions">
+      <button class="btn-secondary" id="btn-reset">Resetar quantidades</button>
+    </div>
+    <div class="crit" id="criterio-info"></div>
+  </section>
+
+  <!-- LISTA DE MÁQUINAS MONTADAS -->
+  <section class="montadas" id="montadas">
+    <div class="montadas-header">
+      <h2>Máquinas montadas</h2>
+      <button class="btn-secondary" id="btn-refresh-log">Atualizar</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Modelo</th>
+            <th>Nº de série</th>
+            <th>Data/Hora</th>
+            <th>Usuário</th>
+          </tr>
+        </thead>
+        <tbody id="montadas-body">
+          <tr><td colspan="4" class="empty">Nenhum registro ainda.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+ // Utilitário
+  async function jfetch(url, opts={}) {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      ...opts
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  // Atualiza blocos de capacidade na UI
+  function renderCapacidades(cap) {
+    if (!cap) return;
+    const ids = ['PM2100','PM2200','PM700'];
+    ids.forEach(m => {
+      const el = document.getElementById(`cap-${m}`);
+      if (el && typeof cap[m] !== 'undefined') el.textContent = cap[m];
+    });
+  }
+
+  // Recarrega lista de montadas
+  async function refreshLog() {
+    try {
+      const data = await jfetch('/producao/montagem/api/montadas');
+      const lista = document.getElementById('lista-montadas'); // <- ajuste se seu ID for outro
+      if (!lista) return;
+      lista.innerHTML = '';
+      (data || []).forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <strong>${item.modelo}</strong>
+          &nbsp;•&nbsp; Série: ${item.serie || '—'}
+          &nbsp;•&nbsp; ${item.data_hora || ''}
+          &nbsp;•&nbsp; ${item.usuario || ''}
+        `;
+        lista.appendChild(li);
+      });
+    } catch (err) {
+      console.error('Falha ao atualizar log:', err);
+    }
+  }
+
+  // Montar 1 unidade do modelo
+  async function montar(modelo, quantidade = 1) {
+    try {
+      const payload = { modelo, quantidade };
+      const data = await jfetch('/producao/montagem/api/montar', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      // feedback simples (pode trocar por toast)
+      console.log(data?.mensagem || 'Montagem concluída');
+
+      // Atualiza capacidades (se backend devolver), senão busca do /api/capacidade
+      if (data && data.cap) {
+        renderCapacidades(data.cap);
+      } else {
+        const caps = await jfetch('/producao/montagem/api/capacidade');
+        // caps = { modelos: { PM2100:{capacidade:..}, ... } }
+        const flat = {};
+        Object.entries(caps.modelos || {}).forEach(([m, obj]) => flat[m] = obj.capacidade);
+        renderCapacidades(flat);
+      }
+
+      // Recarrega log
+      await refreshLog();
+
+    } catch (err) {
+      alert('Não foi possível montar agora. ' + err.message);
+      console.error(err);
+    }
+  }
+
+  // Liga botões MONTAR
+  document.querySelectorAll('.btn-montar').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const modelo = btn.getAttribute('data-m');
+      if (!modelo) return;
+      montar(modelo, 1);
+    });
+  });
+
+  // Botão "Atualizar" do log
+  const btnRefresh = document.getElementById('btn-refresh-log');
+  if (btnRefresh) btnRefresh.addEventListener('click', refreshLog);
+
+  // Primeira carga do log (opcional)
+  refreshLog();
+
+
+
+  const endpoints = {
+    capacidade: "{{ url_for('maquinas_bp.api_capacidade') }}",
+    otimizacao: "{{ url_for('maquinas_bp.api_otimizacao') }}",
+    validar:   "{{ url_for('maquinas_bp.api_validar') }}",   // ainda usado para validação geral (se quiser)
+    montar:    "{{ url_for('maquinas_bp.api_montar') }}",    // NOVO: montar por modelo
+    montadas:  "{{ url_for('maquinas_bp.api_montadas') }}"   // NOVO: listar log
+  };
+
+  const state = {
+    modelos: ["PM2100", "PM2200", "PM700"],
+    capacidade: {},  // {PM2100:{capacidade: N, gargalos:[...]}, ...}
+    otimizacao: {},  // {ideal:{PM2100:N,...}, criterio:"..."}
+    montar: { PM2100: 0, PM2200: 0, PM700: 0 },
+    montadas: []     // [{modelo, serie, data_hora_iso, usuario}, ...]
+  };
+
+  const elCards = document.getElementById("cards-modelos");
+  const elOtz   = document.getElementById("otimizacao-boxes");
+  const elCrit  = document.getElementById("criterio-info");
+  const elToast = document.getElementById("toast");
+  const elLogBody = document.getElementById("montadas-body");
+
+  function toast(msg) {
+    elToast.textContent = msg;
+    elToast.style.display = "block";
+    setTimeout(()=> elToast.style.display = "none", 2200);
+  }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  function renderCards() {
+    elCards.innerHTML = "";
+    state.modelos.forEach(m => {
+      const data = state.capacidade[m] || { capacidade: 0, gargalos: [] };
+      const capVal = data.capacidade ?? 0;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      const gargalosHtml = (data.gargalos||[]).map(g => `
+        <div class="linha">
+          <div><strong>${g.codigo}</strong></div>
+          <div>${g.descricao}</div>
+          <div title="Capacidade local">cap: ${g.cap_local}</div>
+          <div title="Estoque/Consumo">${g.estoque}/${g.consumo}</div>
+        </div>`).join("");
+
+      card.innerHTML = `
+        <div class="modelo-title">
+          <span class="modelo-badge">${m}</span>
+        </div>
+
+        <div class="capacidade">
+          <div class="valor" id="cap-${m}">${capVal}</div>
+          <span class="tag">capacidade máx</span>
+        </div>
+        <div class="hint-cap">A capacidade é limitada pelos gargalos abaixo.</div>
+
+        <div class="gargalos">
+          <div class="gargalos-toggle" data-toggle="${m}">
+            <span>Ver gargalos</span>
+            <svg width="12" height="12" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="#6b7280" stroke-width="2"/></svg>
+          </div>
+          <div class="gargalos-list" id="glist-${m}">
+            ${gargalosHtml || '<div class="linha"><div>—</div><div>Sem dados</div><div></div><div></div></div>'}
+          </div>
+        </div>
+
+        <div class="controle">
+          <button class="step" data-m="${m}" data-op="dec">−</button>
+          <input type="number" min="0" step="1" value="${state.montar[m]||0}" id="qty-${m}" />
+          <button class="step" data-m="${m}" data-op="inc">+</button>
+          <button class="btn-montar" data-m="${m}">MONTAR</button>
+        </div>
+        <div class="erro" id="err-${m}"></div>
+      `;
+      elCards.appendChild(card);
+    });
+
+    // toggle gargalos
+    elCards.querySelectorAll(".gargalos-toggle").forEach(tg => {
+      tg.addEventListener("click", () => {
+        const m = tg.getAttribute("data-toggle");
+        const lst = document.getElementById(`glist-${m}`);
+        const showing = lst.style.display === "block";
+        lst.style.display = showing ? "none" : "block";
+        tg.querySelector("span").textContent = showing ? "Ver gargalos" : "Ocultar gargalos";
+      });
+    });
+
+    // stepper
+    elCards.querySelectorAll("button.step").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const m = b.getAttribute("data-m");
+        const op = b.getAttribute("data-op");
+        const cap = (state.capacidade[m]?.capacidade) ?? 0;
+        let v = state.montar[m] ?? 0;
+        v = (op === "inc") ? v+1 : v-1;
+        v = clamp(v, 0, cap);
+        state.montar[m] = v;
+        document.getElementById(`qty-${m}`).value = v;
+        validateInline(m);
+      });
+    });
+
+    // input direto
+    elCards.querySelectorAll("input[type='number']").forEach(inp=>{
+      inp.addEventListener("input", ()=>{
+        const m = inp.id.split("qty-")[1];
+        const cap = (state.capacidade[m]?.capacidade) ?? 0;
+        let v = parseInt(inp.value || "0", 10);
+        if (isNaN(v)) v = 0;
+        if (v > cap) { v = cap; toast(`Limite para ${m}: ${cap}`); }
+        if (v < 0) v = 0;
+        state.montar[m] = v;
+        inp.value = v;
+        validateInline(m);
+      });
+    });
+
+    // montar por modelo
+    elCards.querySelectorAll(".btn-montar").forEach(btn=>{
+      btn.addEventListener("click", ()=> montarModelo(btn.getAttribute("data-m")));
+    });
+  }
+
+  function validateInline(modelo) {
+    const cap = (state.capacidade[modelo]?.capacidade) ?? 0;
+    const v = state.montar[modelo] ?? 0;
+    const elErr = document.getElementById(`err-${modelo}`);
+    if (v > cap) {
+      elErr.style.display = "block";
+      elErr.textContent = `Quantidade (${v}) excede capacidade (${cap}).`;
+    } else {
+      elErr.style.display = "none";
+      elErr.textContent = "";
+    }
+  }
+
+  function renderOtimizacao() {
+    elOtz.innerHTML = "";
+    state.modelos.forEach(m=>{
+      const ideal = state.otimizacao?.ideal?.[m] ?? 0;
+      const box = document.createElement("div");
+      box.className = "box";
+      box.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="modelo-badge">${m}</span>
+          <strong>Ideal sugerido</strong>
+        </div>
+        <div class="qty">${ideal}</div>
+        <div class="crit">Sugestão de balanceamento</div>
+      `;
+      elOtz.appendChild(box);
+    });
+    elCrit.textContent = state.otimizacao?.criterio ? `Critério: ${state.otimizacao.criterio}` : "";
+  }
+
+  function renderMontadas() {
+    elLogBody.innerHTML = "";
+    if (!state.montadas || state.montadas.length === 0) {
+      elLogBody.innerHTML = `<tr><td colspan="4" class="empty">Nenhum registro ainda.</td></tr>`;
+      return;
+    }
+    state.montadas.forEach(item=>{
+      const tr = document.createElement("tr");
+      // data formatada rápida
+      const dt = item.data_hora || item.data_hora_iso || "";
+      tr.innerHTML = `
+        <td>${item.modelo}</td>
+        <td>${item.serie}</td>
+        <td>${dt}</td>
+        <td>${item.usuario || "-"}</td>
+      `;
+      elLogBody.appendChild(tr);
+    });
+  }
+
+  async function montarModelo(modelo) {
+    const qtd = state.montar[modelo] ?? 0;
+    const cap = (state.capacidade[modelo]?.capacidade) ?? 0;
+    if (qtd <= 0) { toast(`Defina a quantidade de ${modelo} para montar.`); return; }
+    if (qtd > cap) { toast(`Quantidade excede capacidade de ${modelo}.`); return; }
+
+    try {
+      // opcional: checar via validar antes
+      // await validarGeral();
+
+      const resp = await fetch(endpoints.montar, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ modelo, quantidade: qtd })
+      }).then(r=>r.json());
+
+      if (resp.ok) {
+        toast(`${qtd} ${modelo} montada(s) com sucesso.`);
+        // zera apenas este modelo
+        state.montar[modelo] = 0;
+        const inp = document.getElementById(`qty-${modelo}`);
+        if (inp) inp.value = 0;
+        validateInline(modelo);
+        // atualiza log
+        await loadMontadas();
+        // (opcional) recarregar capacidades pós-baixa de estoque
+        await loadCapacidadeEOtimizacao();
+        renderCards();
+        renderOtimizacao();
+      } else {
+        const msg = (resp.erros||[]).map(e=> `${e.motivo}`).join(" | ");
+        toast(`Não foi possível montar: ${msg || 'verifique os dados'}`);
+      }
+    } catch (e) {
+      toast("Erro ao montar.");
+    }
+  }
+
+  async function validarGeral() {
+    const r = await fetch(endpoints.validar, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(state.montar)
+    }).then(r=>r.json());
+    if (!r.ok) {
+      const msg = (r.erros||[]).map(e=> `${e.modelo}: ${e.motivo}`).join(" | ");
+      toast(`Ajustes necessários: ${msg}`);
+      throw new Error("validação falhou");
+    }
+  }
+
+  async function loadCapacidadeEOtimizacao() {
+    const [cap, otz] = await Promise.all([
+      fetch(endpoints.capacidade).then(r=>r.json()),
+      fetch(endpoints.otimizacao).then(r=>r.json())
+    ]);
+    state.capacidade = cap.modelos || {};
+    state.otimizacao = otz || {};
+    // usa os ideais como ponto de partida (sem sobrescrever quem já digitou)
+    state.modelos.forEach(m=>{
+      if (!state.montar[m]) state.montar[m] = state.otimizacao?.ideal?.[m] ?? 0;
+    });
+  }
+
+  async function loadMontadas() {
+    try {
+      const dados = await fetch(endpoints.montadas).then(r=>r.json());
+      state.montadas = dados || [];
+      renderMontadas();
+    } catch {
+      // silencia se endpoint ainda não existir
+    }
+  }
+
+  document.getElementById("btn-reset").addEventListener("click", ()=>{
+    state.modelos.forEach(m=> {
+      state.montar[m] = 0;
+      const inp = document.getElementById(`qty-${m}`);
+      if (inp) inp.value = 0;
+      validateInline(m);
+    });
+  });
+
+  document.getElementById("btn-refresh-log").addEventListener("click", loadMontadas);
+
+  // boot
+  (async function init(){
+    await loadCapacidadeEOtimizacao();
+    renderCards();
+    renderOtimizacao();
+    await loadMontadas();
+  })();
+</script>
+</body>
+</html>
