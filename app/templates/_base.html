@@ -134,7 +134,7 @@
       </header>
 
       <!-- FLASHES -->
-      <div class="flash-container container">
+      <div class="flash-container container h-0">
         {% with msgs = get_flashed_messages(with_categories=true) %}
           {% if msgs %}
             {% for cat, msg in msgs %}

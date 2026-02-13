@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, make_response, request, current_app
 from datetime import datetime
 from pathlib import Path
 import json, random
+from typing import List, Dict # Adicione este import no topo do arquivo
 
 utilidades_bp = Blueprint("utilidades_bp", __name__, url_prefix="/utilidades")
 
@@ -16,7 +17,7 @@ def _caminho_frases_json() -> Path:
     root = Path(current_app.root_path).parent
     return (root / "app" / "data" / "frases.json").resolve()
 
-def _carregar_frases() -> list[dict]:
+def _carregar_frases() -> List[Dict]:
     caminho = _caminho_frases_json()
     if not caminho.exists():
         return []

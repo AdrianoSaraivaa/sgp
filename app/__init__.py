@@ -232,13 +232,6 @@ def create_app() -> Flask:
         alias="OMIE",
     )
 
-    # Check list
-
-    _try_register(
-        app,
-        "app.routes.producao_routes.gerenciamento_producao_routes.gp_checklist_api",
-        "gp_checklist_api_bp",
-    )
 
     # -----------------------------------------------------------------
     # Models
