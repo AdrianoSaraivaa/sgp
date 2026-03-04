@@ -1,4 +1,4 @@
-# app/__init__.py
+# Relative path: app/__init__.py
 """
 Application Factory do Flask para o projeto SGP (Pneumark).
 """
@@ -9,9 +9,9 @@ from datetime import datetime
 from typing import Optional
 
 from flask import Flask
+from flask_login import LoginManager  # <--- Importante para o login
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager  # <--- Importante para o login
 
 # ---------------------------------------------------------------------
 # Extensões globais
@@ -44,13 +44,9 @@ def _try_register(
         mod = importlib.import_module(import_line)
         bp = getattr(mod, attr)
         app.register_blueprint(bp)
-        app.logger.info(
-            "[BOOT] Blueprint registrado: %s (%s.%s)", name, import_line, attr
-        )
+        app.logger.info("[BOOT] Blueprint registrado: %s (%s.%s)", name, import_line, attr)
     except Exception as e:
-        msg = (
-            f"[BOOT] Falha ao registrar blueprint: {name} ({import_line}.{attr}) -> {e}"
-        )
+        msg = f"[BOOT] Falha ao registrar blueprint: {name} ({import_line}.{attr}) -> {e}"
         if required:
             app.logger.exception(msg)
             raise
@@ -79,28 +75,36 @@ def create_app() -> Flask:
     )
 
     # -----------------------------------------------------------------
-# Configurações básicas
-# -----------------------------------------------------------------
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    # Configurações básicas
+    # -----------------------------------------------------------------
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
-raw_db_url = os.environ.get("DATABASE_URL")
+    raw_db_url = os.environ.get("DATABASE_URL")
+    if raw_db_url:
+        s = raw_db_url.strip()
 
-if raw_db_url:
-    # Corrige prefixo antigo postgres://
-    if raw_db_url.startswith("postgres://"):
-        raw_db_url = raw_db_url.replace("postgres://", "postgresql+psycopg://", 1)
-    # Força SQLAlchemy usar psycopg3
-    elif raw_db_url.startswith("postgresql://"):
-        raw_db_url = raw_db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        # 1) Corrige prefixo antigo postgres://
+        if s.startswith("postgres://"):
+            s = s.replace("postgres://", "postgresql://", 1)
 
-database_url = raw_db_url or "sqlite:///pneumark.db"
+        # 2) Se já vier com psycopg2 explícito, troca para psycopg3
+        if s.startswith("postgresql+psycopg2://"):
+            s = s.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SERIES_ADMIN_PIN"] = os.environ.get("SERIES_ADMIN_PIN", "4321")
+        # 3) Se vier sem driver, força psycopg3
+        if s.startswith("postgresql://"):
+            s = s.replace("postgresql://", "postgresql+psycopg://", 1)
 
-if not app.logger.handlers:
-    logging.basicConfig(level=logging.INFO)
+        raw_db_url = s
+
+    database_url = raw_db_url or "sqlite:///pneumark.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SERIES_ADMIN_PIN"] = os.environ.get("SERIES_ADMIN_PIN", "4321")
+
+    if not app.logger.handlers:
+        logging.basicConfig(level=logging.INFO)
+
     # -----------------------------------------------------------------
     # Inicialização de extensões
     # -----------------------------------------------------------------
@@ -191,9 +195,7 @@ if not app.logger.handlers:
     _try_register(app, "app.routes.estoque_routes.editar_peca", "editar_peca_bp")
     _try_register(app, "app.routes.estoque_routes.consultar_peca", "consultar_peca_bp")
     _try_register(app, "app.routes.estoque_routes.deletar_peca", "deletar_peca_bp")
-    _try_register(
-        app, "app.routes.estoque_routes.autocomplete_pecas", "autocomplete_bp"
-    )
+    _try_register(app, "app.routes.estoque_routes.autocomplete_pecas", "autocomplete_bp")
     # ====================================================================
     # [FIM BLOCO] blueprints_estoque
     # ====================================================================
@@ -237,9 +239,7 @@ if not app.logger.handlers:
     _try_register(
         app, "app.routes.producao_routes.maquinas_routes.montar_maquinas", "maquinas_bp"
     )
-    _try_register(
-        app, "app.routes.estoque_routes.editar_conjunto", "editar_conjunto_bp"
-    )
+    _try_register(app, "app.routes.estoque_routes.editar_conjunto", "editar_conjunto_bp")
     _try_register(
         app,
         "app.routes.producao_routes.maquinas_routes.imprimir_etiqueta",
@@ -308,10 +308,14 @@ if not app.logger.handlers:
     # [RESPONSABILIDADE] Registrar blueprints do painel ao vivo (páginas e APIs)
     # ====================================================================
     _try_register(
-        app, "app.routes.producao_routes.painel_routes.board_page", "gp_painel_page_bp"
+        app,
+        "app.routes.producao_routes.painel_routes.board_page",
+        "gp_painel_page_bp",
     )
     _try_register(
-        app, "app.routes.producao_routes.painel_routes.board_api", "gp_painel_api_bp"
+        app,
+        "app.routes.producao_routes.painel_routes.board_api",
+        "gp_painel_api_bp",
     )
     _try_register(
         app,
@@ -323,9 +327,7 @@ if not app.logger.handlers:
         "app.routes.producao_routes.painel_routes.order_api",
         "gp_painel_order_api_bp",
     )
-    _try_register(
-        app, "app.routes.producao_routes.painel_routes.needs_api", "gp_needs_api_bp"
-    )
+    _try_register(app, "app.routes.producao_routes.painel_routes.needs_api", "gp_needs_api_bp")
     # ====================================================================
     # [FIM BLOCO] blueprints_painel_ao_vivo
     # ====================================================================
