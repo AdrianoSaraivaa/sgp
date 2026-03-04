@@ -1,13 +1,26 @@
-__pycache__/
+# Python
 __pycache__/
 *.pyc
-*.pyc
-.venv/
+*.pyo
+*.pyd
+
+# Virtual Environment
 venv/
+.venv/
+
+# Environment / Instance
 instance/
-Thumbs.db
-Thumbs.db
-.DS_Store
-.vscode/
+
+# Logs / Temp
 logs/
 tmp/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Large file
+tree.txt
