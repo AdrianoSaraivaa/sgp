@@ -79,18 +79,28 @@ def create_app() -> Flask:
     )
 
     # -----------------------------------------------------------------
-    # Configurações básicas
-    # -----------------------------------------------------------------
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+# Configurações básicas
+# -----------------------------------------------------------------
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
-    database_url = os.environ.get("DATABASE_URL", "sqlite:///pneumark.db")
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SERIES_ADMIN_PIN"] = os.environ.get("SERIES_ADMIN_PIN", "4321")
+raw_db_url = os.environ.get("DATABASE_URL")
 
-    if not app.logger.handlers:
-        logging.basicConfig(level=logging.INFO)
+if raw_db_url:
+    # Corrige prefixo antigo postgres://
+    if raw_db_url.startswith("postgres://"):
+        raw_db_url = raw_db_url.replace("postgres://", "postgresql+psycopg://", 1)
+    # Força SQLAlchemy usar psycopg3
+    elif raw_db_url.startswith("postgresql://"):
+        raw_db_url = raw_db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
+database_url = raw_db_url or "sqlite:///pneumark.db"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SERIES_ADMIN_PIN"] = os.environ.get("SERIES_ADMIN_PIN", "4321")
+
+if not app.logger.handlers:
+    logging.basicConfig(level=logging.INFO)
     # -----------------------------------------------------------------
     # Inicialização de extensões
     # -----------------------------------------------------------------
