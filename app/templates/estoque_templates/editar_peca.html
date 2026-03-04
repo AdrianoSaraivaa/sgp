@@ -1,15 +1,45 @@
 {% extends "_base.html" %}
 {% set active_page = 'listar' %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
 {% block title %}Editar Peça — Pneumark SGP{% endblock %}
-{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Incluir recursos adicionais no head e prefetch de rotas relacionadas
+==================================================================== -->
 {% block head_extra %}
   <!-- Prefetch de rotas relacionadas -->
   <link rel="prefetch" href="{{ url_for('listar_pecas_bp.listar_pecas') }}">
   <link rel="prefetch" href="{{ url_for('consultar_peca_bp.consultar_peca', peca_id=peca.id) }}">
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_toolbar
+[RESPONSABILIDADE] Renderizar breadcrumb e barra informativa da edição da peça
+==================================================================== -->
 {% block toolbar %}
   <div class="toolbar">
     <div class="breadcrumb" aria-label="Você está em">
@@ -24,7 +54,15 @@
     </div>
   </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_toolbar
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar formulário de edição da peça e ações de navegação
+==================================================================== -->
 {% block content %}
   <section class="card">
     <form method="POST" novalidate>
@@ -110,3 +148,16 @@
     </form>
   </section>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_toolbar
+DOCUMENTO_HTML: block_content
+==================================================================== -->

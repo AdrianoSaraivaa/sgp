@@ -11,11 +11,24 @@ from app.routes.producao_routes.painel_routes.rop_service import (
     get_rop_needs_and_banner,
 )
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] gp_painel_api_bp
+# [RESPONSABILIDADE] Definir blueprint e prefixo das rotas de API do painel de produção
+# ====================================================================
 gp_painel_api_bp = Blueprint(
     "gp_painel_api_bp", __name__, url_prefix="/producao/gp/painel/api"
 )
+# ====================================================================
+# [FIM BLOCO] gp_painel_api_bp
+# ====================================================================
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _ensure_tables
+# [RESPONSABILIDADE] Garantir existência das tabelas necessárias do painel (criar se faltar)
+# ====================================================================
 def _ensure_tables():
     insp = inspect(db.engine)
     for t in ("gp_work_order", "gp_work_stage", "gp_model", "gp_bench_config"):
@@ -24,6 +37,16 @@ def _ensure_tables():
             break
 
 
+# ====================================================================
+# [FIM BLOCO] _ensure_tables
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _enabled_seq_for_model
+# [RESPONSABILIDADE] Obter sequência de bancadas ativas por modelo com fallback e garantias mínimas
+# ====================================================================
 def _enabled_seq_for_model(modelo: str):
     seq = []
     try:
@@ -64,7 +87,17 @@ def _enabled_seq_for_model(modelo: str):
     return sorted(list(set(seq)), key=lambda x: int(x[1:]) if x[1:].isdigit() else 99)
 
 
+# ====================================================================
+# [FIM BLOCO] _enabled_seq_for_model
+# ====================================================================
+
+
 @gp_painel_api_bp.get("/board")
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] board_data
+# [RESPONSABILIDADE] Construir payload do painel com colunas, itens, tempos esperados e necessidades ROP
+# ====================================================================
 def board_data():
     _ensure_tables()
 
@@ -245,7 +278,17 @@ def board_data():
     return jsonify(payload)
 
 
+# ====================================================================
+# [FIM BLOCO] board_data
+# ====================================================================
+
+
 @gp_painel_api_bp.get("/kpis/dia")
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] kpis_dia
+# [RESPONSABILIDADE] Calcular KPIs do dia (throughput, FPY, retrabalho, ciclos e HiPot) com filtros opcionais
+# ====================================================================
 def kpis_dia():
     data_str = request.args.get("data")
     modelo = request.args.get("modelo")
@@ -312,10 +355,36 @@ def kpis_dia():
     return jsonify(result)
 
 
+# ====================================================================
+# [FIM BLOCO] kpis_dia
+# ====================================================================
+
+
 @gp_painel_api_bp.get("/needs")
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] needs_data
+# [RESPONSABILIDADE] Retornar necessidades ROP (lista) para consumo rápido pelo frontend
+# ====================================================================
 def needs_data():
     try:
         rop_data = get_rop_needs_and_banner(db.session)
         return jsonify(rop_data["needs"]), 200
     except Exception:
         return jsonify([]), 200
+
+
+# ====================================================================
+# [FIM BLOCO] needs_data
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: gp_painel_api_bp
+# FUNÇÃO: _ensure_tables
+# FUNÇÃO: _enabled_seq_for_model
+# FUNÇÃO: board_data
+# FUNÇÃO: kpis_dia
+# FUNÇÃO: needs_data
+# ====================================================================

@@ -1,8 +1,18 @@
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] rastreabilidade_serial_template
+[RESPONSABILIDADE] Template Jinja da página de rastreabilidade por serial com layout, estilos (tela/print) e script de consumo da API para montar relatório (gerais, Hi-Pot, checklist, timeline)
+==================================================================== -->
 {% extends "_base.html" %}
 
 {% block title %}Rastreabilidade • {{ serial }}{% endblock %}
 {% block module_name %}Rastreabilidade{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] BLOCO_JINJA
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar o relatório (breadcrumb, cabeçalho, seções) e aplicar CSS (tela + impressão) + JS (fetch da API e renderização dos dados)
+==================================================================== -->
 {% block content %}
 <style>
   /* --- ESTILOS VISUAIS (TELA) --- */
@@ -95,10 +105,25 @@
     #bancadasBoxSection {
         break-before: auto; /* Deixa o navegador decidir, mas evita corte interno */
     }
+
+    /* Forçar abertura de detalhes na impressão */
+    details { display: block !important; }
+    details summary { display: none !important; }
+    details[open] summary { display: none !important; }
   }
 
   /* Classe auxiliar para logo que só aparece na impressão */
   .print-header-only { display: none; }
+
+  /* Estilos para Checklist Nível C */
+  .check-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; align-items: flex-start; }
+  .check-item:last-child { border-bottom: none; }
+  .check-ordem { width: 24px; font-weight: 700; color: #94a3b8; font-size: 0.8rem; margin-top: 2px; }
+  .check-content { flex: 1; }
+  .check-desc { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+  .check-meta { font-size: 0.8rem; color: #64748b; }
+  .check-status { width: 110px; text-align: right; }
+  .exec-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 10px; background: #fff; }
 </style>
 
 <div class="card card-trace">
@@ -145,14 +170,14 @@
     <div id="hipotBox" class="muted">Carregando...</div>
   </section>
 
-  <section class="section-box">
-    <h3 class="section-title">✅ Checklist de Qualidade</h3>
-    <div id="checklistBox" class="muted">Carregando...</div>
-  </section>
-  
   <section class="section-box" id="bancadasBoxSection">
     <h3 class="section-title">⏱️ Histórico de Bancadas (Timeline)</h3>
     <div id="bancadasBox" class="muted">Carregando...</div>
+  </section>
+
+  <section class="section-box">
+    <h3 class="section-title">🔎 CHECKLIST DE QUALIDADE – BANCADA 8</h3>
+    <div id="checklistBox" class="muted">Carregando...</div>
   </section>
 
 </div>
@@ -189,6 +214,8 @@
     if(s==='in_progress') return chip('EM ANDAMENTO','warning');
     if(s==='queued') return chip('EM FILA','neutral');
     if(s==='reprovado' || s==='rejected' || s==='rep' || s==='fail') return chip('REPROVADO','danger');
+    if(s==='retrabalho' || s==='rework') return chip('RETRABALHO','warning');
+    if(s==='não informado' || s==='nao informado') return chip('NÃO INFORMADO','neutral');
     return chip(st||'-','neutral');
   }
 
@@ -204,17 +231,15 @@
       headMeta.innerHTML = `
         <strong>Modelo:</strong> ${d.modelo||'-'} &nbsp;•&nbsp;
         <strong>Status Atual:</strong> ${statusLabel(d.status_atual)} &nbsp;•&nbsp;
-        <strong>Localização:</strong> ${d.current_bench||'-'} &nbsp;•&nbsp;
-        <strong>Atualizado em:</strong> ${fmt(d.ultima_atualizacao)}
+        <strong>Duração Total:</strong> ${d.duracao_min ?? '-'} min
       `;
 
       // Dados gerais
       dadosGerais.innerHTML = `
-        <div class="kv-item"><strong>Ordem de Produção</strong>${d.ordem_producao ?? '-'}</div>
-        <div class="kv-item"><strong>Lote</strong>${d.lote ?? '-'}</div>
-        <div class="kv-item"><strong>Criado em</strong>${fmt(d.criado_em)}</div>
-        <div class="kv-item"><strong>Criado por</strong>${d.criado_por || '-'}</div>
-        <div class="kv-item"><strong>Separação (Estoque)</strong>${d.separacao?.responsavel || '-'} (${d.separacao?.duracao_min ?? '-'} min)</div>
+        <div class="kv-item"><strong>Início da Produção</strong>${fmt(d.started_at)}</div>
+        <div class="kv-item"><strong>Fim da Produção</strong>${fmt(d.finished_at)}</div>
+        <div class="kv-item"><strong>Tempo Total</strong>${d.duracao_min ?? '-'} min</div>
+        <div class="kv-item"><strong>Status</strong>${statusLabel(d.status)}</div>
       `;
 
       // Bancadas (Timeline)
@@ -229,57 +254,109 @@
               <div style="font-size:0.85rem; color:#64748b;">
                 Início: ${fmt(b.inicio)} • Fim: ${fmt(b.fim)} • <strong>${b.duracao_min ?? '-'} min</strong>
               </div>
-              <div style="font-size:0.85rem;">Responsável: <strong>${b.responsavel || '—'}</strong> ${oc}</div>
+              <div style="font-size:0.85rem; color:#475569; margin-top:2px;">
+                Responsável: ${b.responsavel || '-'} ${oc}
+              </div>
             </div>
           `;
         }).join('');
-        bancadasBox.innerHTML = list;
+        bancadasBox.innerHTML = `<div style="margin-top:10px;">${list}</div>`;
       }
 
-      // HiPot - Lógica Atualizada para Novos Campos
-      if(!d.hipot || (!d.hipot.executado && !d.hipot.resultado_final)){
-        hipotBox.innerHTML = `<div class="muted">Ainda não executado.</div>`;
+      // Hi-Pot
+      if(!d.hipot || !d.hipot.executado){
+        hipotBox.innerHTML = `<div class="muted">Nenhum ensaio elétrico registrado.</div>`;
       }else{
         const h = d.hipot;
-        // Tenta pegar os valores novos (hp_v_obs_v) ou cai nos antigos (hp1.valor) caso a API ainda mande o formato velho
-        const tensao = h.hp_v_obs_v || (h.hp1 ? h.hp1.valor : '-') || '-';
-        const aterramento = h.gb_r_mohm || (h.gb1 ? h.gb1.valor : '-') || '-';
-        const operador = h.operador || (h.responsavel) || '-';
-
         hipotBox.innerHTML = `
-           <div class="kv-grid">
-              <div class="kv-item"><strong>Resultado Final</strong> ${statusLabel(h.resultado_final)}</div>
-              <div class="kv-item"><strong>Operador</strong> ${operador}</div>
-              <div class="kv-item"><strong>Data do Teste</strong> ${fmt(h.data_execucao || h.hipot_last_at || d.ultima_atualizacao)}</div>
-           </div>
-           <div style="margin-top:12px; padding-top:12px; border-top:1px dashed #cbd5e1;" class="kv-grid">
-              <div class="kv-item"><strong>Tensão Suportável (V)</strong> <span style="font-size:1.1em">${tensao} V</span></div>
-              <div class="kv-item"><strong>Cont. Aterramento (mΩ)</strong> <span style="font-size:1.1em">${aterramento} mΩ</span></div>
-           </div>
-           ${h.observacao_reprovacao ? `<div style="margin-top:10px; color:#b91c1c; background:#fee2e2; padding:8px; border-radius:6px;"><strong>Obs. Reprovação:</strong> ${h.observacao_reprovacao}</div>` : ''}
+          <div class="kv-grid">
+            <div class="kv-item"><strong>Equipamento</strong>${h.equipamento || '-'}</div>
+            <div class="kv-item"><strong>Calibração</strong>${h.calibracao || '-'}</div>
+            <div class="kv-item"><strong>Resultado Final</strong>${statusLabel(h.resultado_final)}</div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:20px; flex-wrap:wrap; background:#f8fafc; padding:10px; border-radius:8px;">
+            <div><strong>GB:</strong> ${h.gb1?.valor || '-'} ${statusLabel(h.gb1?.status)}</div>
+            <div><strong>HP:</strong> ${h.hp1?.valor || '-'} ${statusLabel(h.hp1?.status)}</div>
+          </div>
+          ${h.observacao_reprovacao ? `<div style="margin-top:10px; color:#b91c1c; font-size:0.85rem;"><strong>Obs:</strong> ${h.observacao_reprovacao}</div>` : ''}
         `;
       }
 
-      // Checklist
-      if(!d.checklist || d.checklist.executado===false){
-        checklistBox.innerHTML = `<div class="muted">Ainda não executado.</div>`;
+      // Checklist (Nível C — Bancada 8)
+      const c8 = d.checklist_b8;
+      if(!c8 || !c8.executado){
+        checklistBox.innerHTML = `<div class="muted">Nenhum checklist de qualidade registrado para a Bancada 8.</div>`;
       }else{
-        const items = (d.checklist.itens||[]).map(it => {
-          const res = (it.resultado||'').toLowerCase()==='ok' ? '<span style="color:#16a34a">✔ OK</span>' : '<span style="color:#dc2626">✖ NOK</span>';
-          return `<div style="border-bottom:1px solid #f1f5f9; padding:6px 0; display:flex; justify-content:space-between;">
-                    <span>${it.descricao||'-'}</span>
-                    <strong>${res}</strong>
-                  </div>`;
+        const latest = c8.latest || {};
+        const execs = c8.executions || [];
+        
+        const header = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:0.9rem; color:#64748b;">Última Inspeção por: <strong>${latest.operador || '-'}</strong></div>
+              <div style="font-size:0.8rem; color:#94a3b8;">Início: ${fmt(latest.started_at)} • Fim: ${fmt(latest.finished_at)} • Duração: <strong>${latest.duracao_min ?? '-'} min</strong></div>
+            </div>
+            <div>${statusLabel(latest.resultado_final)}</div>
+          </div>
+        `;
+
+        const itemsHtml = (latest.itens || []).map(it => {
+          const obs = it.observacao ? `<div class="check-meta" style="color:#475569; margin-top:4px;">📝 <strong>Obs:</strong> ${it.observacao}</div>` : '';
+          const ncrs = (it.ncrs || []).map(n => `<div class="check-meta" style="color:#b91c1c; margin-top:2px;">⚠️ <strong>NCR:</strong> ${n.descricao || n.texto || n}</div>`).join('');
+          
+          return `
+            <div class="check-item">
+              <div class="check-ordem">${it.ordem || ''}</div>
+              <div class="check-content">
+                <div class="check-desc">${it.desc || it.descricao || '-'}</div>
+                ${obs}
+                ${ncrs}
+              </div>
+              <div class="check-status">${statusLabel(it.status)}</div>
+            </div>
+          `;
         }).join('');
+
+        let historyHtml = '';
+        if(execs.length > 1){
+          historyHtml = `
+            <details class="no-print" style="margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:15px;">
+              <summary style="cursor:pointer; color:#3b82f6; font-weight:600; font-size:0.9rem;">Ver histórico de reexecuções (${execs.length - 1})</summary>
+              ${execs.slice(0, -1).reverse().map((ex, idx) => {
+                const exItems = (ex.itens || []).map(it => `
+                  <div style="font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between;">
+                    <span>${it.ordem}. ${it.desc || it.descricao}</span>
+                    <span>${statusLabel(it.status)}</span>
+                  </div>
+                `).join('');
+
+                return `
+                  <div class="exec-box" style="margin-top:10px;">
+                    <div style="display:flex; gap:10px; justify-content:space-between; flex-wrap:wrap;">
+                      <div><strong>Execução</strong> #${execs.length - (idx + 1)}</div>
+                      <div><strong>Resultado</strong> ${statusLabel(ex.resultado_final)}</div>
+                    </div>
+                    <div class="muted" style="margin-top:6px; font-size:0.85rem;">
+                      Operador: <strong>${ex.operador || '-'}</strong> • Início: ${fmt(ex.started_at)} • Fim: ${fmt(ex.finished_at)} • Duração: <strong>${ex.duracao_min ?? '-'} min</strong>
+                    </div>
+                    <div style="margin-top:10px;">${exItems || '<div class="muted">Sem itens.</div>'}</div>
+                  </div>
+                `;
+              }).join('')}
+            </details>
+          `;
+        }
+
         checklistBox.innerHTML = `
-          <div style="margin-bottom:10px;"><strong>Resultado Global:</strong> ${statusLabel(d.checklist.resultado_final)}</div>
-          <div style="background:#f8fafc; padding:10px; border-radius:8px;">${items || '<div class="muted">Sem itens registrados.</div>'}</div>
+          ${header}
+          <div style="background:#f8fafc; padding:10px; border-radius:8px;">${itemsHtml || '<div class="muted">Sem itens registrados.</div>'}</div>
+          ${historyHtml}
         `;
       }
 
-    }catch(err){
-      const msg = `<div style="color:red">Falha ao carregar: ${err.message}</div>`;
-      headMeta.innerHTML = msg;
+    }catch(e){
+      console.error(e);
+      headMeta.innerHTML = `<span style="color:#ef4444">Erro ao carregar dados: ${e.message}</span>`;
     }
   }
 

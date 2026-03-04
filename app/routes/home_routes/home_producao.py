@@ -2,12 +2,19 @@
 from flask import Blueprint, render_template, url_for, redirect
 from flask_login import login_required
 
-home_producao_bp = Blueprint(
-    "home_producao_bp",
-    __name__,
-    url_prefix="/producao"
-)
+# ====================================================================
+# [BLOCO] BLUEPRINT
+# [NOME] home_producao_bp
+# [RESPONSABILIDADE] Registrar rotas do módulo de produção com prefixo /producao
+# ====================================================================
+home_producao_bp = Blueprint("home_producao_bp", __name__, url_prefix="/producao")
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] home_producao
+# [RESPONSABILIDADE] Renderizar página inicial do módulo de produção com cards de navegação
+# ====================================================================
 @home_producao_bp.route("/", methods=["GET"])
 @login_required
 def home_producao():
@@ -57,16 +64,28 @@ def home_producao():
         breadcrumb_url = "/"
 
     return render_template(
-        "home_templates/home_producao.html",
-        cards=cards,
-        breadcrumb_url=breadcrumb_url
+        "home_templates/home_producao.html", cards=cards, breadcrumb_url=breadcrumb_url
     )
 
+
+# ====================================================================
+# [FIM BLOCO] home_producao
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] placeholder
+# [RESPONSABILIDADE] Redirecionar para endpoints existentes ou exibir mensagem de recurso indisponível
+# ====================================================================
 @home_producao_bp.route("/placeholder/<slug>", methods=["GET"])
 def placeholder(slug):
     mapping = {
         "montar-maquina": ("maquinas_bp.pagina_montagem", {}),
-        "painel-visual": (None, {"redirect": "/producao/gp/painel/"}),  # segurança extra
+        "painel-visual": (
+            None,
+            {"redirect": "/producao/gp/painel/"},
+        ),  # segurança extra
     }
 
     if slug in mapping:
@@ -79,5 +98,22 @@ def placeholder(slug):
     return render_template(
         "home_templates/home_producao.html",
         cards=[],
-        placeholder=f'Recurso "{slug}" ainda não disponível.'
+        placeholder=f'Recurso "{slug}" ainda não disponível.',
     )
+
+
+# ====================================================================
+# [FIM BLOCO] placeholder
+# ====================================================================
+
+# ====================================================================
+# [FIM BLOCO] home_producao_bp
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLUEPRINT: home_producao_bp
+# FUNÇÃO: home_producao
+# FUNÇÃO: placeholder
+# ====================================================================

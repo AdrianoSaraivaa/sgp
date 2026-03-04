@@ -5,9 +5,22 @@ from datetime import datetime
 from sqlalchemy import func
 from app.models_sqla import db, Peca
 
+# ====================================================================
+# [BLOCO] CONFIG_LOGGER
+# [NOME] logger
+# [RESPONSABILIDADE] Inicializar logger do módulo para rastreamento do serviço de estoque
+# ====================================================================
 logger = logging.getLogger(__name__)
+# ====================================================================
+# [FIM BLOCO] logger
+# ====================================================================
 
 
+# ====================================================================
+# [BLOCO] BLOCO_DB
+# [NOME] update_stock_after_finish
+# [RESPONSABILIDADE] Atualizar estoque de conjunto incrementando estoque_atual da peça correspondente ao model_code
+# ====================================================================
 def update_stock_after_finish(model_code: str):
     """
     Incrementa o estoque_atual da peça (tipo='conjunto')
@@ -52,3 +65,15 @@ def update_stock_after_finish(model_code: str):
         db.session.rollback()
         logger.error(f"[Estoque] Erro ao atualizar estoque para {model_code}: {str(e)}")
         raise e
+
+
+# ====================================================================
+# [FIM BLOCO] update_stock_after_finish
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CONFIG_LOGGER: logger
+# BLOCO_DB: update_stock_after_finish
+# ====================================================================

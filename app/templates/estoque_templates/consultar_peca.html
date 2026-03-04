@@ -1,8 +1,31 @@
 {% extends "_base.html" %}
 {% set active_page = 'listar' %}
-{% block title %}Consulta de Peça — Pneumark SGP{% endblock %}
-{% block module_name %}Módulo de Estoque{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Consulta de Peça — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_toolbar
+[RESPONSABILIDADE] Renderizar a barra de ferramentas com breadcrumb de navegação
+==================================================================== -->
 {% block toolbar %}
   <div class="toolbar">
     <div class="breadcrumb" aria-label="Você está em">
@@ -12,7 +35,15 @@
     </div>
   </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_toolbar
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Exibir os detalhes da peça consultada e ação de retorno
+==================================================================== -->
 {% block content %}
   <section class="wrap" style="display:grid; gap:18px">
     <div class="card no-hover">
@@ -33,3 +64,15 @@
     </div>
   </section>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_toolbar
+DOCUMENTO_HTML: block_content
+==================================================================== -->

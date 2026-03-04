@@ -12,9 +12,22 @@ from app.models_sqla import (
     GPHipotRun,
 )
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] trace_api_bp
+# [RESPONSABILIDADE] Definir blueprint e prefixo das rotas de rastreabilidade por número de série
+# ====================================================================
 trace_api_bp = Blueprint("trace_api_bp", __name__, url_prefix="/producao/gp")
+# ====================================================================
+# [FIM BLOCO] trace_api_bp
+# ====================================================================
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _iso
+# [RESPONSABILIDADE] Converter datetime em string ISO de forma tolerante a erros e valores nulos
+# ====================================================================
 def _iso(dt):
     try:
         return dt.isoformat() if dt else None
@@ -22,7 +35,17 @@ def _iso(dt):
         return str(dt) if dt else None
 
 
+# ====================================================================
+# [FIM BLOCO] _iso
+# ====================================================================
+
+
 @trace_api_bp.route("/trace/<serial>", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] get_trace_timeline
+# [RESPONSABILIDADE] Retornar timeline completa de etapas, checklists e HiPot para um serial
+# ====================================================================
 def get_trace_timeline(serial):
     try:
         work_order = db.session.scalars(
@@ -172,7 +195,17 @@ def get_trace_timeline(serial):
         return jsonify({"error": f"Erro interno: {str(e)}"}), 500
 
 
+# ====================================================================
+# [FIM BLOCO] get_trace_timeline
+# ====================================================================
+
+
 @trace_api_bp.route("/trace/<serial>/summary", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] get_trace_summary
+# [RESPONSABILIDADE] Retornar resumo de rastreabilidade (contagens e última atividade) para um serial
+# ====================================================================
 def get_trace_summary(serial):
     try:
         work_order = db.session.scalars(
@@ -234,3 +267,17 @@ def get_trace_summary(serial):
         )
     except Exception as e:
         return jsonify({"error": f"Erro interno: {str(e)}"}), 500
+
+
+# ====================================================================
+# [FIM BLOCO] get_trace_summary
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: trace_api_bp
+# FUNÇÃO: _iso
+# FUNÇÃO: get_trace_timeline
+# FUNÇÃO: get_trace_summary
+# ====================================================================

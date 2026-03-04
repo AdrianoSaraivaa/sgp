@@ -1,3 +1,8 @@
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] ajustes_configuracao
+# [RESPONSABILIDADE] Definir parâmetros iniciais (porta/baud/paths) e configurações da API/retry
+# ====================================================================
 # === Ajustes ===
 $portName = "COM5"        # mude se necessário (ex.: COM3, COM4...)
 $baud     = 9600
@@ -11,12 +16,28 @@ $adminPin  = ""                 # se usar PIN nas APIs, coloque aqui; caso contr
 $maxRetries = 3
 $retryBaseMs = 700
 $alsoWriteCsvOnSuccess = $false # se quiser também registrar no CSV mesmo quando o POST der certo
+# ====================================================================
+# [FIM BLOCO] ajustes_configuracao
+# ====================================================================
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] porta_serial_config
+# [RESPONSABILIDADE] Configurar parâmetros e instanciar porta serial para leitura de etiquetas EPL
+# ====================================================================
 # === Porta serial ===
 $port = New-Object System.IO.Ports.SerialPort $portName, $baud, 'None', 8, 'One'
 $port.NewLine = "`n"
 $port.ReadTimeout = 500
+# ====================================================================
+# [FIM BLOCO] porta_serial_config
+# ====================================================================
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] helpers_datetime_serial_post
+# [RESPONSABILIDADE] Funções auxiliares para timestamp ISO, resolução de serial e POST com retry na API
+# ====================================================================
 # >>> Helpers (NOVO)
 function Get-NowIso() {
   return (Get-Date).ToUniversalTime().ToString("s") + "Z"
@@ -51,7 +72,15 @@ function Post-Result($payload) {
     }
   }
 }
+# ====================================================================
+# [FIM BLOCO] helpers_datetime_serial_post
+# ====================================================================
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] Parse-EPLLabel
+# [RESPONSABILIDADE] Parse de linhas EPL para extrair campos de teste (HP/GB/TF/potências/status)
+# ====================================================================
 # === Parser de etiquetas EPL ===
 function Parse-EPLLabel($lines) {
   # Extrai o texto entre aspas das linhas A... (ignora coordenadas)
@@ -138,7 +167,15 @@ function Parse-EPLLabel($lines) {
     Status = $status
   }
 }
+# ====================================================================
+# [FIM BLOCO] Parse-EPLLabel
+# ====================================================================
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] main_loop_serial_read_and_dispatch
+# [RESPONSABILIDADE] Abrir porta, capturar etiqueta (N..P1), parsear, resolver serial, postar na API e registrar fallback CSV
+# ====================================================================
 try {
   $port.Open()
   Write-Host "Escutando $portName e parseando etiquetas EPL -> $outCsv (CTRL+C para parar)"
@@ -218,3 +255,16 @@ try {
 finally {
   if ($port.IsOpen) { $port.Close() }
 }
+# ====================================================================
+# [FIM BLOCO] main_loop_serial_read_and_dispatch
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: ajustes_configuracao
+# BLOCO_UTIL: porta_serial_config
+# BLOCO_UTIL: helpers_datetime_serial_post
+# FUNÇÃO: Parse-EPLLabel
+# BLOCO_UTIL: main_loop_serial_read_and_dispatch
+# ====================================================================

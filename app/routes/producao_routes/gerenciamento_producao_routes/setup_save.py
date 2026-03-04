@@ -8,7 +8,16 @@ from typing import Dict, Any
 from app import db
 from app.models.producao_models.gp_modelos import GPModel, GPBenchConfig
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] gp_setup_save_bp
+# [RESPONSABILIDADE] Criação e configuração do Blueprint das rotas de salvar/carregar setup do GP
+# ====================================================================
 gp_setup_save_bp = Blueprint("gp_setup_save_bp", __name__)
+
+# ====================================================================
+# [FIM BLOCO] gp_setup_save_bp
+# ====================================================================
 
 # ------------------------------
 # Helpers
@@ -17,6 +26,11 @@ REQUIRED_BENCHES = {"b5": True, "b8": True, "sep": True}
 ALL_BENCHES = ["sep", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"]
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _ensure_tables
+# [RESPONSABILIDADE] Garantir existência das tabelas de setup em ambiente de desenvolvimento
+# ====================================================================
 def _ensure_tables() -> None:
     """Cria gp_model e gp_bench_config se ainda não existirem (ambiente de dev)."""
     insp = inspect(db.engine)
@@ -24,6 +38,16 @@ def _ensure_tables() -> None:
         db.create_all()
 
 
+# ====================================================================
+# [FIM BLOCO] _ensure_tables
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _normalize_bench_id
+# [RESPONSABILIDADE] Normalizar identificador de bancada para o padrão interno (sep/b1..b8)
+# ====================================================================
 def _normalize_bench_id(bid: str) -> str:
     bid = (bid or "").strip().lower()
     if bid in ALL_BENCHES:
@@ -37,6 +61,16 @@ def _normalize_bench_id(bid: str) -> str:
     return bid
 
 
+# ====================================================================
+# [FIM BLOCO] _normalize_bench_id
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _defaults_for
+# [RESPONSABILIDADE] Gerar valores padrão de configuração para uma bancada específica
+# ====================================================================
 def _defaults_for(bid: str) -> Dict[str, Any]:
     obrig = REQUIRED_BENCHES.get(bid, False)
     return {
@@ -52,10 +86,20 @@ def _defaults_for(bid: str) -> Dict[str, Any]:
     }
 
 
+# ====================================================================
+# [FIM BLOCO] _defaults_for
+# ====================================================================
+
+
 # ------------------------------
 # POST /producao/gp/setup/save
 # body: {"modelo": "PM2100", "benches": { "b1": {...}, "b2": {...} } }
 # ------------------------------
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] save_setup
+# [RESPONSABILIDADE] Salvar configurações de setup por modelo e bancada com validações e UPSERT em GPBenchConfig
+# ====================================================================
 @gp_setup_save_bp.post("/producao/gp/setup/save")
 def save_setup():
     _ensure_tables()
@@ -145,10 +189,20 @@ def save_setup():
     return jsonify({"ok": True, "modelo": model.nome})
 
 
+# ====================================================================
+# [FIM BLOCO] save_setup
+# ====================================================================
+
+
 # ------------------------------
 # GET /producao/gp/setup/load?modelo=PM2100
 # Retorna dicionário consolidado por bancada para preencher a UI.
 # ------------------------------
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] load_setup
+# [RESPONSABILIDADE] Carregar configurações de setup por modelo e retornar payload consolidado por bancada
+# ====================================================================
 @gp_setup_save_bp.get("/producao/gp/setup/load")
 def load_setup():
     _ensure_tables()
@@ -190,3 +244,19 @@ def load_setup():
         benches[bid]["obrigatorio"] = True
 
     return jsonify({"ok": True, "modelo": modelo, "benches": benches})
+
+
+# ====================================================================
+# [FIM BLOCO] load_setup
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: gp_setup_save_bp
+# FUNÇÃO: _ensure_tables
+# FUNÇÃO: _normalize_bench_id
+# FUNÇÃO: _defaults_for
+# FUNÇÃO: save_setup
+# FUNÇÃO: load_setup
+# ====================================================================

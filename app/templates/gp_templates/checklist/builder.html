@@ -1,7 +1,30 @@
 {% extends "_base.html" %}
-{% block title %}Bancada 8 — Checklist (Builder){% endblock %}
-{% block subtitle %}Defina até 10 itens de verificação por modelo{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Bancada 8 — Checklist (Builder){% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir subtítulo informativo da página no template base
+==================================================================== -->
+{% block subtitle %}Defina até 10 itens de verificação por modelo{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Definir estilos específicos para layout, tabela e ações da página
+==================================================================== -->
 {% block head_extra %}
 <style>
   .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
@@ -24,7 +47,15 @@
   .footer-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar seleção de modelo, tabela de itens do checklist e ações de salvar
+==================================================================== -->
 {% block content %}
 <div class="wrap">
 
@@ -69,3 +100,15 @@
 
 <script src="{{ url_for('static', filename='js/gp_checklist/builder.js') }}"></script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+==================================================================== -->

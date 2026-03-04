@@ -1,21 +1,37 @@
-
 # app/routes/estoque_routes/listar_pecas.py
 from flask import Blueprint, render_template, request
 from sqlalchemy import or_, case, func
+
 # Import from the SQLAlchemy models package.  The ``Peca`` class
 # defined in ``app.models_sqla`` exposes the ``.query`` API that
 # SQLAlchemy constructs rely on.
 from app.models_sqla import Peca
 
-listar_pecas_bp = Blueprint('listar_pecas_bp', __name__)
+# ====================================================================
+# [BLOCO] BLUEPRINT
+# [NOME] listar_pecas_bp
+# [RESPONSABILIDADE] Registrar rotas relacionadas à listagem e busca de peças/conjuntos
+# ====================================================================
+listar_pecas_bp = Blueprint("listar_pecas_bp", __name__)
 
-@listar_pecas_bp.route('/listar_pecas')
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] listar_pecas
+# [RESPONSABILIDADE] Listar peças/conjuntos com filtro de busca e ordenação por tipo e descrição
+# ====================================================================
+@listar_pecas_bp.route("/listar_pecas")
 def listar_pecas():
-    busca = (request.args.get('busca') or '').strip().lower()
+    busca = (request.args.get("busca") or "").strip().lower()
 
     q = Peca.query
     if busca:
         like = f"%{busca}%"
+        # ====================================================================
+        # [BLOCO] BLOCO_DB
+        # [NOME] filtro_busca_pecas_db
+        # [RESPONSABILIDADE] Aplicar filtro de busca por código Pneumark ou descrição (case-insensitive)
+        # ====================================================================
         q = q.filter(
             or_(
                 func.lower(Peca.codigo_pneumark).like(like),
@@ -24,9 +40,34 @@ def listar_pecas():
         )
 
     # conjuntos no topo, depois descrição A→Z
-    ordem_conjunto = case((Peca.tipo == 'conjunto', 0), else_=1)
+    ordem_conjunto = case((Peca.tipo == "conjunto", 0), else_=1)
+    # ====================================================================
+    # [BLOCO] BLOCO_DB
+    # [NOME] consulta_pecas_ordenadas_db
+    # [RESPONSABILIDADE] Buscar peças/conjuntos ordenando conjuntos primeiro e depois por descrição
+    # ====================================================================
     pecas = q.order_by(ordem_conjunto.asc(), Peca.descricao.asc()).all()
 
-    return render_template('estoque_templates/listar_peca.html',
-                           pecas=pecas,
-                           busca=request.args.get('busca', ''))
+    return render_template(
+        "estoque_templates/listar_peca.html",
+        pecas=pecas,
+        busca=request.args.get("busca", ""),
+    )
+
+
+# ====================================================================
+# [FIM BLOCO] listar_pecas
+# ====================================================================
+
+# ====================================================================
+# [FIM BLOCO] listar_pecas_bp
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLUEPRINT: listar_pecas_bp
+# FUNÇÃO: listar_pecas
+# BLOCO_DB: filtro_busca_pecas_db
+# BLOCO_DB: consulta_pecas_ordenadas_db
+# ====================================================================

@@ -17,6 +17,11 @@ from typing import Optional
 from ..base_model import BaseModel
 
 
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] Montagem
+# [RESPONSABILIDADE] Representar registro de montagem de máquina com dados de etiqueta e status
+# ====================================================================
 @dataclass
 class Montagem(BaseModel):
     """Represents an assembly (montagem) of a machine or product."""
@@ -41,10 +46,29 @@ class Montagem(BaseModel):
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida da montagem para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<Montagem {self.modelo} serial={self.serial}>"
 
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
 
+
+# ====================================================================
+# [FIM BLOCO] Montagem
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] LabelReprintLog
+# [RESPONSABILIDADE] Registrar eventos de reimpressão de etiqueta vinculados a uma montagem
+# ====================================================================
 @dataclass
 class LabelReprintLog(BaseModel):
     """Logs each label reprint for a given assembly."""
@@ -57,5 +81,29 @@ class LabelReprintLog(BaseModel):
     reprint_by: str = field(default="")
     reprint_at: datetime = field(default_factory=datetime.utcnow)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida do log de reimpressão para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<LabelReprintLog montagem_id={self.montagem_id} at={self.reprint_at}>"
+
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
+
+
+# ====================================================================
+# [FIM BLOCO] LabelReprintLog
+# ====================================================================
+
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CLASSE: Montagem
+# MÉTODO: __repr__
+# CLASSE: LabelReprintLog
+# MÉTODO: __repr__
+# ====================================================================

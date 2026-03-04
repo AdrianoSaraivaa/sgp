@@ -22,6 +22,12 @@ from app.models_sqla import (
     GPChecklistExecutionItem,
 )
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] AliasesChecklistModels
+# [RESPONSABILIDADE] Reexportar modelos SQLAlchemy GP e manter aliases compatíveis com código legado
+# ====================================================================
+
 # Backwards-compatible aliases
 ChecklistTemplate = GPChecklistTemplate
 ChecklistItem = GPChecklistItem
@@ -32,6 +38,15 @@ ChecklistExecutionItem = GPChecklistExecutionItem
 ChecklistExec = GPChecklistExecution
 ChecklistExecItem = GPChecklistExecutionItem
 
+# ====================================================================
+# [FIM BLOCO] AliasesChecklistModels
+# ====================================================================
+
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] __all__
+# [RESPONSABILIDADE] Definir símbolos públicos exportados pelo módulo para compatibilidade de importação
+# ====================================================================
 __all__ = [
     "GPChecklistTemplate",
     "GPChecklistItem",
@@ -44,3 +59,13 @@ __all__ = [
     "ChecklistExec",
     "ChecklistExecItem",
 ]
+# ====================================================================
+# [FIM BLOCO] __all__
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: AliasesChecklistModels
+# BLOCO_UTIL: __all__
+# ====================================================================

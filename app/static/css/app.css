@@ -1,3 +1,8 @@
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] :root
+[RESPONSABILIDADE] Definir variáveis globais de tema (cores, raios, sombras e transições)
+==================================================================== */
 :root{
   /* Paleta Pneumark Bold */
   --bg:        #f2f5fb;         /* fundo claro com leve azul */
@@ -24,9 +29,26 @@
   --speed: .22s;
   --easing: cubic-bezier(.2,.8,.2,1);
 }
+/* ====================================================================
+[FIM BLOCO] :root
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] Reset/Base
+[RESPONSABILIDADE] Aplicar reset básico de box-sizing e altura base da página
+==================================================================== */
 *{box-sizing:border-box}
 html,body{height:100%}
+/* ====================================================================
+[FIM BLOCO] Reset/Base
+==================================================================== */
+
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] body
+[RESPONSABILIDADE] Definir estilos globais de tipografia, fundo e cor do texto
+==================================================================== */
 body{
   margin:0;
   background: rgb(250, 250, 250);
@@ -34,7 +56,15 @@ body{
   font: 15px/1.45 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   letter-spacing:.2px;
 }
+/* ====================================================================
+[FIM BLOCO] body
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .app
+[RESPONSABILIDADE] Definir estrutura principal do app e animação de entrada
+==================================================================== */
 /* ====== APP SHELL ====== */
 .app{
   position:relative; z-index:1; /* acima da marca d'água */
@@ -45,7 +75,15 @@ body{
   transition:opacity .35s var(--easing), transform .35s var(--easing);
 }
 .app.ready{opacity:1; transform:none}
+/* ====================================================================
+[FIM BLOCO] .app
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] header.appbar / .appbar-inner / .brand
+[RESPONSABILIDADE] Estilizar barra superior (appbar), layout interno e identidade visual
+==================================================================== */
 /* ====== APPBAR ====== */
 header.appbar{
   position:sticky; top:0; z-index:50;
@@ -65,7 +103,15 @@ header.appbar{
 }
 .brand h1{ margin:0;font-size:18px;font-weight:800; letter-spacing:.3px; color:#fff }
 .brand small{display:block;color:#c9d6ea;font-weight:600;margin-top:2px}
+/* ====================================================================
+[FIM BLOCO] header.appbar / .appbar-inner / .brand
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .nav
+[RESPONSABILIDADE] Estilizar navegação em formato de pills com estados hover/active
+==================================================================== */
 /* NAV pills */
 .nav{ display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
 .nav a{
@@ -83,7 +129,15 @@ header.appbar{
   border-color:#ffb3b3;
   box-shadow: 0 0 0 6px rgba(230,0,0,.12);
 }
+/* ====================================================================
+[FIM BLOCO] .nav
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .actions / .kbd / .userchip
+[RESPONSABILIDADE] Estilizar área de ações à direita e chips informativos do cabeçalho
+==================================================================== */
 /* AÇÕES À DIREITA */
 .actions{display:flex;align-items:center;gap:10px}
 .kbd{
@@ -102,10 +156,26 @@ header.appbar{
   background:rgba(255,255,255,.08); color:#fff;
 }
 .userchip i{color:#ffb3b3}
+/* ====================================================================
+[FIM BLOCO] .actions / .kbd / .userchip
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .container
+[RESPONSABILIDADE] Definir container principal responsivo para conteúdo
+==================================================================== */
 /* ====== MAIN ====== */
 .container{ max-width:1200px; margin:0 auto; padding:20px; width:100%; }
+/* ====================================================================
+[FIM BLOCO] .container
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .flash-container / .flash
+[RESPONSABILIDADE] Estilizar mensagens flash e variações de estado (success/danger/warning)
+==================================================================== */
 /* FLASHES */
 .flash-container{
 
@@ -120,7 +190,15 @@ header.appbar{
 .flash.success{ background:#dff5e7; color:#0f5b2a; border-color:#b9e6c7 }
 .flash.danger{ background:#ffe4e4; color:#7a0c0c; border-color:#ffc6c6 }
 .flash.warning{ background:#fff4dc; color:#6b4e0f; border-color:#ffe3a6 }
+/* ====================================================================
+[FIM BLOCO] .flash-container / .flash
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .toolbar / .breadcrumb / .searchbar
+[RESPONSABILIDADE] Estilizar barra de ferramentas com breadcrumb e campo de busca
+==================================================================== */
 /* BREADCRUMB + SEARCH BAR (opcionais por página) */
 .toolbar{
   display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; margin-bottom:18px;
@@ -144,7 +222,15 @@ header.appbar{
   background:transparent; border:0; outline:0; color:var(--text); width:220px; font-size:14px;
 }
 .searchbar input::placeholder{ color:#8aa0bf }
+/* ====================================================================
+[FIM BLOCO] .toolbar / .breadcrumb / .searchbar
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .grid
+[RESPONSABILIDADE] Definir grid responsiva de cards com breakpoints
+==================================================================== */
 /* GRID DE CARDS */
 .grid{
   display:grid; gap:16px;
@@ -155,7 +241,15 @@ header.appbar{
 @media (max-width:780px){  .grid{ grid-template-columns: repeat(3, 1fr)} }
 @media (max-width:540px){  .grid{ grid-template-columns: repeat(2, 1fr)} }
 @media (max-width:380px){  .grid{ grid-template-columns: 1fr } }
+/* ====================================================================
+[FIM BLOCO] .grid
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .card / .no-hover
+[RESPONSABILIDADE] Estilizar cards, efeitos visuais, hover e variação sem hover
+==================================================================== */
 .card{
   position:relative; overflow:hidden; isolation:isolate;
   background: linear-gradient(180deg, #ffffff, #f9fbff);
@@ -182,7 +276,15 @@ header.appbar{
   box-shadow: none;
   cursor: default;
 }
+/* ====================================================================
+[FIM BLOCO] .card / .no-hover
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .medal / .cta
+[RESPONSABILIDADE] Estilizar elementos internos do card (ícone/medalha, textos e CTA)
+==================================================================== */
 .medal{
   height:72px; width:72px; border-radius:16px; display:grid; place-items:center;
   background: #f7f8fb;
@@ -199,7 +301,15 @@ header.appbar{
   display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:13px;
   color: var(--accent);
 }
+/* ====================================================================
+[FIM BLOCO] .medal / .cta
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .kbd-hint / .chip
+[RESPONSABILIDADE] Estilizar badges de atalho e chips de destaque nos cards
+==================================================================== */
 /* Badge de atalho (1–9) */
 .card .kbd-hint{
   position:absolute; top:10px; left:10px; z-index:2;
@@ -214,14 +324,30 @@ header.appbar{
   color:#1a3a6b; border:1px solid #c5d8ff;
   padding:4px 8px; font-size:11px; border-radius:999px; letter-spacing:.3px; font-weight:800;
 }
+/* ====================================================================
+[FIM BLOCO] .kbd-hint / .chip
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .notice
+[RESPONSABILIDADE] Estilizar bloco de aviso/placeholder com borda tracejada
+==================================================================== */
 /* Aviso/placeholder */
 .notice{
   background: #ffffff;
   border:1px dashed var(--border); color:var(--muted);
   padding:12px 14px; border-radius:12px; margin-bottom:16px;
 }
+/* ====================================================================
+[FIM BLOCO] .notice
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .ripple / @keyframes ripple / .fadeout
+[RESPONSABILIDADE] Definir efeitos de ripple, animação e camada de fadeout para transições
+==================================================================== */
 /* Ripple e transições */
 .ripple{
   position:absolute; border-radius:50%; transform:scale(0);
@@ -235,7 +361,15 @@ header.appbar{
   pointer-events:none; opacity:0; transition:opacity .28s var(--easing)
 }
 .fadeout.active{ opacity:1 }
+/* ====================================================================
+[FIM BLOCO] .ripple / @keyframes ripple / .fadeout
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] Foco visível (a11y)
+[RESPONSABILIDADE] Padronizar estilos de foco visível para navegação e formulários
+==================================================================== */
 /* Acessibilidade: foco visível */
 .nav a:focus-visible,
 .card:focus-visible,
@@ -248,7 +382,15 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px var(--ring);
   border-color: #ffb3b3;
 }
+/* ====================================================================
+[FIM BLOCO] Foco visível (a11y)
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .footer
+[RESPONSABILIDADE] Estilizar rodapé opcional com separador e tipografia reduzida
+==================================================================== */
 /* Footer opcional */
 .footer{
   width: 61%;
@@ -258,7 +400,15 @@ textarea:focus-visible {
   text-align:center;
   border-top:1px solid var(--border);
 }
+/* ====================================================================
+[FIM BLOCO] .footer
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] main.container / .toolbar / .grid (ajustes)
+[RESPONSABILIDADE] Ajustar espaçamento e alinhamento vertical para aproximar cards do topo
+==================================================================== */
 /* ===== Ajuste global de espaçamento (cards mais no topo) ===== */
 main.container{
   display:flex;              /* garante alinhamento no topo */
@@ -276,7 +426,15 @@ main.container{
   align-content: start;      /* conteúdo da grid gruda no topo do espaço disponível */
 
 }
+/* ====================================================================
+[FIM BLOCO] main.container / .toolbar / .grid (ajustes)
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] .logout-btn
+[RESPONSABILIDADE] Estilizar botão de logout como elemento discreto com hover
+==================================================================== */
 .logout-btn {
   background: none;
   border: none;
@@ -287,3 +445,31 @@ main.container{
 .logout-btn:hover {
   color: #c0392b;
 }
+/* ====================================================================
+[FIM BLOCO] .logout-btn
+==================================================================== */
+
+/* ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+BLOCO_UTIL: :root
+BLOCO_UTIL: Reset/Base
+BLOCO_UTIL: body
+BLOCO_UTIL: .app
+BLOCO_UTIL: header.appbar / .appbar-inner / .brand
+BLOCO_UTIL: .nav
+BLOCO_UTIL: .actions / .kbd / .userchip
+BLOCO_UTIL: .container
+BLOCO_UTIL: .flash-container / .flash
+BLOCO_UTIL: .toolbar / .breadcrumb / .searchbar
+BLOCO_UTIL: .grid
+BLOCO_UTIL: .card / .no-hover
+BLOCO_UTIL: .medal / .cta
+BLOCO_UTIL: .kbd-hint / .chip
+BLOCO_UTIL: .notice
+BLOCO_UTIL: .ripple / @keyframes ripple / .fadeout
+BLOCO_UTIL: Foco visível (a11y)
+BLOCO_UTIL: .footer
+BLOCO_UTIL: main.container / .toolbar / .grid (ajustes)
+BLOCO_UTIL: .logout-btn
+==================================================================== */

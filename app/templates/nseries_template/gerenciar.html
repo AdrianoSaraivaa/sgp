@@ -1,27 +1,180 @@
-<section style="max-width:1200px;margin:40px auto;font-family:Arial, sans-serif">
-  <h1>Gestão de Números de Série</h1>
+{% extends "_base.html" %}
+{% set active_page = 'series' %}
 
-  <!-- Filtros -->
-  <div style="display:flex; gap:8px; margin-bottom:20px;">
-    <input id="q" type="search" placeholder="Buscar modelo ou nº de série" style="flex:1; padding:6px;">
-    <select id="modelo">
-      <option value="">Modelo (todos)</option>
-      <option>PM700</option>
-      <option>PM2100</option>
-      <option>PM2200</option>
-    </select>
-    <select id="status">
-      <option value="">Status (todos)</option>
-      <option value="valid">Válido</option>
-      <option value="invalid">Inválido</option>
-    </select>
-    <button id="btn-filtrar" class="btn-primary">Filtrar</button>
+{% block title %}Gestão de Números de Série — Pneumark SGP{% endblock %}
+{% block module_name %}Produção{% endblock %}
+{% block subtitle %}Gestão de Números de Série{% endblock %}
+
+{% block head_extra %}
+<!-- ====================================================================
+[BLOCO] ESTILOS
+[NOME] series_styles
+[RESPONSABILIDADE] Layout + tabela + filtros + modal e badges para a tela de gestão de seriais
+==================================================================== -->
+<style>
+  .wrap{ max-width:1200px; margin:0 auto; padding: 10px 0; }
+
+  .card{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-1);
+    padding: 14px;
+  }
+
+  .actions-top{
+    display:flex; gap:10px; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; margin-bottom:12px;
+  }
+  .filters{
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center; width:100%;
+  }
+  .filters .searchbar--compact{ min-width: 320px; flex: 1; }
+  .filters select{
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background:#fff;
+    font:inherit;
+    min-width: 170px;
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:#fff;
+    text-decoration:none;
+    color:#0e1a2b;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .btn:hover{ transform: translateY(-2px); box-shadow: var(--shadow-2); border-color:#cfd5e4; }
+  .btn i{ color: var(--brand); }
+  .btn.primary{ background: linear-gradient(180deg, #ffd9d9, #ffc7c7); border-color:#ffb3b3; }
+
+  .table-wrap{ background:#fff; border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-1); overflow:auto; }
+  table.listing{ width:100%; border-collapse:collapse; min-width: 980px; }
+  .listing th, .listing td{ padding:12px 14px; border-bottom:1px solid #eef2f7; text-align:left; font-size:14px; vertical-align:middle; }
+  .listing thead th{ position:sticky; top:0; background:var(--navy); color:#fff; z-index:1; }
+  .listing tbody tr:hover td{ background:#f8fbff; }
+  .listing td.actions{ white-space:nowrap; text-align:center; }
+
+  code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
+
+  /* Badges */
+  .badge{
+    display:inline-block; padding:3px 8px; border-radius:999px;
+    font-size:12px; font-weight:800; border:1px solid #ddd;
+  }
+  .badge.ok{ background:#e9f7ee; color:#155724; border-color:#bfe6cd; }
+  .badge.err{ background:#ffebeb; color:#9d0000; border-color:#ffcaca; }
+  .badge.neu{ background:#f4f6f9; color:#324255; border-color:#d7deea; }
+
+  /* Pager */
+  .pager{
+    display:flex; gap:8px; align-items:center; justify-content:flex-end;
+    margin-top:10px;
+  }
+  .pager .info{ font-size:12px; color:#64748b; }
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.25);
+    display:none; align-items:center; justify-content:center;
+    z-index: 1000;
+  }
+  .modal{
+    width:min(860px, 94vw);
+    background:#fff;
+    border-radius:16px;
+    border:1px solid var(--border);
+    box-shadow: var(--shadow-2);
+    overflow:hidden;
+  }
+  .modal header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px;
+    border-bottom:1px solid var(--border);
+  }
+  .modal header h3{ margin:0; font-size:16px; }
+  .modal .content{ padding:16px; }
+  .modal .close{
+    border:none; background:transparent; cursor:pointer;
+    font-size:22px; line-height:1;
+  }
+  .kv{ display:grid; grid-template-columns: 180px 1fr; gap:10px 12px; }
+  .kv .k{ color:#64748b; font-weight:800; font-size:13px; }
+  .kv .v{ color:#0e1a2b; font-weight:700; font-size:13px; }
+
+  .toast{
+    position:fixed; right:16px; bottom:16px;
+    display:none; gap:10px; align-items:center;
+    background:#111; color:#fff;
+    padding:12px 14px; border-radius:12px; z-index:1100;
+  }
+
+  @media (max-width: 760px){
+    .listing th:nth-child(5), .listing td:nth-child(5),
+    .listing th:nth-child(6), .listing td:nth-child(6){ display:none; } /* esconde data/usuário no mobile */
+  }
+</style>
+<!-- ====================================================================
+[FIM BLOCO] series_styles
+==================================================================== -->
+{% endblock %}
+
+{% block content %}
+<!-- ====================================================================
+[BLOCO] CONTEUDO
+[NOME] series_page
+[RESPONSABILIDADE] Tela de gestão de números de série: filtros, lista paginada e ações
+==================================================================== -->
+<div class="wrap">
+  <div class="card">
+    <div class="actions-top">
+      <div class="breadcrumb" aria-label="Você está em">
+        <a href="{{ breadcrumb_url|default('/') }}">Módulos</a> &nbsp;/&nbsp;
+        <a href="/producao">Produção</a> &nbsp;/&nbsp;
+        <strong>Gestão de Números de Série</strong>
+      </div>
+
+      <div class="actions-right" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button class="btn" type="button" id="btnRefresh"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters">
+      <label class="searchbar searchbar--compact" for="q">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input id="q" type="search" placeholder="Buscar modelo ou nº de série" autocomplete="off">
+      </label>
+
+      <select id="modelo" aria-label="Modelo">
+        <option value="">Modelo (todos)</option>
+        <option>PM700</option>
+        <option>PM2100</option>
+        <option>PM2200</option>
+      </select>
+
+      <select id="status" aria-label="Status">
+        <option value="">Status (todos)</option>
+        <option value="valid">Válido</option>
+        <option value="invalid">Inválido</option>
+      </select>
+
+      <button id="btn-filtrar" class="btn primary" type="button">
+        <i class="fa-solid fa-filter"></i> Filtrar
+      </button>
+    </div>
   </div>
 
   <!-- Tabela -->
-  <div style="overflow-x:auto;">
-    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse; width:100%;">
-      <thead style="background:#eee;">
+  <div class="table-wrap" style="margin-top:12px;">
+    <table class="listing" id="tabelaSeries">
+      <thead>
         <tr>
           <th>Modelo</th>
           <th>Nº de série</th>
@@ -29,38 +182,101 @@
           <th>Impressões</th>
           <th>Data/Hora</th>
           <th>Usuário</th>
-          <th>Ações</th>
+          <th style="text-align:center">Ações</th>
         </tr>
       </thead>
       <tbody id="grid-body">
-        <!-- preenchido via JS -->
+        <tr><td colspan="7" class="muted" style="padding:16px; color:#64748b;">Carregando…</td></tr>
       </tbody>
     </table>
   </div>
 
-  <!-- Pager simples -->
-  <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px;">
-    <button id="prev">◀</button>
-    <span id="pager-info" style="font-size:12px;color:#555"></span>
-    <button id="next">▶</button>
+  <!-- Pager -->
+  <div class="pager">
+    <button id="prev" class="btn" type="button">◀</button>
+    <span id="pager-info" class="info"></span>
+    <button id="next" class="btn" type="button">▶</button>
   </div>
-</section>
+</div>
 
+<!-- Modal Detalhes -->
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <header>
+      <h3 id="modalTitle">Detalhes do Serial</h3>
+      <button class="close" id="btnCloseModal" aria-label="Fechar">×</button>
+    </header>
+    <div class="content">
+      <div class="kv" id="modalKv">
+        <div class="k">Carregando</div><div class="v">…</div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap;">
+        <button class="btn" type="button" id="btnModalReprint"><i class="fa-solid fa-print"></i> Reimprimir</button>
+        <button class="btn" type="button" id="btnModalInvalidate"><i class="fa-solid fa-ban"></i> Invalidar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg">Pronto.</span></div>
+<!-- ====================================================================
+[FIM BLOCO] series_page
+==================================================================== -->
+{% endblock %}
+
+{% block scripts_extra %}
 <script>
+/* ====================================================================
+[BLOCO] JS
+[NOME] series_js
+[RESPONSABILIDADE] Carregamento paginado + filtros + ações (detalhe, reprint, invalidar)
+==================================================================== */
+
 let page = 1, pages = 1;
+let lastSelectedId = null;
+
+const API = {
+  list: '/producao/series/api',
+  detail: (id) => `/producao/series/api/${encodeURIComponent(id)}`,
+  reprint: (id) => `/producao/series/api/${encodeURIComponent(id)}/reprint`,
+  invalidate: (id) => `/producao/series/api/${encodeURIComponent(id)}/invalidate`,
+};
 
 function badge(st) {
-  const color = st === 'valid' ? '#0a0' : (st === 'invalid' ? '#b00' : '#666');
-  const label = st || '';
-  return `<span style="padding:2px 6px; border:1px solid ${color}; color:${color}; border-radius:12px; font-size:12px;">${label}</span>`;
+  if (st === 'valid')   return `<span class="badge ok">válido</span>`;
+  if (st === 'invalid') return `<span class="badge err">inválido</span>`;
+  return `<span class="badge neu">${(st || '—')}</span>`;
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  const m = document.getElementById('toastMsg');
+  if (!t || !m) return;
+  m.textContent = msg || 'Pronto.';
+  t.style.display = 'flex';
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=> t.style.display='none', 2200);
+}
+
+function qs(id){ return document.getElementById(id); }
+
+function openModal(){
+  const b = qs('modalBackdrop');
+  b.style.display = 'flex';
+  b.setAttribute('aria-hidden', 'false');
+}
+function closeModal(){
+  const b = qs('modalBackdrop');
+  b.style.display = 'none';
+  b.setAttribute('aria-hidden', 'true');
 }
 
 async function load() {
-  const q = document.getElementById('q').value.trim();
-  const modelo = document.getElementById('modelo').value;
-  const status = document.getElementById('status').value;
+  const q = (qs('q').value || '').trim();
+  const modelo = qs('modelo').value;
+  const status = qs('status').value;
 
-  const url = new URL(location.origin + '/producao/series/api');
+  const url = new URL(location.origin + API.list);
   url.searchParams.set('page', page);
   url.searchParams.set('per_page', 20);
   if (q) url.searchParams.set('q', q);
@@ -69,19 +285,21 @@ async function load() {
 
   let data;
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     data = await r.json();
   } catch (e) {
     data = { items: [], page: 1, pages: 1, total: 0, error: String(e) };
   }
 
   pages = data.pages || 1;
-  const tb = document.getElementById('grid-body');
+
+  const tb = qs('grid-body');
   tb.innerHTML = '';
 
   if (!data.items || data.items.length === 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="7" style="text-align:center; color:#777; padding:16px;">Sem registros</td>`;
+    tr.innerHTML = `<td colspan="7" style="text-align:center; color:#64748b; padding:16px;">Sem registros</td>`;
     tb.appendChild(tr);
   } else {
     data.items.forEach(item => {
@@ -91,26 +309,132 @@ async function load() {
         <td><code>${item.numero_serie || ''}</code></td>
         <td>${badge(item.status)}</td>
         <td>${item.printed_count ?? 0}</td>
-        <td>${item.created_at || ''}</td>
-        <td>${item.created_by || ''}</td>
-        <td>
-          <button data-act="detail" data-id="${item.id}">Detalhes</button>
-          <button data-act="reprint" data-id="${item.id}">Reimprimir</button>
-          <button data-act="invalidate" data-id="${item.id}">Invalidar</button>
+        <td>${item.created_at || '—'}</td>
+        <td>${item.created_by || '—'}</td>
+        <td class="actions">
+          <button class="btn" type="button" data-act="detail" data-id="${item.id}"><i class="fa-solid fa-eye"></i> Detalhes</button>
+          <button class="btn" type="button" data-act="reprint" data-id="${item.id}"><i class="fa-solid fa-print"></i> Reimprimir</button>
+          <button class="btn" type="button" data-act="invalidate" data-id="${item.id}"><i class="fa-solid fa-ban"></i> Invalidar</button>
         </td>
       `;
+      tr.querySelector('td.actions').classList.add('actions'); // compat
+      tr.querySelector('td.actions').style.textAlign = 'center';
+      tr.querySelector('td.actions').style.whiteSpace = 'nowrap';
       tb.appendChild(tr);
     });
   }
 
-  document.getElementById('pager-info').textContent =
+  qs('pager-info').textContent =
     `Página ${data.page || page} de ${data.pages || 1} — ${data.total ?? 0} itens`;
+
+  qs('prev').disabled = page <= 1;
+  qs('next').disabled = page >= pages;
 }
 
-document.getElementById('btn-filtrar').addEventListener('click', () => { page = 1; load(); });
-document.getElementById('prev').addEventListener('click', () => { if (page > 1) { page--; load(); } });
-document.getElementById('next').addEventListener('click', () => { if (page < pages) { page++; load(); } });
-document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page = 1; load(); } });
+async function apiPost(url){
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'} });
+  let out;
+  try { out = await r.json(); } catch { out = { ok:false, error:'Resposta inválida' }; }
+  if (!r.ok) out.ok = false;
+  return out;
+}
+
+async function openDetail(id){
+  lastSelectedId = id;
+  qs('modalTitle').textContent = 'Detalhes do Serial';
+  qs('modalKv').innerHTML = `<div class="k">Carregando</div><div class="v">…</div>`;
+  openModal();
+
+  try{
+    const r = await fetch(API.detail(id), { cache:'no-store' });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    // esperado: { ok:true, item:{...} } ou direto item
+    const item = data.item || data;
+
+    qs('modalKv').innerHTML = `
+      <div class="k">Modelo</div><div class="v">${item.modelo || '—'}</div>
+      <div class="k">Número de Série</div><div class="v"><code>${item.numero_serie || '—'}</code></div>
+      <div class="k">Status</div><div class="v">${badge(item.status)}</div>
+      <div class="k">Impressões</div><div class="v">${item.printed_count ?? 0}</div>
+      <div class="k">Criado em</div><div class="v">${item.created_at || '—'}</div>
+      <div class="k">Criado por</div><div class="v">${item.created_by || '—'}</div>
+      <div class="k">Observação</div><div class="v">${item.obs || '—'}</div>
+    `;
+  }catch(err){
+    qs('modalKv').innerHTML = `<div class="k">Erro</div><div class="v">Não foi possível carregar: ${String(err)}</div>`;
+  }
+}
+
+async function doReprint(id){
+  if(!id) return;
+  const ok = confirm('Reimprimir este serial?');
+  if(!ok) return;
+  const out = await apiPost(API.reprint(id));
+  if(out.ok){
+    toast('Reimpressão registrada.');
+    await load();
+  }else{
+    alert('Falha ao reimprimir: ' + (out.error || 'erro'));
+  }
+}
+
+async function doInvalidate(id){
+  if(!id) return;
+  const ok = confirm('Invalidar este serial? Esta ação não deve ser usada sem motivo.');
+  if(!ok) return;
+  const out = await apiPost(API.invalidate(id));
+  if(out.ok){
+    toast('Serial invalidado.');
+    await load();
+  }else{
+    alert('Falha ao invalidar: ' + (out.error || 'erro'));
+  }
+}
+
+/* ===== Eventos UI ===== */
+qs('btn-filtrar').addEventListener('click', () => { page = 1; load(); });
+qs('btnRefresh').addEventListener('click', () => load());
+
+qs('prev').addEventListener('click', () => { if (page > 1) { page--; load(); } });
+qs('next').addEventListener('click', () => { if (page < pages) { page++; load(); } });
+
+qs('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page = 1; load(); } });
+qs('modelo').addEventListener('change', () => { page = 1; load(); });
+qs('status').addEventListener('change', () => { page = 1; load(); });
+
+/* Delegação de ações na tabela */
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-act][data-id]');
+  if(!btn) return;
+  const act = btn.getAttribute('data-act');
+  const id = btn.getAttribute('data-id');
+
+  if(act === 'detail') return openDetail(id);
+  if(act === 'reprint') return doReprint(id);
+  if(act === 'invalidate') return doInvalidate(id);
+});
+
+/* Modal */
+qs('btnCloseModal').addEventListener('click', closeModal);
+qs('modalBackdrop').addEventListener('click', (e)=>{ if(e.target === qs('modalBackdrop')) closeModal(); });
+
+qs('btnModalReprint').addEventListener('click', ()=> doReprint(lastSelectedId));
+qs('btnModalInvalidate').addEventListener('click', ()=> doInvalidate(lastSelectedId));
 
 document.addEventListener('DOMContentLoaded', load);
+
+/* ====================================================================
+[FIM BLOCO] series_js
+==================================================================== */
 </script>
+{% endblock %}
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+ESTILOS: series_styles
+CONTEUDO: series_page
+JS: series_js
+==================================================================== -->

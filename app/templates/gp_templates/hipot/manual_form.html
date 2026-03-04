@@ -1,7 +1,30 @@
 {% extends "_base.html" %}
-{% block title %}HiPot Manual{% endblock %}
-{% block module_name %}Produção · HiPot{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}HiPot Manual{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Produção · HiPot{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar formulário de registro manual do HiPot e submissão para rota do backend
+==================================================================== -->
 {% block content %}
 <div class="container" style="max-width:480px;margin:0 auto;padding:12px;">
   <h1>HiPot — Registro Manual</h1>
@@ -18,3 +41,14 @@
   </form>
 </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_content
+==================================================================== -->

@@ -1,7 +1,30 @@
 {% extends "_base.html" %}
-{% block title %}Checklist — Execução (B8){% endblock %}
-{% block subtitle %}Execução guiada por template (JSON){% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Checklist — Execução (B8){% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir subtítulo informativo da página no template base
+==================================================================== -->
+{% block subtitle %}Execução guiada por template (JSON){% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Definir estilos específicos para layout, execução e modais
+==================================================================== -->
 {% block head_extra %}
 <style>
   .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
@@ -41,7 +64,15 @@
   .modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top: 10px; }
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar dados de execução, área de itens, modais NCR/PIN e inclusão do script
+==================================================================== -->
 {% block content %}
 <div class="wrap">
   <div class="card">
@@ -115,3 +146,15 @@
 
 <script src="{{ url_for('static', filename='js/gp_checklist/exec.js') }}"></script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+==================================================================== -->

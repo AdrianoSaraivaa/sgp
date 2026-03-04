@@ -14,6 +14,11 @@ from typing import Optional
 from ..base_model import BaseModel
 
 
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] Fornecedor
+# [RESPONSABILIDADE] Representar fornecedor (tabela fornecedores) usando BaseModel e armazenar dados de contato
+# ====================================================================
 @dataclass
 class Fornecedor(BaseModel):
     """Represents a supplier in the inventory system."""
@@ -30,3 +35,15 @@ class Fornecedor(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Fornecedor {self.nome_empresa}>"
+
+
+# ====================================================================
+# [FIM BLOCO] Fornecedor
+# ====================================================================
+
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CLASSE: Fornecedor
+# ====================================================================

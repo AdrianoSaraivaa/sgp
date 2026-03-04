@@ -15,6 +15,11 @@ from typing import Optional
 from ..base_model import BaseModel
 
 
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] WorkOrder
+# [RESPONSABILIDADE] Representar ordem de produção vinculada a um número de série (gp_work_order)
+# ====================================================================
 @dataclass
 class WorkOrder(BaseModel):
     """Represents an order tied to a specific serial number."""
@@ -34,15 +39,34 @@ class WorkOrder(BaseModel):
 
     #: Timestamp quando a ordem foi concluída.  Só é preenchido quando
     #: todas as etapas obrigatórias foram finalizadas e o produto passa
-    #: para o estado final.  Este campo foi adicionado na Onda 2 para
+    #: para o estado final.  Este campo foi adicionado na Onda 2 para
     #: permitir que o painel mostre a data/hora de conclusão na coluna
     #: "Final".
     finished_at: Optional[datetime] = field(default=None)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida da ordem para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<WorkOrder serial={self.serial} bench={self.current_bench} status={self.status}>"
 
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
 
+
+# ====================================================================
+# [FIM BLOCO] WorkOrder
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] WorkStage
+# [RESPONSABILIDADE] Representar etapa individual de uma ordem de produção (gp_work_stage)
+# ====================================================================
 @dataclass
 class WorkStage(BaseModel):
     """Represents a step (etapa) in the progression of a work order."""
@@ -75,10 +99,29 @@ class WorkStage(BaseModel):
     #: físicas ou operadores.  Opcional.
     workstation: Optional[str] = field(default=None)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida da etapa para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<WorkStage order_id={self.order_id} bench={self.bench_id}>"
 
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
 
+
+# ====================================================================
+# [FIM BLOCO] WorkStage
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] RopAlert
+# [RESPONSABILIDADE] Representar alerta de ponto de pedido (ROP) associado a uma peça/conjunto
+# ====================================================================
 @dataclass
 class RopAlert(BaseModel):
     """Represents an alert generated when a part reaches its reorder point."""
@@ -92,5 +135,31 @@ class RopAlert(BaseModel):
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida do alerta ROP para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<RopAlert peca_id={self.peca_id} active={self.in_alert}>"
+
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
+
+
+# ====================================================================
+# [FIM BLOCO] RopAlert
+# ====================================================================
+
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CLASSE: WorkOrder
+# MÉTODO: __repr__
+# CLASSE: WorkStage
+# MÉTODO: __repr__
+# CLASSE: RopAlert
+# MÉTODO: __repr__
+# ====================================================================

@@ -1,7 +1,30 @@
 {% extends "_base.html" %}
-{% block title %}Módulos — Pneumark SGP{% endblock %}
-{% block subtitle %}Módulos do Sistema{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Módulos — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir o subtítulo exibido no layout
+==================================================================== -->
+{% block subtitle %}Módulos do Sistema{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Prefetch das rotas principais do hub de módulos
+==================================================================== -->
 {% block head_extra %}
   <!-- Prefetch das rotas mais usadas -->
   <link rel="prefetch" href="{{ url_for('estoque_bp.tela_estoque') }}">
@@ -11,7 +34,15 @@
   <link rel="prefetch" href="/assistencia">
   <link rel="prefetch" href="/projetos">
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar o hub de módulos (cards + busca)
+==================================================================== -->
 {% block content %}
   <div class="toolbar">
     <div class="breadcrumb" aria-label="Você está em">
@@ -25,7 +56,11 @@
   </div>
 
   <section class="grid" id="cardsGrid">
-    <!-- ESTOQUE -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_estoque
+    [RESPONSABILIDADE] Acesso ao módulo de Estoque
+    ==================================================================== -->
     <a class="card navlink" href="{{ url_for('estoque_bp.tela_estoque') }}" data-title="estoque" data-index="1" tabindex="0" role="link">
       <span class="kbd-hint">1</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-warehouse"></i></div>
@@ -33,8 +68,15 @@
       <p>Cadastro, listas, estruturas e movimentações.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_estoque
+    ==================================================================== -->
 
-    <!-- PRODUÇÃO -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_producao
+    [RESPONSABILIDADE] Acesso ao módulo de Produção
+    ==================================================================== -->
     <a class="card navlink" href="/producao" data-title="producao produção montagem" data-index="2" tabindex="0" role="link">
       <span class="kbd-hint">2</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-industry"></i></div>
@@ -42,8 +84,15 @@
       <p>Montagem, seriais e apontamentos.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_producao
+    ==================================================================== -->
 
-    <!-- QUALIDADE -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_qualidade
+    [RESPONSABILIDADE] Acesso ao módulo de Qualidade
+    ==================================================================== -->
     <a class="card navlink" href="/qualidade" data-title="qualidade testes inspeção" data-index="3" tabindex="0" role="link">
       <span class="kbd-hint">3</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-shield-heart"></i></div>
@@ -51,8 +100,15 @@
       <p>Planos de teste e liberações.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_qualidade
+    ==================================================================== -->
 
-    <!-- COMPRAS -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_compras
+    [RESPONSABILIDADE] Acesso ao módulo de Compras
+    ==================================================================== -->
     <a class="card navlink" href="/compras" data-title="compras suprimentos fornecedores" data-index="4" tabindex="0" role="link">
       <span class="kbd-hint">4</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-cart-shopping"></i></div>
@@ -60,8 +116,15 @@
       <p>Cotações e pedidos de compra.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_compras
+    ==================================================================== -->
 
-    <!-- ASSISTÊNCIA TÉCNICA -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_assistencia
+    [RESPONSABILIDADE] Acesso ao módulo de Assistência Técnica
+    ==================================================================== -->
     <a class="card navlink" href="/assistencia" data-title="assistencia técnica suporte rma" data-index="5" tabindex="0" role="link">
       <span class="kbd-hint">5</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-screwdriver-wrench"></i></div>
@@ -69,8 +132,15 @@
       <p>Atendimentos, RMA e histórico.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_assistencia
+    ==================================================================== -->
 
-    <!-- PROJETOS -->
+    <!-- ====================================================================
+    [BLOCO] CARD_NAVEGACAO
+    [NOME] card_projetos
+    [RESPONSABILIDADE] Acesso ao módulo de Projetos
+    ==================================================================== -->
     <a class="card navlink" href="/projetos" data-title="projetos engenharia desenvolvimento" data-index="6" tabindex="0" role="link">
       <span class="kbd-hint">6</span>
       <div class="medal" aria-hidden="true"><i class="fa-solid fa-diagram-project"></i></div>
@@ -78,12 +148,27 @@
       <p>Engenharia e mudanças técnicas.</p>
       <span class="cta">Abrir <i class="fa fa-arrow-right" aria-hidden="true"></i></span>
     </a>
+    <!-- ====================================================================
+    [FIM BLOCO] card_projetos
+    ==================================================================== -->
   </section>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] Busca rápida, ripple, navegação suave e atalhos numéricos
+==================================================================== -->
 {% block scripts %}
 <script>
-  // Filtro rápido
+  // ====================================================================
+  // [BLOCO] UI_FILTRO
+  // [NOME] filtro_rapido_modulos
+  // [RESPONSABILIDADE] Filtrar cards por texto (data-title + título)
+  // ====================================================================
   const filtro = document.getElementById('filtro');
   const grid = document.getElementById('cardsGrid');
   let timer;
@@ -95,8 +180,15 @@
     });
   }
   filtro?.addEventListener('input', ()=>{ clearTimeout(timer); timer = setTimeout(applyFilter, 80); });
+  // ====================================================================
+  // [FIM BLOCO] filtro_rapido_modulos
+  // ====================================================================
 
-  // Ripple + transição suave (usa routeTo do _base.html)
+  // ====================================================================
+  // [BLOCO] UI_RIPPLE
+  // [NOME] ripple_cards
+  // [RESPONSABILIDADE] Efeito ripple no clique/teclado antes da navegação
+  // ====================================================================
   function addRipple(target, evt){
     const rect = target.getBoundingClientRect();
     const cx = evt && typeof evt.clientX === 'number' ? evt.clientX - rect.left : rect.width/2;
@@ -116,7 +208,15 @@
     addRipple(el, null);
     routeTo(href);
   }
+  // ====================================================================
+  // [FIM BLOCO] ripple_cards
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] NAVEGACAO
+  // [NOME] handlers_cards
+  // [RESPONSABILIDADE] Clique/teclado nos cards usando routeTo (base) + tooltip de atalho
+  // ====================================================================
   grid?.querySelectorAll('.navlink').forEach(link=>{
     link.addEventListener('click', (e)=>{
       e.preventDefault();
@@ -133,8 +233,15 @@
     const idx = link.getAttribute('data-index');
     if (idx && Number(idx) <= 9) link.title = `Abrir • atalho ${idx}`;
   });
+  // ====================================================================
+  // [FIM BLOCO] handlers_cards
+  // ====================================================================
 
-  // Atalhos: "1–9" abrem cards visíveis
+  // ====================================================================
+  // [BLOCO] ATALHOS_TECLADO
+  // [NOME] atalhos_1a9
+  // [RESPONSABILIDADE] Teclas 1–9 abrem os cards visíveis na ordem
+  // ====================================================================
   window.addEventListener('keydown', (e)=>{
     if (/^[1-9]$/.test(e.key)){
       const n = Number(e.key);
@@ -142,5 +249,31 @@
       if (visibles[n-1]) simulateClick(visibles[n-1]);
     }
   });
+  // ====================================================================
+  // [FIM BLOCO] atalhos_1a9
+  // ====================================================================
 </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+CARD_NAVEGACAO: card_estoque
+CARD_NAVEGACAO: card_producao
+CARD_NAVEGACAO: card_qualidade
+CARD_NAVEGACAO: card_compras
+CARD_NAVEGACAO: card_assistencia
+CARD_NAVEGACAO: card_projetos
+UI_FILTRO: filtro_rapido_modulos
+UI_RIPPLE: ripple_cards
+NAVEGACAO: handlers_cards
+ATALHOS_TECLADO: atalhos_1a9
+==================================================================== -->

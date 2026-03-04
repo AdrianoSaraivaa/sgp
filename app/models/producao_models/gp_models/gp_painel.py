@@ -14,9 +14,18 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ...base_model import BaseModel
-from ..seriais import WorkOrder, WorkStage, RopAlert  # noqa: F401  pylint: disable=unused-import
+from ..seriais import (
+    WorkOrder,
+    WorkStage,
+    RopAlert,
+)  # noqa: F401  pylint: disable=unused-import
 
 
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] GPModel
+# [RESPONSABILIDADE] Representar modelo de máquina configurado para o processo GP (tabela gp_model)
+# ====================================================================
 @dataclass
 class GPModel(BaseModel):
     """Represents a machine model configured for the GP process."""
@@ -26,10 +35,29 @@ class GPModel(BaseModel):
     id: Optional[int] = field(default=None)
     nome: str = field(default="")
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida do modelo para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<GPModel nome={self.nome}>"
 
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
 
+
+# ====================================================================
+# [FIM BLOCO] GPModel
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] BenchConfig
+# [RESPONSABILIDADE] Representar configuração de bancada por modelo com parâmetros de tempo e responsabilidades
+# ====================================================================
 @dataclass
 class BenchConfig(BaseModel):
     """Configuration linking a model to a bench with timing information."""
@@ -48,10 +76,29 @@ class BenchConfig(BaseModel):
     responsavel: Optional[str] = field(default=None)
     observacoes: Optional[str] = field(default=None)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida da configuração de bancada para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<BenchConfig model_id={self.model_id} bench_id={self.bench_id}>"
 
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
 
+
+# ====================================================================
+# [FIM BLOCO] BenchConfig
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] __all__
+# [RESPONSABILIDADE] Definir símbolos públicos exportados pelo módulo para uso externo
+# ====================================================================
 __all__ = [
     "GPModel",
     "BenchConfig",
@@ -59,3 +106,16 @@ __all__ = [
     "WorkStage",
     "RopAlert",
 ]
+# ====================================================================
+# [FIM BLOCO] __all__
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CLASSE: GPModel
+# MÉTODO: __repr__
+# CLASSE: BenchConfig
+# MÉTODO: __repr__
+# BLOCO_UTIL: __all__
+# ====================================================================

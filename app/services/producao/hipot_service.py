@@ -5,9 +5,22 @@ from app import db
 from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 from app.services.producao.bench_flow_service import advance_after_finish
 
+# ====================================================================
+# [BLOCO] CONFIG_LOGGER
+# [NOME] logger
+# [RESPONSABILIDADE] Inicializar logger do módulo para rastreamento do serviço HiPot
+# ====================================================================
 logger = logging.getLogger(__name__)
+# ====================================================================
+# [FIM BLOCO] logger
+# ====================================================================
 
 
+# ====================================================================
+# [BLOCO] BLOCO_DB
+# [NOME] aplicar_resultado_hipot
+# [RESPONSABILIDADE] Processar resultado HiPot, atualizar ordem/etapa e avançar fluxo conforme configuração de bancadas
+# ====================================================================
 def aplicar_resultado_hipot(payload: dict) -> dict:
     """
     Processa o resultado do teste HiPot, atualiza a ordem de produção,
@@ -66,3 +79,15 @@ def aplicar_resultado_hipot(payload: dict) -> dict:
         ),
         "hipot_flag": order.hipot_flag,
     }
+
+
+# ====================================================================
+# [FIM BLOCO] aplicar_resultado_hipot
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CONFIG_LOGGER: logger
+# BLOCO_DB: aplicar_resultado_hipot
+# ====================================================================

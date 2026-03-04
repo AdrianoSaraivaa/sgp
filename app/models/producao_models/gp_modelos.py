@@ -1,4 +1,3 @@
-
 """Legacy module for GP model management.
 
 Historically, the ``gp_modelos`` module provided access to model
@@ -12,4 +11,29 @@ Developers should prefer importing directly from ``app.models_sqla``.
 
 from app.models_sqla import GPModel, GPBenchConfig
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] ReexportGPModelos
+# [RESPONSABILIDADE] Reexportar modelos GPModel e GPBenchConfig para compatibilidade com imports legados
+# ====================================================================
+
+# ====================================================================
+# [FIM BLOCO] ReexportGPModelos
+# ====================================================================
+
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] __all__
+# [RESPONSABILIDADE] Definir símbolos públicos exportados pelo módulo para importações compatíveis
+# ====================================================================
 __all__ = ["GPModel", "GPBenchConfig"]
+# ====================================================================
+# [FIM BLOCO] __all__
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: ReexportGPModelos
+# BLOCO_UTIL: __all__
+# ====================================================================

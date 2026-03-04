@@ -1,15 +1,16 @@
-
 # app/routes/producao_routes/maquinas_routes/montagens.py
 from __future__ import annotations
 from datetime import datetime
 from flask import Blueprint, Response, request, jsonify, abort
 from app import db
+
 # Use the SQLAlchemy models instead of the dataclasses. Import from the
 # auto-generated models_sqla package to ensure that ``.query`` is available.
 from app.models_sqla import Montagem, LabelReprintLog, GPWorkOrder
 from app.routes.producao_routes.maquinas_routes.consumo_service import (
     estornar_reserva_componentes,
 )
+
 # Use the real serial generator from app.services.serials instead of the stub.
 from app.services.serials import generate_serials
 from sqlalchemy import select  # precisa para as queries com with_for_update
@@ -19,6 +20,11 @@ from app.routes.producao_routes.painel_routes.order_api import ensure_gp_workord
 
 import logging
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] logger
+# [RESPONSABILIDADE] Configurar logger do módulo para registrar eventos e erros das rotas
+# ====================================================================
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -27,18 +33,42 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+# ====================================================================
+# [FIM BLOCO] logger
+# ====================================================================
 
 
-
-
-
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] montagens_bp
+# [RESPONSABILIDADE] Definir blueprint e prefixo das rotas de montagens
+# ====================================================================
 montagens_bp = Blueprint("montagens_bp", __name__, url_prefix="/producao/montagem")
+# ====================================================================
+# [FIM BLOCO] montagens_bp
+# ====================================================================
+
 
 @montagens_bp.route("/listar", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] listar_montagens
+# [RESPONSABILIDADE] Listar montagens mais recentes com limite configurado
+# ====================================================================
 def listar_montagens():
     q = Montagem.query.order_by(Montagem.id.desc()).limit(300).all()
     return jsonify([m.as_dict() for m in q])
+
+
+# ====================================================================
+# [FIM BLOCO] listar_montagens
+# ====================================================================
 @montagens_bp.route("/criar", methods=["POST"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] criar_montagens
+# [RESPONSABILIDADE] Criar montagens em lote, gerar seriais e garantir ordens no painel
+# ====================================================================
 def criar_montagens():
     """
     Espera JSON: { modelo: "PM2100", quantidade: 3, usuario: "Operador" }
@@ -78,7 +108,7 @@ def criar_montagens():
         return abort(400, f"Erro ao salvar (serial pode já existir): {e}")
 
     # --- Enfileira no Painel (bancada SEP) para cada serial criado (idempotente) ---
-       # --- Garantir ordens no Painel (idempotente via ensure_gp_workorder) ---
+    # --- Garantir ordens no Painel (idempotente via ensure_gp_workorder) ---
     warn = None
     try:
         for m in criadas:
@@ -89,13 +119,22 @@ def criar_montagens():
         # Não derruba a montagem; apenas reporta aviso no JSON
         warn = f"Falha ao garantir/enfileirar no Painel: {e}"
 
-
     resp = {"ok": True, "itens": [m.as_dict() for m in criadas]}
     if warn:
         resp["warning"] = warn
     return jsonify(resp)
 
 
+# ====================================================================
+# [FIM BLOCO] criar_montagens
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] gerar_serial_stub
+# [RESPONSABILIDADE] Gerar serial unitário usando o serviço de geração e aplicar fallback em falha
+# ====================================================================
 def gerar_serial_stub(modelo: str) -> str:
     """
     Gera um único número de série para o modelo informado usando o gerador
@@ -113,14 +152,23 @@ def gerar_serial_stub(modelo: str) -> str:
         base = int(datetime.utcnow().timestamp()) % 1000000
         return f"{base}"
 
-    
+
+# ====================================================================
+# [FIM BLOCO] gerar_serial_stub
+# ====================================================================
+
 
 @montagens_bp.route("/cancelar/<int:montagem_id>", methods=["POST"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] cancelar_montagem
+# [RESPONSABILIDADE] Cancelar montagem com motivo, atualizando status e metadados no banco
+# ====================================================================
 def cancelar_montagem(montagem_id: int):
     """
     Marca como CANCELADA. NÃO apaga nem permite repetir serial.
     Não estorna peças ao estoque (apenas marca status).
-    
+
     Body: { motivo: "...", usuario: "..." }
     """
     data = request.get_json() or {}
@@ -150,27 +198,49 @@ def cancelar_montagem(montagem_id: int):
         return jsonify({"ok": False, "erro": str(e)}), 500
 
 
+# ====================================================================
+# [FIM BLOCO] cancelar_montagem
+# ====================================================================
 
 
 @montagens_bp.route("/reprints/<int:montagem_id>", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] listar_reprints_por_id
+# [RESPONSABILIDADE] Listar logs de reimpressão associados a uma montagem pelo id
+# ====================================================================
 def listar_reprints_por_id(montagem_id: int):
     m = Montagem.query.get_or_404(montagem_id)
-    logs = (LabelReprintLog.query
-            .filter_by(montagem_id=m.id)
-            .order_by(LabelReprintLog.id.desc())
-            .all())
-    return jsonify([{
-        "id": l.id,
-        "montagem_id": l.montagem_id,
-        "motivo": l.motivo,
-        "reprint_by": l.reprint_by,
-        "reprint_at": l.reprint_at.strftime("%Y-%m-%d %H:%M")
-    } for l in logs])
+    logs = (
+        LabelReprintLog.query.filter_by(montagem_id=m.id)
+        .order_by(LabelReprintLog.id.desc())
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "id": l.id,
+                "montagem_id": l.montagem_id,
+                "motivo": l.motivo,
+                "reprint_by": l.reprint_by,
+                "reprint_at": l.reprint_at.strftime("%Y-%m-%d %H:%M"),
+            }
+            for l in logs
+        ]
+    )
 
 
+# ====================================================================
+# [FIM BLOCO] listar_reprints_por_id
+# ====================================================================
 
 
 @montagens_bp.route("/reprints/by-serial/<serial>", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] listar_reprints_por_serial
+# [RESPONSABILIDADE] Listar logs de reimpressão associados a uma montagem pelo serial
+# ====================================================================
 def listar_reprints_por_serial(serial: str):
     m = Montagem.query.filter_by(serial=serial).first()
     if not m:
@@ -178,10 +248,17 @@ def listar_reprints_por_serial(serial: str):
     return listar_reprints_por_id(m.id)
 
 
-
+# ====================================================================
+# [FIM BLOCO] listar_reprints_por_serial
+# ====================================================================
 
 
 @montagens_bp.route("/export/csv", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] exportar_montagens_csv
+# [RESPONSABILIDADE] Exportar montagens filtradas por data/modelo/status em formato CSV
+# ====================================================================
 def exportar_montagens_csv():
     """
     Query params:
@@ -205,7 +282,9 @@ def exportar_montagens_csv():
         try:
             dt_to = datetime.strptime(dt, "%Y-%m-%d")
             # incluir o dia todo
-            q = q.filter(Montagem.data_hora < dt_to.replace(hour=23, minute=59, second=59))
+            q = q.filter(
+                Montagem.data_hora < dt_to.replace(hour=23, minute=59, second=59)
+            )
         except Exception:
             pass
 
@@ -220,24 +299,47 @@ def exportar_montagens_csv():
     itens = q.order_by(Montagem.id.desc()).all()
 
     # Monta CSV
-    lines = ["id;modelo;serial;data_hora;usuario;status;label_printed;label_print_count"]
+    lines = [
+        "id;modelo;serial;data_hora;usuario;status;label_printed;label_print_count"
+    ]
     for m in itens:
-        lines.append(";".join([
-            str(m.id),
-            m.modelo,
-            m.serial,
-            m.data_hora.strftime("%Y-%m-%d %H:%M"),
-            m.usuario or "",
-            m.status,
-            "1" if m.label_printed else "0",
-            str(m.label_print_count or 0),
-        ]))
+        lines.append(
+            ";".join(
+                [
+                    str(m.id),
+                    m.modelo,
+                    m.serial,
+                    m.data_hora.strftime("%Y-%m-%d %H:%M"),
+                    m.usuario or "",
+                    m.status,
+                    "1" if m.label_printed else "0",
+                    str(m.label_print_count or 0),
+                ]
+            )
+        )
     csv_data = "\n".join(lines)
 
     return Response(
         csv_data.encode("utf-8"),
         mimetype="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": 'attachment; filename="montagens.csv"'
-        }
+        headers={"Content-Disposition": 'attachment; filename="montagens.csv"'},
     )
+
+
+# ====================================================================
+# [FIM BLOCO] exportar_montagens_csv
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: logger
+# BLOCO_UTIL: montagens_bp
+# FUNÇÃO: listar_montagens
+# FUNÇÃO: criar_montagens
+# FUNÇÃO: gerar_serial_stub
+# FUNÇÃO: cancelar_montagem
+# FUNÇÃO: listar_reprints_por_id
+# FUNÇÃO: listar_reprints_por_serial
+# FUNÇÃO: exportar_montagens_csv
+# ====================================================================

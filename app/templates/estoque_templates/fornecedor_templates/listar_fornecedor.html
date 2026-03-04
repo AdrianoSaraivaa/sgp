@@ -1,9 +1,31 @@
 {% extends "_base.html" %}
 {% set active_page = 'fornecedores' %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
 {% block title %}Lista de Fornecedores — Pneumark SGP{% endblock %}
-{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Módulo de Estoque{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Incluir prefetch e estilos específicos para listagem de fornecedores
+==================================================================== -->
 {% block head_extra %}
   <link rel="prefetch" href="{{ url_for('cadastrar_fornecedor_bp.cadastrar_fornecedor') }}">
   <style>
@@ -30,7 +52,15 @@
     }
   </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_toolbar
+[RESPONSABILIDADE] Renderizar breadcrumb e filtro instantâneo na toolbar
+==================================================================== -->
 {% block toolbar %}
   <div class="toolbar">
     <div class="breadcrumb" aria-label="Você está em">
@@ -46,7 +76,15 @@
     </label>
   </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_toolbar
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Exibir ações de navegação, busca via GET e tabela de fornecedores com ações
+==================================================================== -->
 {% block content %}
   <!-- Ações topo -->
   <div class="actions-top">
@@ -101,7 +139,15 @@
     </table>
   </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts_extra
+[RESPONSABILIDADE] Implementar filtro rápido no cliente para tabela de fornecedores
+==================================================================== -->
 {% block scripts_extra %}
   <script>
     // Filtro rápido no cliente (campo da toolbar)
@@ -117,3 +163,17 @@
     inputQ?.addEventListener('input', ()=>{ clearTimeout(window.__flt); window.__flt=setTimeout(filtrar,80); });
   </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts_extra
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_toolbar
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts_extra
+==================================================================== -->

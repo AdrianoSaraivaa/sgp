@@ -1,8 +1,40 @@
 {% extends "_base.html" %}
-{% block title %}Comunicação OMIE — Pneumark SGP{% endblock %}
-{% block module_name %}Comunicação com o OMIE{% endblock %}
-{% block subtitle %}Requisições automáticas por Ponto de Pedido + Exportações{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Comunicação OMIE — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Comunicação com o OMIE{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir subtítulo informativo do módulo no template base
+==================================================================== -->
+{% block subtitle %}Requisições automáticas por Ponto de Pedido + Exportações{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Definir estilos específicos da página para layout, tabela, modal e toast
+==================================================================== -->
 {# ============================ ESTILOS ESPECÍFICOS ============================ #}
 {% block head_extra %}
 <style>
@@ -41,7 +73,15 @@
   @media (max-width: 1100px){ .omie-grid{grid-template-columns:1fr} }
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar cards de requisições, exportações e modal de detalhes
+==================================================================== -->
 {# ============================ CONTEÚDO DA PÁGINA ============================ #}
 {% block content %}
 <div class="omie-grid">
@@ -138,18 +178,39 @@
 
 <div class="toast" id="toast"><span id="toastMsg">Pronto.</span></div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts_extra
+[RESPONSABILIDADE] Implementar listagem, filtros, modal de detalhes e ações de exportação via API
+==================================================================== -->
 {# ============================ JS ============================ #}
 {% block scripts_extra %}
 <script>
   console.log("[OMIE] :: Scripts carregados com sucesso.");
 
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] refs_dom_filtros
+  [RESPONSABILIDADE] Mapear referências do DOM para filtros e tabela de requisições
+  ==================================================================== */
   const elBody = document.getElementById('reqBody');
   const busca = document.getElementById('busca');
   const filtroStatus = document.getElementById('filtroStatus');
   const dataDe = document.getElementById('dataDe');
   const dataAte = document.getElementById('dataAte');
+  /* ====================================================================
+  [FIM BLOCO] refs_dom_filtros
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] BLOCO_API
+  [NOME] API
+  [RESPONSABILIDADE] Centralizar endpoints usados para listagem, detalhes e exportações
+  ==================================================================== */
   const API = {
     listarRequisicoes: '/estoque/omie/api/requisicoes/listar',
     detalhesRequisicao: (cod) => `/estoque/omie/api/requisicoes/${encodeURIComponent(cod)}`,
@@ -160,13 +221,29 @@
     expProdForn: '/estoque/omie/api/export/produto_fornecedor.xlsx',
     expSnapshotPP: '/estoque/omie/api/export/snapshot_pontopedido.xlsx'
   };
+  /* ====================================================================
+  [FIM BLOCO] API
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] statusBadge
+  [RESPONSABILIDADE] Gerar HTML do badge de status conforme valor informado
+  ==================================================================== */
   function statusBadge(st){
     if(st === 'enviado') return `<span class="badge ok">enviado</span>`;
     if(st === 'erro') return `<span class="badge err">erro</span>`;
     return `<span class="badge pend">pendente</span>`;
   }
+  /* ====================================================================
+  [FIM BLOCO] statusBadge
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] renderRow
+  [RESPONSABILIDADE] Criar elemento <tr> para uma requisição na tabela principal
+  ==================================================================== */
   function renderRow(rec){
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -181,7 +258,15 @@
     `;
     return tr;
   }
+  /* ====================================================================
+  [FIM BLOCO] renderRow
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] carregarLista
+  [RESPONSABILIDADE] Consultar API de requisições, aplicar filtros e renderizar tabela
+  ==================================================================== */
   async function carregarLista(){
     try{
       console.log("[OMIE] :: Carregar lista requisicoes...");
@@ -206,76 +291,144 @@
       elBody.innerHTML = `<tr><td colspan="8" class="muted">Erro ao carregar lista.</td></tr>`;
     }
   }
+  /* ====================================================================
+  [FIM BLOCO] carregarLista
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] listeners_filtros
+  [RESPONSABILIDADE] Associar eventos dos filtros ao recarregamento da lista
+  ==================================================================== */
   [busca, filtroStatus, dataDe, dataAte].forEach(el=>{
     el.addEventListener('change', carregarLista);
     el.addEventListener('keyup', ev=>{ if(ev.key==='Enter') carregarLista(); });
   });
 
   carregarLista(); // load inicial
+  /* ====================================================================
+  [FIM BLOCO] listeners_filtros
+  ==================================================================== */
 
 
-// ===== Modal Detalhes =====
-const backdrop = document.getElementById('modalBackdrop');
-const fecharModal = document.getElementById('fecharModal');
-const metaReq = document.getElementById('metaReq');
-const itensReq = document.getElementById('itensReq');
-const linkOmie = document.getElementById('linkOmie');
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] refs_dom_modal
+  [RESPONSABILIDADE] Mapear referências do DOM do modal de detalhes
+  ==================================================================== */
+  // ===== Modal Detalhes =====
+  const backdrop = document.getElementById('modalBackdrop');
+  const fecharModal = document.getElementById('fecharModal');
+  const metaReq = document.getElementById('metaReq');
+  const itensReq = document.getElementById('itensReq');
+  const linkOmie = document.getElementById('linkOmie');
+  /* ====================================================================
+  [FIM BLOCO] refs_dom_modal
+  ==================================================================== */
 
-function abrirModal(){ backdrop.style.display='flex'; backdrop.setAttribute('aria-hidden','false'); }
-function fechar(){ backdrop.style.display='none'; backdrop.setAttribute('aria-hidden','true'); }
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] abrirModal
+  [RESPONSABILIDADE] Exibir o modal de detalhes de requisição
+  ==================================================================== */
+  function abrirModal(){ backdrop.style.display='flex'; backdrop.setAttribute('aria-hidden','false'); }
+  /* ====================================================================
+  [FIM BLOCO] abrirModal
+  ==================================================================== */
 
-fecharModal.addEventListener('click', fechar);
-backdrop.addEventListener('click', (e)=> { if(e.target===backdrop) fechar(); });
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] fechar
+  [RESPONSABILIDADE] Ocultar o modal de detalhes de requisição
+  ==================================================================== */
+  function fechar(){ backdrop.style.display='none'; backdrop.setAttribute('aria-hidden','true'); }
+  /* ====================================================================
+  [FIM BLOCO] fechar
+  ==================================================================== */
 
-// Delegação de evento para todos os botões "detalhes"
-document.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('[data-det]');
-  if(!btn) return;
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] listeners_modal
+  [RESPONSABILIDADE] Configurar eventos de fechar modal por botão e clique no backdrop
+  ==================================================================== */
+  fecharModal.addEventListener('click', fechar);
+  backdrop.addEventListener('click', (e)=> { if(e.target===backdrop) fechar(); });
+  /* ====================================================================
+  [FIM BLOCO] listeners_modal
+  ==================================================================== */
 
-  const cod = btn.getAttribute('data-det');
-  try{
-    // limpa conteúdo enquanto carrega
-    metaReq.textContent = 'Carregando...';
-    itensReq.innerHTML = `<tr><td colspan="5" class="muted">Carregando…</td></tr>`;
-    abrirModal();
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] delegacao_botao_detalhes
+  [RESPONSABILIDADE] Tratar clique em botões de detalhes e carregar dados via API
+  ==================================================================== */
+  // Delegação de evento para todos os botões "detalhes"
+  document.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('[data-det]');
+    if(!btn) return;
 
-    const res = await fetch(API.detalhesRequisicao(cod), { cache: 'no-store' });
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const cod = btn.getAttribute('data-det');
+    try{
+      // limpa conteúdo enquanto carrega
+      metaReq.textContent = 'Carregando...';
+      itensReq.innerHTML = `<tr><td colspan="5" class="muted">Carregando…</td></tr>`;
+      abrirModal();
 
-    metaReq.innerHTML = `
-      <div><b>Fornecedor:</b> ${data.cab.fornecedor}</div>
-      <div><b>codIntReqCompra:</b> ${data.cab.cod}</div>
-      <div><b>Data/Hora:</b> ${data.cab.data_hora}</div>
-      <div><b>Status:</b> ${data.cab.status}</div>
-      <div><b>E-mail:</b> ${data.cab.email_enviado ? 'enviado' : '—'}</div>
-    `;
-    itensReq.innerHTML = data.itens.map(i=>`
-      <tr>
-        <td>${i.codigo_interno}</td>
-        <td>${i.descricao}</td>
-        <td>${i.codProd || '—'}</td>
-        <td>${i.qtde}</td>
-        <td>${i.obs || ''}</td>
-      </tr>
-    `).join('');
-    linkOmie.href = data.cab.link_omie || '#';
-  }catch(err){
-    console.error('Falha ao carregar detalhes:', err);
-    metaReq.textContent = 'Erro ao carregar detalhes.';
-    itensReq.innerHTML = `<tr><td colspan="5" class="muted">Não foi possível carregar os itens.</td></tr>`;
-  }
-});
+      const res = await fetch(API.detalhesRequisicao(cod), { cache: 'no-store' });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
 
-
-
-
-
-
-
-
-
+      metaReq.innerHTML = `
+        <div><b>Fornecedor:</b> ${data.cab.fornecedor}</div>
+        <div><b>codIntReqCompra:</b> ${data.cab.cod}</div>
+        <div><b>Data/Hora:</b> ${data.cab.data_hora}</div>
+        <div><b>Status:</b> ${data.cab.status}</div>
+        <div><b>E-mail:</b> ${data.cab.email_enviado ? 'enviado' : '—'}</div>
+      `;
+      itensReq.innerHTML = data.itens.map(i=>`
+        <tr>
+          <td>${i.codigo_interno}</td>
+          <td>${i.descricao}</td>
+          <td>${i.codProd || '—'}</td>
+          <td>${i.qtde}</td>
+          <td>${i.obs || ''}</td>
+        </tr>
+      `).join('');
+      linkOmie.href = data.cab.link_omie || '#';
+    }catch(err){
+      console.error('Falha ao carregar detalhes:', err);
+      metaReq.textContent = 'Erro ao carregar detalhes.';
+      itensReq.innerHTML = `<tr><td colspan="5" class="muted">Não foi possível carregar os itens.</td></tr>`;
+    }
+  });
+  /* ====================================================================
+  [FIM BLOCO] delegacao_botao_detalhes
+  ==================================================================== */
 
 </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts_extra
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts_extra
+BLOCO_UTIL: refs_dom_filtros
+BLOCO_API: API
+FUNÇÃO: statusBadge
+FUNÇÃO: renderRow
+FUNÇÃO: carregarLista
+BLOCO_UTIL: listeners_filtros
+BLOCO_UTIL: refs_dom_modal
+FUNÇÃO: abrirModal
+FUNÇÃO: fechar
+BLOCO_UTIL: listeners_modal
+BLOCO_UTIL: delegacao_botao_detalhes
+==================================================================== -->

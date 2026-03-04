@@ -1,34 +1,215 @@
 {% extends "_base.html" %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Tela de registro (criar conta) com validação de erro e link para login
+==================================================================== -->
 {% block content %}
-<div style="max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px;">
-    <h2 style="text-align: center;">Criar Nova Conta</h2>
-    
-    {% if erro %}
-        <div style="color: red; text-align: center; margin-bottom: 15px;">{{ erro }}</div>
-    {% endif %}
-    
-    <form method="POST">
-        <div style="margin-bottom: 15px;">
-            <label>Usuário:</label>
-            <input type="text" name="usuario" class="form-control" required style="width: 100%;">
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <label>Senha:</label>
-            <input type="password" name="senha" class="form-control" required style="width: 100%;">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label>Confirmar Senha:</label>
-            <input type="password" name="confirmar_senha" class="form-control" required style="width: 100%;">
-        </div>
-        
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Cadastrar</button>
-    </form>
-    
-    <div style="text-align: center; margin-top: 15px;">
-        <a href="{{ url_for('login_bp.login') }}">Já tenho conta (Login)</a>
+<div class="auth-wrap">
+  <section class="auth-card" role="form" aria-label="Formulário de Cadastro">
+    <div class="auth-head">
+      <img class="auth-logo" src="{{ url_for('static', filename='img/Logo jpg.jpg') }}" alt="Pneumark">
+      <div>
+        <h1 class="auth-title">Criar Nova Conta</h1>
+        <p class="auth-sub">Preencha os dados para criar seu acesso</p>
+      </div>
     </div>
+
+    {% if erro %}
+      <div class="flash danger auth-err" role="alert">{{ erro }}</div>
+    {% endif %}
+
+    <form class="auth-form" method="POST" novalidate>
+      <div class="auth-field">
+        <label for="usuario">Usuário</label>
+        <input class="auth-input" id="usuario" name="usuario" type="text"
+               placeholder="Seu usuário" autocomplete="username" required>
+      </div>
+
+      <div class="auth-field">
+        <label for="senha">Senha</label>
+        <input class="auth-input" id="senha" name="senha" type="password"
+               placeholder="Crie uma senha" autocomplete="new-password" required>
+      </div>
+
+      <div class="auth-field">
+        <label for="confirmar_senha">Confirmar Senha</label>
+        <input class="auth-input" id="confirmar_senha" name="confirmar_senha" type="password"
+               placeholder="Repita a senha" autocomplete="new-password" required>
+      </div>
+
+      <button class="auth-btn" type="submit">
+        <i class="fa-solid fa-user-plus" aria-hidden="true"></i> &nbsp;Cadastrar
+      </button>
+    </form>
+
+    <div class="auth-register-link">
+      <a href="{{ url_for('login_bp.login') }}">
+        Já tenho conta? <strong>Entrar</strong>
+      </a>
+    </div>
+
+    <div class="auth-foot">
+      <span>&copy; {{ 2025 }} Pneumark</span>
+      <span>Segurança primeiro • <span aria-hidden="true">🔒</span></span>
+    </div>
+  </section>
 </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Estilos específicos da página de registro (alinhado ao login)
+==================================================================== -->
+{% block head_extra %}
+<style>
+  .auth-wrap{
+    min-height: calc(100vh - 76px);
+    display:grid;
+    place-items:center;
+  }
+  .auth-card{
+    width:min(420px, 92vw);
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    box-shadow: var(--shadow-2);
+    position:relative;
+    overflow:hidden;
+  }
+  .auth-card::after{
+    content:"";
+    position:absolute;
+    inset:-35% -35% auto auto;
+    height:160px; width:160px; border-radius:50%;
+    background: radial-gradient(closest-side, rgba(230,0,0,.16), transparent 70%);
+    filter: blur(6px);
+  }
+  .auth-head{
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:16px;
+    position:relative; z-index:1;
+  }
+  .auth-logo{
+    height:44px; width:auto; border-radius:10px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .auth-title{
+    margin:0; font-size:20px;
+    color:var(--text); font-weight:800; letter-spacing:.3px;
+  }
+  .auth-sub{ margin:0; color:var(--muted); font-size:13px; }
+
+  .auth-form{ margin-top:10px; position:relative; z-index:1; }
+  .auth-field{ display:grid; gap:6px; margin:12px 0; }
+  .auth-field label{
+    font-size:13px; color:#30425a; font-weight:700; letter-spacing:.2px;
+  }
+  .auth-input{
+    width:100%;
+    padding:12px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background:#fff;
+    color:var(--text);
+    font-size:14px;
+    outline:0;
+    transition: box-shadow var(--speed) var(--easing), border-color var(--speed) var(--easing);
+  }
+  .auth-input::placeholder{ color:#8aa0bf; }
+  .auth-input:focus{
+    border-color:#ffb3b3;
+    box-shadow: 0 0 0 4px rgba(230,0,0,.10);
+  }
+
+  .auth-btn{
+    width:100%;
+    padding:12px 14px;
+    border:0;
+    border-radius:12px;
+    background: linear-gradient(180deg, #ff4545, #e60000);
+    color:#fff;
+    font-weight:800;
+    font-size:15px;
+    letter-spacing:.2px;
+    cursor:pointer;
+    box-shadow: 0 6px 18px rgba(230,0,0,.28);
+    transition: transform var(--speed) var(--easing), box-shadow var(--speed) var(--easing), filter var(--speed) var(--easing);
+  }
+  .auth-btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(230,0,0,.36);
+    filter:saturate(1.05);
+  }
+  .auth-btn:active{ transform:none; }
+
+  .auth-register-link{
+    text-align:center;
+    margin: 18px 0 0;
+    position:relative; z-index:1;
+  }
+  .auth-register-link a{
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    border-bottom: 1px dashed var(--muted);
+    transition: color .2s, border-color .2s;
+  }
+  .auth-register-link a:hover{
+    color: var(--text);
+    border-bottom-color: var(--text);
+  }
+
+  .auth-foot{
+    margin-top:14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    color:var(--muted);
+    font-size:12px;
+    position:relative; z-index:1;
+  }
+
+  .auth-err{ margin-bottom:10px; position:relative; z-index:1; }
+</style>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] UX: foco inicial no usuário + Enter confirma no campo de confirmação
+==================================================================== -->
+{% block scripts %}
+<script>
+  const u = document.getElementById('usuario');
+  if (u) setTimeout(()=> u.focus(), 80);
+
+  const c = document.getElementById('confirmar_senha');
+  c?.addEventListener('keydown', (e)=> {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      c.form?.submit();
+    }
+  });
+</script>
+{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_scripts
+==================================================================== -->

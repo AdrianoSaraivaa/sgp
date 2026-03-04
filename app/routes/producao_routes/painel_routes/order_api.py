@@ -15,23 +15,52 @@ except Exception:  # pragma: no cover
 # -----------------------------------------------------------------------------
 # Blueprint para o app registrar rotas de ordens no Painel
 # -----------------------------------------------------------------------------
+
+# ====================================================================
+# [BLOCO] BLOCO_CONFIG
+# [NOME] gp_painel_order_api_bp
+# [RESPONSABILIDADE] Registro do Blueprint de API de ordens do Painel
+# ====================================================================
 gp_painel_order_api_bp = Blueprint(
     "gp_painel_order_api_bp",
     __name__,
     url_prefix="/producao/gp/painel/api/orders",
 )
+# ====================================================================
+# [FIM BLOCO] gp_painel_order_api_bp
+# ====================================================================
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] ping
+# [RESPONSABILIDADE] Healthcheck simples do serviço de ordens do Painel
+# ====================================================================
 @gp_painel_order_api_bp.get("/ping")
 def ping():
     """Healthcheck simples do serviço de ordens do Painel."""
     return jsonify({"ok": True, "service": "order_api"})
 
+
+# ====================================================================
+# [FIM BLOCO] ping
+# ====================================================================
+
+
 # -----------------------------------------------------------------------------
 # Serviço: garante que exista um GPWorkOrder para o serial informado.
 # Agora cria já com current_bench = 'sep' para aparecer no card ESTOQUE.
 # -----------------------------------------------------------------------------
-def ensure_gp_workorder(session: db.session, *, serial: str, modelo: str,
-                        model_code: Optional[str] = None) -> GPWorkOrder:
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] ensure_gp_workorder
+# [RESPONSABILIDADE] Garantir/criar GPWorkOrder para um serial e retornar a ordem
+# ====================================================================
+def ensure_gp_workorder(
+    session: db.session, *, serial: str, modelo: str, model_code: Optional[str] = None
+) -> GPWorkOrder:
     """
     Garante que exista um GPWorkOrder para o serial informado.
     - Se não existir, cria com status 'queued' e current_bench='sep' (entra em ESTOQUE).
@@ -51,9 +80,9 @@ def ensure_gp_workorder(session: db.session, *, serial: str, modelo: str,
         serial=serial,
         modelo=modelo,
         status="queued",
-        current_bench="sep",       # obrigatório para o board mostrar no ESTOQUE
+        current_bench="sep",  # obrigatório para o board mostrar no ESTOQUE
         hipot_flag=False,
-        hipot_status="",           # HOTFIX: evitar IntegrityError (NOT NULL)
+        hipot_status="",  # HOTFIX: evitar IntegrityError (NOT NULL)
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -62,11 +91,23 @@ def ensure_gp_workorder(session: db.session, *, serial: str, modelo: str,
     return order
 
 
+# ====================================================================
+# [FIM BLOCO] ensure_gp_workorder
+# ====================================================================
+
+
 # -----------------------------------------------------------------------------
 # Nova rota: timeline completa de um serial
 # -----------------------------------------------------------------------------
+
 from app.models.producao_models.gp_execucao import GPWorkStage
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] timeline
+# [RESPONSABILIDADE] Retornar timeline completa de um serial com etapas por bancada
+# ====================================================================
 @gp_painel_order_api_bp.get("/timeline/<serial>")
 def timeline(serial):
     """Retorna histórico completo de um serial, com etapas por bancada."""
@@ -74,31 +115,52 @@ def timeline(serial):
     if not order:
         return jsonify({"ok": False, "error": f"serial não encontrado: {serial}"}), 404
 
-    stages = (GPWorkStage.query
-              .filter_by(order_id=order.id)
-              .order_by(GPWorkStage.started_at.asc())
-              .all())
+    stages = (
+        GPWorkStage.query.filter_by(order_id=order.id)
+        .order_by(GPWorkStage.started_at.asc())
+        .all()
+    )
 
     def _dt(x):
         return x.isoformat() if x else None
 
     data = []
     for s in stages:
-        data.append({
-            "bench_id": s.bench_id,
-            "started_at": _dt(s.started_at),
-            "finished_at": _dt(s.finished_at),
-            "operador": getattr(s, "operador", None),
-            "result": getattr(s, "result", None),
-            "rework_flag": bool(getattr(s, "rework_flag", False)),
-            "workstation": getattr(s, "workstation", None),
-            "observacoes": getattr(s, "observacoes", None),
-        })
+        data.append(
+            {
+                "bench_id": s.bench_id,
+                "started_at": _dt(s.started_at),
+                "finished_at": _dt(s.finished_at),
+                "operador": getattr(s, "operador", None),
+                "result": getattr(s, "result", None),
+                "rework_flag": bool(getattr(s, "rework_flag", False)),
+                "workstation": getattr(s, "workstation", None),
+                "observacoes": getattr(s, "observacoes", None),
+            }
+        )
 
-    return jsonify({
-        "ok": True,
-        "serial": order.serial,
-        "modelo": order.modelo,
-        "finished_at": getattr(order, "finished_at", None) and order.finished_at.isoformat(),
-        "stages": data,
-    })
+    return jsonify(
+        {
+            "ok": True,
+            "serial": order.serial,
+            "modelo": order.modelo,
+            "finished_at": getattr(order, "finished_at", None)
+            and order.finished_at.isoformat(),
+            "stages": data,
+        }
+    )
+
+
+# ====================================================================
+# [FIM BLOCO] timeline
+# ====================================================================
+
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_CONFIG: gp_painel_order_api_bp
+# FUNÇÃO: ping
+# FUNÇÃO: ensure_gp_workorder
+# FUNÇÃO: timeline
+# ====================================================================

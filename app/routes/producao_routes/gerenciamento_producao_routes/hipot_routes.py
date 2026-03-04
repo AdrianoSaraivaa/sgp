@@ -11,16 +11,41 @@ from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 from datetime import datetime
 
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] gp_hipot_bp
+# [RESPONSABILIDADE] Criação e configuração do Blueprint do módulo HiPot do GP
+# ====================================================================
 gp_hipot_bp = Blueprint("gp_hipot_bp", __name__, url_prefix="/producao/gp/hipot")
 
 
+# ====================================================================
+# [FIM BLOCO] gp_hipot_bp
+# ====================================================================
+
+
 # --- já existia ---
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] perfil_editor
+# [RESPONSABILIDADE] Renderizar a tela de edição de perfil do HiPot
+# ====================================================================
 @gp_hipot_bp.route("/perfil", methods=["GET"])
 def perfil_editor():
     return render_template("gp_templates/hipot/profile_editor.html")
 
 
+# ====================================================================
+# [FIM BLOCO] perfil_editor
+# ====================================================================
+
+
 # --- já existia ---
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] exec_manual
+# [RESPONSABILIDADE] Renderizar a tela de execução manual do HiPot com serial opcional
+# ====================================================================
 @gp_hipot_bp.route("/exec-manual", methods=["GET"])
 def exec_manual():
     # Opcionalmente aceita 'serial' na query string para pré-preencher o campo
@@ -28,7 +53,17 @@ def exec_manual():
     return render_template("gp_templates/hipot/exec_manual.html", serial=serial_param)
 
 
+# ====================================================================
+# [FIM BLOCO] exec_manual
+# ====================================================================
+
+
 # --- NOVO: salvar execução manual ---
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] save_execucao
+# [RESPONSABILIDADE] Persistir execução manual do HiPot e aplicar resultado na ordem/etapa B5
+# ====================================================================
 @gp_hipot_bp.route("/api/save", methods=["POST"])
 def save_execucao():
     data = request.get_json(force=True, silent=True) or {}
@@ -152,6 +187,16 @@ def save_execucao():
     return jsonify({"ok": True, "id": run.id, "final_ok": run.final_ok})
 
 
+# ====================================================================
+# [FIM BLOCO] save_execucao
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_debug_status
+# [RESPONSABILIDADE] Rota de debug para verificar presença da tabela gp_hipot_run no banco
+# ====================================================================
 @gp_hipot_bp.route("/api/debug/status", methods=["GET"])
 def hipot_debug_status():
     # Importa ``inspect`` localmente para evitar importações desnecessárias
@@ -163,6 +208,16 @@ def hipot_debug_status():
     )
 
 
+# ====================================================================
+# [FIM BLOCO] hipot_debug_status
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_create_table
+# [RESPONSABILIDADE] Rota de debug para criar tabelas faltantes com base nos models carregados
+# ====================================================================
 @gp_hipot_bp.route("/api/debug/create-table", methods=["POST"])
 def hipot_create_table():
     # garantir que o modelo está importado
@@ -172,6 +227,16 @@ def hipot_create_table():
     return jsonify({"ok": True})
 
 
+# ====================================================================
+# [FIM BLOCO] hipot_create_table
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_result_apply
+# [RESPONSABILIDADE] Receber e aplicar resultado do HiPoT via endpoint JSON (coletor/ingestor)
+# ====================================================================
 @gp_hipot_bp.route("/api/result", methods=["POST"])
 def hipot_result_apply():
     """
@@ -201,9 +266,19 @@ def hipot_result_apply():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
+# ====================================================================
+# [FIM BLOCO] hipot_result_apply
+# ====================================================================
+
+
 # ============================================================
 # Rotas para execução manual integrada (B5 no painel)
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_manual
+# [RESPONSABILIDADE] Renderizar formulário manual de HiPot para um serial específico (uso no painel/B5)
+# ====================================================================
 @gp_hipot_bp.route("/<serial>", methods=["GET"])
 def hipot_manual(serial: str):
     """Exibe um formulário simples para registrar o resultado HiPot.
@@ -225,6 +300,16 @@ def hipot_manual(serial: str):
     )
 
 
+# ====================================================================
+# [FIM BLOCO] hipot_manual
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_manual_submit
+# [RESPONSABILIDADE] Processar submissão manual do HiPot via formulário e aplicar resultado no fluxo/etapa B5
+# ====================================================================
 @gp_hipot_bp.route("/<serial>/submit", methods=["POST"])
 def hipot_manual_submit(serial: str):
     """Processa o envio manual do resultado HiPot para uma máquina.
@@ -303,6 +388,10 @@ def hipot_manual_submit(serial: str):
     return jsonify({"ok": True, "final_ok": run.final_ok})
 
 
+# ====================================================================
+# [FIM BLOCO] hipot_manual_submit
+# ====================================================================
+
 # app/routes/producao_routes/gerenciamento_producao_routes/hipot_routes.py
 
 # ... (após as rotas existentes, mas antes do fim do arquivo) ...
@@ -311,6 +400,11 @@ def hipot_manual_submit(serial: str):
 # ============================================================
 # NOVO: API para submissão via modal do Painel Kanban
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] hipot_painel_submit
+# [RESPONSABILIDADE] Receber submissão do modal do painel (B5) e registrar/avançar resultado HiPot
+# ====================================================================
 @gp_hipot_bp.route("/api/painel-submit-result", methods=["POST"])
 def hipot_painel_submit():
     """
@@ -424,3 +518,23 @@ def hipot_painel_submit():
         )
 
     return jsonify({"ok": True, "final_ok": run.final_ok, "status": status})
+
+
+# ====================================================================
+# [FIM BLOCO] hipot_painel_submit
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: gp_hipot_bp
+# FUNÇÃO: perfil_editor
+# FUNÇÃO: exec_manual
+# FUNÇÃO: save_execucao
+# FUNÇÃO: hipot_debug_status
+# FUNÇÃO: hipot_create_table
+# FUNÇÃO: hipot_result_apply
+# FUNÇÃO: hipot_manual
+# FUNÇÃO: hipot_manual_submit
+# FUNÇÃO: hipot_painel_submit
+# ====================================================================

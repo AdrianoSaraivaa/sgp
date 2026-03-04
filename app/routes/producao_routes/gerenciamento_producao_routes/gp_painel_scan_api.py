@@ -25,11 +25,20 @@ from app.models.producao_models.gp_execucao import GPWorkOrder, GPWorkStage
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.INFO)
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] gp_painel_scan_api_bp
+# [RESPONSABILIDADE] Criação e configuração do Blueprint da API de scan do painel GP
+# ====================================================================
 gp_painel_scan_api_bp = Blueprint(
     "gp_painel_scan_api_bp",
     __name__,
     url_prefix="/producao/gp/painel/api",
 )
+
+# ====================================================================
+# [FIM BLOCO] gp_painel_scan_api_bp
+# ====================================================================
 
 # ============================================================
 # BLOCO 2 — Constantes e Regex
@@ -47,6 +56,11 @@ TECH_COLUMNS = ("sep", "final")
 # ============================================================
 # BLOCO 3 — Helpers de resposta JSON
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _json_error
+# [RESPONSABILIDADE] Montar resposta JSON de erro padronizada para a API
+# ====================================================================
 def _json_error(
     status: int,
     *,
@@ -63,15 +77,35 @@ def _json_error(
     return jsonify(payload), status
 
 
+# ====================================================================
+# [FIM BLOCO] _json_error
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _json_ok
+# [RESPONSABILIDADE] Montar resposta JSON de sucesso padronizada para a API
+# ====================================================================
 def _json_ok(**kwargs):
     payload = {"ok": True}
     payload.update(kwargs)
     return jsonify(payload), 200
 
 
+# ====================================================================
+# [FIM BLOCO] _json_ok
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 4 — Parse da leitura/scan
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _parse_scan
+# [RESPONSABILIDADE] Interpretar texto do scan e extrair (bench_id, serial) quando aplicável
+# ====================================================================
 def _parse_scan(text: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Retorna (bench_id, serial)
@@ -91,9 +125,19 @@ def _parse_scan(text: str) -> Tuple[Optional[str], Optional[str]]:
     return None, None
 
 
+# ====================================================================
+# [FIM BLOCO] _parse_scan
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 5 — Roteiro (forçando rota central e pulando inativos)
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _benches_enabled_for_order
+# [RESPONSABILIDADE] Determinar a sequência de bancadas habilitadas para a ordem conforme configuração/serviço
+# ====================================================================
 def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
     """
     Retorna a sequência de bancadas habilitadas para o modelo da ordem.
@@ -206,6 +250,16 @@ def _benches_enabled_for_order(order: GPWorkOrder) -> List[str]:
     return sorted(set(enabled), key=lambda k: int(k[1:]) if k[1:].isdigit() else 999)
 
 
+# ====================================================================
+# [FIM BLOCO] _benches_enabled_for_order
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _next_bench_for_order
+# [RESPONSABILIDADE] Calcular a próxima bancada da ordem considerando apenas bancadas ativas
+# ====================================================================
 def _next_bench_for_order(order: GPWorkOrder, from_bench: Optional[str]) -> str:
     """
     Calcula a PRÓXIMA bancada baseada APENAS nas bancadas ativas.
@@ -231,13 +285,33 @@ def _next_bench_for_order(order: GPWorkOrder, from_bench: Optional[str]) -> str:
     return seq[idx + 1] if idx + 1 < len(seq) else "final"
 
 
+# ====================================================================
+# [FIM BLOCO] _next_bench_for_order
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 6 — Helpers de banco (buscar/abrir/fechar stages)
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _get_order_by_serial
+# [RESPONSABILIDADE] Buscar ordem de produção GP pelo serial
+# ====================================================================
 def _get_order_by_serial(serial: str) -> Optional[GPWorkOrder]:
     return GPWorkOrder.query.filter_by(serial=serial).first()
 
 
+# ====================================================================
+# [FIM BLOCO] _get_order_by_serial
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _find_open_stage
+# [RESPONSABILIDADE] Localizar etapa aberta (não finalizada) de uma ordem em uma bancada específica
+# ====================================================================
 def _find_open_stage(order_id: int, bench_id: str) -> Optional[GPWorkStage]:
     return (
         GPWorkStage.query.filter_by(
@@ -248,6 +322,16 @@ def _find_open_stage(order_id: int, bench_id: str) -> Optional[GPWorkStage]:
     )
 
 
+# ====================================================================
+# [FIM BLOCO] _find_open_stage
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _get_last_b5_stage
+# [RESPONSABILIDADE] Recuperar a última etapa da bancada B5 para fins de debounce
+# ====================================================================
 def _get_last_b5_stage(order_id: int) -> Optional[GPWorkStage]:
     return (
         GPWorkStage.query.filter_by(order_id=order_id, bench_id="b5")
@@ -256,6 +340,16 @@ def _get_last_b5_stage(order_id: int) -> Optional[GPWorkStage]:
     )
 
 
+# ====================================================================
+# [FIM BLOCO] _get_last_b5_stage
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _open_stage
+# [RESPONSABILIDADE] Abrir uma nova etapa de produção para a ordem e definir current_bench
+# ====================================================================
 def _open_stage(order: GPWorkOrder, bench_id: str, operador: str = "") -> GPWorkStage:
     stg = GPWorkStage(order_id=order.id, bench_id=bench_id, operador=operador or "")
     stg.started_at = datetime.utcnow()
@@ -264,6 +358,16 @@ def _open_stage(order: GPWorkOrder, bench_id: str, operador: str = "") -> GPWork
     return stg
 
 
+# ====================================================================
+# [FIM BLOCO] _open_stage
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _finish_stage
+# [RESPONSABILIDADE] Finalizar uma etapa e atualizar current_bench para a próxima conforme roteiro ativo
+# ====================================================================
 def _finish_stage(order: GPWorkOrder, stage: GPWorkStage) -> str:
     stage.finished_at = datetime.utcnow()
     next_b = _next_bench_for_order(order, stage.bench_id)
@@ -271,9 +375,19 @@ def _finish_stage(order: GPWorkOrder, stage: GPWorkStage) -> str:
     return next_b
 
 
+# ====================================================================
+# [FIM BLOCO] _finish_stage
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 7 — B5 (debounce)
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _b5_is_locked
+# [RESPONSABILIDADE] Aplicar debounce para impedir reabertura imediata da bancada B5 após aprovação
+# ====================================================================
 def _b5_is_locked(order: GPWorkOrder) -> Tuple[bool, Optional[dict]]:
     """
     Impede reabertura imediata da B5 (HiPot) se aprovada recentemente.
@@ -318,9 +432,19 @@ def _b5_is_locked(order: GPWorkOrder) -> Tuple[bool, Optional[dict]]:
     return True, resp
 
 
+# ====================================================================
+# [FIM BLOCO] _b5_is_locked
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 8 — Integração (bench_flow_service) com fallback
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _flow_set_current_bench_on_scan
+# [RESPONSABILIDADE] Integrar com bench_flow_service para posicionar bancada corrente após scan, com fallback local
+# ====================================================================
 def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[str, str]:
     try:
         from app.services.producao.bench_flow_service import (
@@ -351,6 +475,16 @@ def _flow_set_current_bench_on_scan(session, serial: str, bench: str) -> Dict[st
         return {"ok": "true", "current_bench": bench, "fallback": True}
 
 
+# ====================================================================
+# [FIM BLOCO] _flow_set_current_bench_on_scan
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _flow_advance_after_finish
+# [RESPONSABILIDADE] Integrar com bench_flow_service para avançar após finalizar etapa, com fallback local
+# ====================================================================
 def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
     try:
         from app.services.producao.bench_flow_service import (
@@ -370,15 +504,35 @@ def _flow_advance_after_finish(session, serial: str) -> Dict[str, str]:
         return {"ok": "true", "current_bench": nxt, "fallback": True}
 
 
+# ====================================================================
+# [FIM BLOCO] _flow_advance_after_finish
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 9 — Rotas
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] scan_b5
+# [RESPONSABILIDADE] Rota de compatibilidade para processar scan da B5 delegando para scan_generic
+# ====================================================================
 @gp_painel_scan_api_bp.route("/scan-b5", methods=["POST"])
 def scan_b5():
     # Shim de compatibilidade: processa como /scan
     return scan_generic()
 
 
+# ====================================================================
+# [FIM BLOCO] scan_b5
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] scan_generic
+# [RESPONSABILIDADE] Processar scans genéricos do painel, alternando entre abrir/fechar etapas e avançar no roteiro
+# ====================================================================
 @gp_painel_scan_api_bp.route("/scan", methods=["POST"])
 def scan_generic():
     """
@@ -610,9 +764,19 @@ def scan_generic():
         )
 
 
+# ====================================================================
+# [FIM BLOCO] scan_generic
+# ====================================================================
+
+
 # ============================================================
 # BLOCO 10 — Rotas de Debug
 # ============================================================
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] debug_stages
+# [RESPONSABILIDADE] Rota de debug para listar etapas da ordem por serial
+# ====================================================================
 @gp_painel_scan_api_bp.route("/debug/stages/<serial>", methods=["GET"])
 def debug_stages(serial):
     order = _get_order_by_serial(serial)
@@ -642,6 +806,16 @@ def debug_stages(serial):
     )
 
 
+# ====================================================================
+# [FIM BLOCO] debug_stages
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] debug_current_bench
+# [RESPONSABILIDADE] Rota de debug para consultar bancada atual e status da ordem por serial
+# ====================================================================
 @gp_painel_scan_api_bp.route("/debug/bench/<serial>", methods=["GET"])
 def debug_current_bench(serial):
     order = _get_order_by_serial(serial)
@@ -650,3 +824,31 @@ def debug_current_bench(serial):
     return _json_ok(
         serial=order.serial, current_bench=order.current_bench, status=order.status
     )
+
+
+# ====================================================================
+# [FIM BLOCO] debug_current_bench
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: gp_painel_scan_api_bp
+# FUNÇÃO: _json_error
+# FUNÇÃO: _json_ok
+# FUNÇÃO: _parse_scan
+# FUNÇÃO: _benches_enabled_for_order
+# FUNÇÃO: _next_bench_for_order
+# FUNÇÃO: _get_order_by_serial
+# FUNÇÃO: _find_open_stage
+# FUNÇÃO: _get_last_b5_stage
+# FUNÇÃO: _open_stage
+# FUNÇÃO: _finish_stage
+# FUNÇÃO: _b5_is_locked
+# FUNÇÃO: _flow_set_current_bench_on_scan
+# FUNÇÃO: _flow_advance_after_finish
+# FUNÇÃO: scan_b5
+# FUNÇÃO: scan_generic
+# FUNÇÃO: debug_stages
+# FUNÇÃO: debug_current_bench
+# ====================================================================

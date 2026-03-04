@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _coalesce_int
+# [RESPONSABILIDADE] Normalizar valores numéricos opcionais para inteiro com fallback seguro
+# ====================================================================
 def _coalesce_int(value: Optional[int], default: int = 0) -> int:
     try:
         return int(value) if value is not None else default
@@ -31,6 +36,16 @@ def _coalesce_int(value: Optional[int], default: int = 0) -> int:
         return default
 
 
+# ====================================================================
+# [FIM BLOCO] _coalesce_int
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _infer_model_code_from_peca
+# [RESPONSABILIDADE] Inferir model_code a partir do código do conjunto, com fallback para o próprio código
+# ====================================================================
 def _infer_model_code_from_peca(peca: "Peca") -> str:
     code = getattr(peca, "codigo_pneumark", None) or ""
     try:
@@ -44,6 +59,16 @@ def _infer_model_code_from_peca(peca: "Peca") -> str:
     return str(code or "").strip()
 
 
+# ====================================================================
+# [FIM BLOCO] _infer_model_code_from_peca
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _get_capacidade
+# [RESPONSABILIDADE] Obter capacidade de produção calculada para um model_code (quando disponível)
+# ====================================================================
 def _get_capacidade(model_code: str) -> Optional[int]:
     try:
         from app.services.producao.capacidade_service import calcular_capacidade_modelo  # type: ignore
@@ -54,6 +79,16 @@ def _get_capacidade(model_code: str) -> Optional[int]:
         return None
 
 
+# ====================================================================
+# [FIM BLOCO] _get_capacidade
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _eval_rop_for_conjunto
+# [RESPONSABILIDADE] Avaliar estado ROP de um conjunto e calcular sugestão de montagem
+# ====================================================================
 def _eval_rop_for_conjunto(peca: "Peca") -> Dict[str, Any]:
     atual = _coalesce_int(getattr(peca, "estoque_atual", 0), 0)
     min_ = _coalesce_int(getattr(peca, "estoque_minimo", 0), 0)
@@ -77,11 +112,21 @@ def _eval_rop_for_conjunto(peca: "Peca") -> Dict[str, Any]:
     }
 
 
+# ====================================================================
+# [FIM BLOCO] _eval_rop_for_conjunto
+# ====================================================================
+
+
 # ---------------------------------------------------------------------------
 # API pública
 # ---------------------------------------------------------------------------
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] list_rop_needs
+# [RESPONSABILIDADE] Listar necessidades de montagem por conjuntos em ROP (sugerido > 0)
+# ====================================================================
 def list_rop_needs(session) -> List[Dict[str, Any]]:
     needs: List[Dict[str, Any]] = []
     if Peca is None:
@@ -113,6 +158,16 @@ def list_rop_needs(session) -> List[Dict[str, Any]]:
     return needs
 
 
+# ====================================================================
+# [FIM BLOCO] list_rop_needs
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] build_needs_banner
+# [RESPONSABILIDADE] Montar string de banner resumindo necessidades de montagem (modelo +quantidade)
+# ====================================================================
 def build_needs_banner(needs: List[Dict[str, Any]]) -> str:
     if not needs:
         return ""
@@ -125,12 +180,32 @@ def build_needs_banner(needs: List[Dict[str, Any]]) -> str:
     return f"Montar: {' • '.join(parts)}" if parts else ""
 
 
+# ====================================================================
+# [FIM BLOCO] build_needs_banner
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] get_rop_needs_and_banner
+# [RESPONSABILIDADE] Retornar necessidades ROP e banner de resumo em uma estrutura única
+# ====================================================================
 def get_rop_needs_and_banner(session) -> Dict[str, Any]:
     needs = list_rop_needs(session)
     banner = build_needs_banner(needs)
     return {"needs": needs, "needs_banner": banner}
 
 
+# ====================================================================
+# [FIM BLOCO] get_rop_needs_and_banner
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] handle_rop_on_change
+# [RESPONSABILIDADE] Atualizar estado de alerta ROP e disparar e-mail de notificação com deduplicação
+# ====================================================================
 def handle_rop_on_change(
     peca_conjunto: "Peca", session, force_email: bool = False
 ) -> None:
@@ -185,11 +260,21 @@ def handle_rop_on_change(
         logger.exception(f"[ROP] Erro ao atualizar estado/dispatch de e-mail: {e}")
 
 
+# ====================================================================
+# [FIM BLOCO] handle_rop_on_change
+# ====================================================================
+
+
 # ---------------------------------------------------------------------------
 # E-mail
 # ---------------------------------------------------------------------------
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _send_rop_email
+# [RESPONSABILIDADE] Enviar e-mail de alerta ROP com detalhes de estoque e sugestão de montagem
+# ====================================================================
 def _send_rop_email(peca_conjunto: "Peca", st: Dict[str, Any]) -> None:
     try:
         from app.services.montagem.notifications.email_service import send_email  # type: ignore
@@ -223,3 +308,22 @@ def _send_rop_email(peca_conjunto: "Peca", st: Dict[str, Any]) -> None:
         logger.info(f"[ROP][EMAIL] Enviado para {to}: {assunto}")
     except Exception as e:
         logger.error(f"[ROP][EMAIL] Falha ao enviar: {e}")
+
+
+# ====================================================================
+# [FIM BLOCO] _send_rop_email
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# FUNÇÃO: _coalesce_int
+# FUNÇÃO: _infer_model_code_from_peca
+# FUNÇÃO: _get_capacidade
+# FUNÇÃO: _eval_rop_for_conjunto
+# FUNÇÃO: list_rop_needs
+# FUNÇÃO: build_needs_banner
+# FUNÇÃO: get_rop_needs_and_banner
+# FUNÇÃO: handle_rop_on_change
+# FUNÇÃO: _send_rop_email
+# ====================================================================

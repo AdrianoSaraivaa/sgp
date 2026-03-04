@@ -13,6 +13,11 @@
 
     <style>
 
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] appbar_layout_styles
+      [RESPONSABILIDADE] Estilos globais do topo, appbar, navegação e responsividade
+      ==================================================================== */
       .topline{height:5px;background:linear-gradient(90deg,#e60000,#FF7A00,#00AEEF,#28a745,#e60000);background-size:300% 150%;animation:slide 7s linear infinite}
       @keyframes slide{0%{background-position:0% 50%}100%{background-position:100% 50%}}
       .appbar{background:#2a1b0f;color:#fff}
@@ -40,7 +45,15 @@
       .app{opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease}
       .app.ready{opacity:1;transform:none}
       @media (max-width:900px){.appbar-inner{grid-template-columns:1fr;gap:10px}nav.nav{justify-content:flex-start;overflow:auto}.widgets{flex-wrap:wrap}}
+      /* ====================================================================
+      [FIM BLOCO] appbar_layout_styles
+      ==================================================================== */
 
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] weather_mini_styles
+      [RESPONSABILIDADE] Estilos da mini-previsão (5 dias) no widget de clima
+      ==================================================================== */
       /* Mini-previsão (discreta) */
       .weather-mini{display:flex;gap:10px;margin-left:8px;flex-wrap:nowrap}
       .wxday{display:flex;flex-direction:column;align-items:center;font-size:.72rem;line-height:1.1;min-width:34px}
@@ -50,6 +63,9 @@
       .wxday .min{opacity:.7}
       
       @media (max-width:900px){.weather-mini{gap:8px}}
+      /* ====================================================================
+      [FIM BLOCO] weather_mini_styles
+      ==================================================================== */
     
     </style>
 
@@ -73,6 +89,11 @@
             </div>
           </div>
 
+          <!-- ====================================================================
+          [BLOCO] BLOCO_UTIL
+          [NOME] global_navigation
+          [RESPONSABILIDADE] Renderizar navegação principal do sistema
+          ==================================================================== -->
           <!-- Navegação -->
           <nav class="nav">
             
@@ -81,7 +102,15 @@
               data-no-fade translate="no">Home</a>
           
             </nav>
+          <!-- ====================================================================
+          [FIM BLOCO] global_navigation
+          ==================================================================== -->
 
+          <!-- ====================================================================
+          [BLOCO] BLOCO_UTIL
+          [NOME] global_widgets
+          [RESPONSABILIDADE] Exibir widgets globais (relógio, clima, frase do dia e usuário/logout)
+          ==================================================================== -->
           <!-- Widgets globais -->
           <div class="widgets">
             <div class="widget" title="Data e hora local">
@@ -130,9 +159,17 @@
 
             </div> -->
           </div>
+          <!-- ====================================================================
+          [FIM BLOCO] global_widgets
+          ==================================================================== -->
         </div>
       </header>
 
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] flash_messages
+      [RESPONSABILIDADE] Renderizar mensagens flash do backend (com categorias)
+      ==================================================================== -->
       <!-- FLASHES -->
       <div class="flash-container container h-0">
         {% with msgs = get_flashed_messages(with_categories=true) %}
@@ -143,22 +180,54 @@
           {% endif %}
         {% endwith %}
       </div>
+      <!-- ====================================================================
+      [FIM BLOCO] flash_messages
+      ==================================================================== -->
 
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] main_content
+      [RESPONSABILIDADE] Área principal para toolbar e conteúdo dos módulos (blocks Jinja)
+      ==================================================================== -->
       <main class="container" role="main">
         {% block toolbar %}{% endblock %}
         {% block content %}{% endblock %}
       </main>
+      <!-- ====================================================================
+      [FIM BLOCO] main_content
+      ==================================================================== -->
 
+      <!-- ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] footer_block
+      [RESPONSABILIDADE] Renderizar rodapé padrão (block Jinja para sobrescrita)
+      ==================================================================== -->
       {% block footer %}
         <div class="footer">© {{ now().year if now is defined else '' }} Pneumark — SGP</div>
       {% endblock %}
+      <!-- ====================================================================
+      [FIM BLOCO] footer_block
+      ==================================================================== -->
     </div>
 
     <script>
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] app_entry_animation
+      [RESPONSABILIDADE] Aplicar animação de entrada suave ao carregar a aplicação
+      ==================================================================== */
       // Entrada suave
       const app = document.getElementById('app');
       requestAnimationFrame(()=> app.classList.add('ready'));
+      /* ====================================================================
+      [FIM BLOCO] app_entry_animation
+      ==================================================================== */
 
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] route_fade_navigation
+      [RESPONSABILIDADE] Interceptar cliques em links e aplicar efeito de fade-out na navegação
+      ==================================================================== */
       // Saída com fade
       const fadeout = document.getElementById('fadeout');
       
@@ -175,7 +244,15 @@
         if(!href || href.startsWith('#') || a.hasAttribute('data-no-fade')) return;
         e.preventDefault(); routeTo(href);
       });
+      /* ====================================================================
+      [FIM BLOCO] route_fade_navigation
+      ==================================================================== */
 
+      /* ====================================================================
+      [BLOCO] BLOCO_UTIL
+      [NOME] clock_widget
+      [RESPONSABILIDADE] Atualizar relógio no header em intervalos regulares
+      ==================================================================== */
       // Relógio (com guard)
       const clockEl = document.getElementById('clock');
       
@@ -189,7 +266,15 @@
       }
       
       tickClock(); setInterval(tickClock, 15000);
+      /* ====================================================================
+      [FIM BLOCO] clock_widget
+      ==================================================================== */
 
+      /* ====================================================================
+      [BLOCO] BLOCO_API
+      [NOME] weather_widget
+      [RESPONSABILIDADE] Buscar clima (Open-Meteo) e renderizar mini-previsão de 5 dias
+      ==================================================================== */
       // ===== CLIMA: Embu-Guaçu/SP + mini previsão 5 dias =====
       const weatherEl = document.getElementById('weather');
       const wlabel    = document.getElementById('weather-label');
@@ -260,7 +345,15 @@
 
       // Ponto fixo: Embu-Guaçu/SP
       fetchWeatherNowAndDaily(-23.83, -46.81, "Embu-Guaçu");
+      /* ====================================================================
+      [FIM BLOCO] weather_widget
+      ==================================================================== */
 
+      /* ====================================================================
+      [BLOCO] BLOCO_API
+      [NOME] motd_widget
+      [RESPONSABILIDADE] Buscar frase motivacional via endpoint interno e renderizar no header
+      ==================================================================== */
       // ===== FRASE MOTIVACIONAL =====
       const motdEl = document.getElementById('motd-text');
       fetch('{{ url_for("utilidades_bp.frase_motivacional") }}', {cache:'no-store'})
@@ -269,6 +362,9 @@
           if (d && d.texto) motdEl.textContent = d.texto + (d.autor ? ` — ${d.autor}` : '');
         })
         .catch(()=> { motdEl.textContent = "Qualidade é fazer o simples, bem feito."; });
+      /* ====================================================================
+      [FIM BLOCO] motd_widget
+      ==================================================================== */
     
     </script>
 
@@ -277,3 +373,20 @@
   </body>
 
 </html>
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+BLOCO_UTIL: appbar_layout_styles
+BLOCO_UTIL: weather_mini_styles
+BLOCO_UTIL: global_navigation
+BLOCO_UTIL: global_widgets
+BLOCO_UTIL: flash_messages
+BLOCO_UTIL: main_content
+BLOCO_UTIL: footer_block
+BLOCO_UTIL: app_entry_animation
+BLOCO_UTIL: route_fade_navigation
+BLOCO_UTIL: clock_widget
+BLOCO_API: weather_widget
+BLOCO_API: motd_widget
+==================================================================== -->

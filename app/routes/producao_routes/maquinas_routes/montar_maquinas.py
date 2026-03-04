@@ -32,6 +32,11 @@ from app.routes.producao_routes.painel_routes import rop_service
 # ============================================================
 # Logger
 # ============================================================
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] logger
+# [RESPONSABILIDADE] Configurar logger do módulo para registrar eventos e erros das rotas
+# ====================================================================
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -39,11 +44,22 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+# ====================================================================
+# [FIM BLOCO] logger
+# ====================================================================
 
 # ============================================================
 # Blueprint
 # ============================================================
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] maquinas_bp
+# [RESPONSABILIDADE] Definir blueprint e prefixo das rotas de montagem de máquinas
+# ====================================================================
 maquinas_bp = Blueprint("maquinas_bp", __name__, url_prefix="/producao/montagem")
+# ====================================================================
+# [FIM BLOCO] maquinas_bp
+# ====================================================================
 
 MODELOS = ["PM2100", "PM2200", "PM700", "PM25"]
 
@@ -55,6 +71,11 @@ MODEL_TO_CONJUNTO = {
 }
 
 
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _resolver_codigo_conjunto
+# [RESPONSABILIDADE] Resolver o código do conjunto/BOM a partir do modelo e registrar logs de diagnóstico
+# ====================================================================
 def _resolver_codigo_conjunto(modelo: str) -> str | None:
     codigo = MODEL_TO_CONJUNTO.get(modelo)
     if not codigo:
@@ -66,6 +87,16 @@ def _resolver_codigo_conjunto(modelo: str) -> str | None:
     return codigo
 
 
+# ====================================================================
+# [FIM BLOCO] _resolver_codigo_conjunto
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _assert_bom_existe
+# [RESPONSABILIDADE] Validar existência de BOM/estrutura para o conjunto informado
+# ====================================================================
 def _assert_bom_existe(codigo_conjunto: str) -> bool:
     qtd = (
         db.session.query(EstruturaMaquina)
@@ -79,16 +110,36 @@ def _assert_bom_existe(codigo_conjunto: str) -> bool:
     return qtd > 0
 
 
+# ====================================================================
+# [FIM BLOCO] _assert_bom_existe
+# ====================================================================
+
+
 # ============================================================
 # Views / APIs
 # ============================================================
 @maquinas_bp.route("/", methods=["GET"])
 @login_required
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] pagina_montagem
+# [RESPONSABILIDADE] Renderizar página principal de montagem de máquina
+# ====================================================================
 def pagina_montagem():
     return render_template("producao_templates/montagem_templates/montar_maquina.html")
 
 
+# ====================================================================
+# [FIM BLOCO] pagina_montagem
+# ====================================================================
+
+
 @maquinas_bp.route("/api/capacidade", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] api_capacidade
+# [RESPONSABILIDADE] Retornar capacidades calculadas por modelo e registrar resumo em log
+# ====================================================================
 def api_capacidade():
     try:
         capacidades = calcular_todas_capacidades(MODELOS)
@@ -102,7 +153,17 @@ def api_capacidade():
         return jsonify({"ok": False, "erro": str(e)}), 500
 
 
+# ====================================================================
+# [FIM BLOCO] api_capacidade
+# ====================================================================
+
+
 @maquinas_bp.route("/api/otimizacao", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] api_otimizacao
+# [RESPONSABILIDADE] Calcular e retornar plano otimizado a partir das capacidades atuais
+# ====================================================================
 def api_otimizacao():
     try:
         capacidades = calcular_todas_capacidades(MODELOS)["modelos"]
@@ -113,7 +174,17 @@ def api_otimizacao():
         return jsonify({"ok": False, "erro": str(e)}), 500
 
 
+# ====================================================================
+# [FIM BLOCO] api_otimizacao
+# ====================================================================
+
+
 @maquinas_bp.route("/api/validar", methods=["POST"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] api_validar
+# [RESPONSABILIDADE] Validar payload de montagem (modelo/quantidade) e checar mapeamento/BOM
+# ====================================================================
 def api_validar():
     payload = request.get_json(silent=True) or {}
     erros = []
@@ -149,7 +220,17 @@ def api_validar():
     return jsonify({"ok": ok, "erros": erros})
 
 
+# ====================================================================
+# [FIM BLOCO] api_validar
+# ====================================================================
+
+
 @maquinas_bp.route("/api/montadas", methods=["GET"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] api_montadas
+# [RESPONSABILIDADE] Listar montagens recentes e formatar data/hora para horário local
+# ====================================================================
 def api_montadas():
     itens = Montagem.query.order_by(Montagem.id.desc()).limit(300).all()
 
@@ -176,7 +257,17 @@ def api_montadas():
     )
 
 
+# ====================================================================
+# [FIM BLOCO] api_montadas
+# ====================================================================
+
+
 @maquinas_bp.route("/api/montar", methods=["POST"])
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] api_montar
+# [RESPONSABILIDADE] Montar lote: gerar seriais, reservar componentes, criar ordens no painel e checar ROP/OMIE
+# ====================================================================
 def api_montar():
     data = request.get_json() or {}
     modelo = (data.get("modelo") or "").strip()
@@ -316,34 +407,61 @@ def api_montar():
 
         # 5) (novo passo) Atualiza alertas ROP de produção (conjuntos)
         try:
-            conjunto = db.session.query(Peca).filter_by(codigo_pneumark=codigo_conjunto).one_or_none()
+            conjunto = (
+                db.session.query(Peca)
+                .filter_by(codigo_pneumark=codigo_conjunto)
+                .one_or_none()
+            )
             if conjunto:
                 rop_service.handle_rop_on_change(conjunto, db.session)
-                logger.info(f"[ROP] Estoque do conjunto {codigo_conjunto} atualizado; verificação de ROP realizada.")
+                logger.info(
+                    f"[ROP] Estoque do conjunto {codigo_conjunto} atualizado; verificação de ROP realizada."
+                )
             else:
-                logger.error(f"[ROP] Peça conjunto {codigo_conjunto} não encontrada para verificar ROP.")
+                logger.error(
+                    f"[ROP] Peça conjunto {codigo_conjunto} não encontrada para verificar ROP."
+                )
         except Exception as e:
-            logger.exception(f"[ROP] Erro ao atualizar alerta de Ponto de Pedido para {codigo_conjunto}: {e}")
+            logger.exception(
+                f"[ROP] Erro ao atualizar alerta de Ponto de Pedido para {codigo_conjunto}: {e}"
+            )
 
         # 6) (novo passo) Verifica ROP de peças consumidas e integra com OMIE
         try:
             # Obter lista de componentes da BOM do conjunto e seus estoques atualizados
-            componentes = db.session.query(EstruturaMaquina).filter_by(codigo_maquina=codigo_conjunto).all()
+            componentes = (
+                db.session.query(EstruturaMaquina)
+                .filter_by(codigo_maquina=codigo_conjunto)
+                .all()
+            )
             for comp in componentes:
-                peca_consumida = db.session.query(Peca).filter_by(codigo_pneumark=comp.codigo_peca).one_or_none()
+                peca_consumida = (
+                    db.session.query(Peca)
+                    .filter_by(codigo_pneumark=comp.codigo_peca)
+                    .one_or_none()
+                )
                 if peca_consumida and peca_consumida.ponto_pedido is not None:
                     estoque = peca_consumida.estoque_atual or 0
                     ponto = peca_consumida.ponto_pedido or 0
                     if estoque <= ponto:
                         # Gera requisição de compra no OMIE
                         from app.utils import omie_utils
+
                         try:
-                            quantidade_sugerida = (peca_consumida.estoque_maximo or estoque) - estoque
+                            quantidade_sugerida = (
+                                peca_consumida.estoque_maximo or estoque
+                            ) - estoque
                             if quantidade_sugerida > 0:
-                                omie_utils.solicitar_requisicao_compra(peca_consumida, quantidade_sugerida)
-                                logger.info(f"[OMIE] Requisição de compra gerada para peça {peca_consumida.codigo_pneumark} (estoque {estoque} <= PP {ponto}).")
+                                omie_utils.solicitar_requisicao_compra(
+                                    peca_consumida, quantidade_sugerida
+                                )
+                                logger.info(
+                                    f"[OMIE] Requisição de compra gerada para peça {peca_consumida.codigo_pneumark} (estoque {estoque} <= PP {ponto})."
+                                )
                         except Exception as e:
-                            logger.error(f"[OMIE] Falha ao solicitar compra para peça {peca_consumida.codigo_pneumark}: {e}")
+                            logger.error(
+                                f"[OMIE] Falha ao solicitar compra para peça {peca_consumida.codigo_pneumark}: {e}"
+                            )
             # (nenhum commit aqui, omie_utils deve tratar persistência em sua implementação)
         except Exception as e:
             logger.exception(f"Erro ao verificar ROP de peças após montagem: {e}")
@@ -357,3 +475,23 @@ def api_montar():
     if warn:
         resp["warning"] = warn
     return jsonify(resp)
+
+
+# ====================================================================
+# [FIM BLOCO] api_montar
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: logger
+# BLOCO_UTIL: maquinas_bp
+# FUNÇÃO: _resolver_codigo_conjunto
+# FUNÇÃO: _assert_bom_existe
+# FUNÇÃO: pagina_montagem
+# FUNÇÃO: api_capacidade
+# FUNÇÃO: api_otimizacao
+# FUNÇÃO: api_validar
+# FUNÇÃO: api_montadas
+# FUNÇÃO: api_montar
+# ====================================================================

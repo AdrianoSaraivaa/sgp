@@ -1,35 +1,70 @@
-
 # app/services/montagem/capacidade_service.py
 from __future__ import annotations
 from typing import Dict, List
 import logging
+
 # Import the SQLAlchemy models instead of dataclasses.  The
 # ``app.models_sqla`` package defines ``Peca`` and ``EstruturaMaquina``
 # with a ``query`` attribute, which is required by this service.
 from app.models_sqla import Peca, EstruturaMaquina
 
+# ====================================================================
+# [BLOCO] CONFIG_LOGGER
+# [NOME] logger
+# [RESPONSABILIDADE] Configurar logger do módulo com handler e formatação padrão
+# ====================================================================
 # Logger simples
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s"))
+    _h.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s")
+    )
     logger.addHandler(_h)
     logger.setLevel(logging.INFO)
+# ====================================================================
+# [FIM BLOCO] logger
+# ====================================================================
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] _MODELO_TO_CONJUNTO_NORM
+# [RESPONSABILIDADE] Mapear modelos normalizados para códigos de conjunto Pneumark
+# ====================================================================
 # --------- MAPEAMENTO MODELO → CÓDIGO DO CONJUNTO (chaves normalizadas) ---------
 _MODELO_TO_CONJUNTO_NORM: Dict[str, str] = {
     "PM2100": "7-000",
     "PM2200": "2-000",
-    "PM700":  "28-000",
-    "PM25":   "PM0025",
+    "PM700": "28-000",
+    "PM25": "PM0025",
     "PM0025": "PM0025",
 }
+# ====================================================================
+# [FIM BLOCO] _MODELO_TO_CONJUNTO_NORM
+# ====================================================================
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _norm_model_key
+# [RESPONSABILIDADE] Normalizar chave de modelo removendo separadores e padronizando maiúsculas
+# ====================================================================
 def _norm_model_key(s: str) -> str:
     """Normaliza nome do modelo removendo espaços/hífens e deixando MAIÚSCULO."""
     s = (s or "").strip().upper()
     return "".join(ch for ch in s if ch.isalnum())
 
+
+# ====================================================================
+# [FIM BLOCO] _norm_model_key
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _to_codigo_maquina
+# [RESPONSABILIDADE] Converter modelo/código informado para código de conjunto (codigo_maquina)
+# ====================================================================
 def _to_codigo_maquina(modelo_ou_codigo: str) -> str:
     """
     Aceita 'PM2100', 'PM-2100', 'pm 2100' ou o código '7-000'.
@@ -43,16 +78,37 @@ def _to_codigo_maquina(modelo_ou_codigo: str) -> str:
     key = _norm_model_key(s)
     cod = _MODELO_TO_CONJUNTO_NORM.get(key, "")
     if not cod:
-        logger.warning(f"[capacidade] Modelo sem mapeamento: '{modelo_ou_codigo}' (key='{key}')")
+        logger.warning(
+            f"[capacidade] Modelo sem mapeamento: '{modelo_ou_codigo}' (key='{key}')"
+        )
     return cod
 
+
+# ====================================================================
+# [FIM BLOCO] _to_codigo_maquina
+# ====================================================================
+
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] __all__
+# [RESPONSABILIDADE] Definir API pública do módulo (exports)
+# ====================================================================
 # ---------- FUNÇÕES PÚBLICAS ----------
 __all__ = [
     "calcular_capacidade_modelo",
     "calcular_todas_capacidades",
     "calcular_otimizacao",
 ]
+# ====================================================================
+# [FIM BLOCO] __all__
+# ====================================================================
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] calcular_capacidade_modelo
+# [RESPONSABILIDADE] Calcular capacidade máxima e gargalos de produção para um modelo/código via estrutura e estoque
+# ====================================================================
 def calcular_capacidade_modelo(modelo_ou_codigo: str) -> Dict:
     """
     Calcula a capacidade máxima para um modelo (ex.: 'PM2100') OU para um
@@ -72,50 +128,73 @@ def calcular_capacidade_modelo(modelo_ou_codigo: str) -> Dict:
     if not codigo_maquina:
         return {"capacidade": 0, "gargalos": []}
 
-    estrutura: List[EstruturaMaquina] = (
-        EstruturaMaquina.query.filter_by(codigo_maquina=codigo_maquina).all()
-    )
+    estrutura: List[EstruturaMaquina] = EstruturaMaquina.query.filter_by(
+        codigo_maquina=codigo_maquina
+    ).all()
     if not estrutura:
-        logger.info(f"[capacidade] Sem estrutura para codigo_maquina='{codigo_maquina}'")
+        logger.info(
+            f"[capacidade] Sem estrutura para codigo_maquina='{codigo_maquina}'"
+        )
         return {"capacidade": 0, "gargalos": []}
 
     gargalos: List[Dict] = []
     capacidade_total = None
 
     for item in estrutura:
-        peca: Peca | None = Peca.query.filter_by(codigo_pneumark=item.codigo_peca).first()
+        peca: Peca | None = Peca.query.filter_by(
+            codigo_pneumark=item.codigo_peca
+        ).first()
 
         if not peca:
-            gargalos.append({
-                "codigo": item.codigo_peca,
-                "descricao": "NÃO ENCONTRADA",
-                "cap_local": 0,
-                "estoque": 0,
-                "consumo": int(item.quantidade or 0),
-            })
+            gargalos.append(
+                {
+                    "codigo": item.codigo_peca,
+                    "descricao": "NÃO ENCONTRADA",
+                    "cap_local": 0,
+                    "estoque": 0,
+                    "consumo": int(item.quantidade or 0),
+                }
+            )
             capacidade_total = 0
-            logger.warning(f"[capacidade] Peça não encontrada: {item.codigo_peca} (consumo={item.quantidade})")
+            logger.warning(
+                f"[capacidade] Peça não encontrada: {item.codigo_peca} (consumo={item.quantidade})"
+            )
             continue
 
         consumo = int(item.quantidade or 0)
         estoque = int(peca.estoque_atual or 0)
         cap_local = (estoque // consumo) if consumo > 0 else 0
 
-        gargalos.append({
-            "codigo": peca.codigo_pneumark,
-            "descricao": peca.descricao,
-            "cap_local": cap_local,
-            "estoque": estoque,
-            "consumo": consumo,
-        })
+        gargalos.append(
+            {
+                "codigo": peca.codigo_pneumark,
+                "descricao": peca.descricao,
+                "cap_local": cap_local,
+                "estoque": estoque,
+                "consumo": consumo,
+            }
+        )
 
-        capacidade_total = cap_local if capacidade_total is None else min(capacidade_total, cap_local)
+        capacidade_total = (
+            cap_local if capacidade_total is None else min(capacidade_total, cap_local)
+        )
 
     # ordenar gargalos do mais limitante para o menos
     gargalos.sort(key=lambda g: g["cap_local"])
 
     return {"capacidade": capacidade_total or 0, "gargalos": gargalos}
 
+
+# ====================================================================
+# [FIM BLOCO] calcular_capacidade_modelo
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] calcular_todas_capacidades
+# [RESPONSABILIDADE] Calcular capacidade/gargalos para uma lista de modelos/códigos
+# ====================================================================
 def calcular_todas_capacidades(modelos: List[str]) -> Dict:
     """
     Calcula capacidade/gargalos para cada item da lista.
@@ -124,6 +203,17 @@ def calcular_todas_capacidades(modelos: List[str]) -> Dict:
     modelos_dict = {m: calcular_capacidade_modelo(m) for m in modelos}
     return {"modelos": modelos_dict}
 
+
+# ====================================================================
+# [FIM BLOCO] calcular_todas_capacidades
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] calcular_otimizacao
+# [RESPONSABILIDADE] Sugerir plano simples de alocação balanceada com base nas capacidades calculadas
+# ====================================================================
 def calcular_otimizacao(capacidades: Dict) -> Dict:
     """
     Sugere um plano simples: dividir de forma balanceada entre os modelos.
@@ -134,3 +224,21 @@ def calcular_otimizacao(capacidades: Dict) -> Dict:
     for modelo, cap in capacidades.items():
         ideal[modelo] = int((cap.get("capacidade") or 0) // n)
     return {"ideal": ideal, "criterio": "balanceamento_proporcional"}
+
+
+# ====================================================================
+# [FIM BLOCO] calcular_otimizacao
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CONFIG_LOGGER: logger
+# BLOCO_UTIL: _MODELO_TO_CONJUNTO_NORM
+# FUNÇÃO: _norm_model_key
+# FUNÇÃO: _to_codigo_maquina
+# BLOCO_UTIL: __all__
+# FUNÇÃO: calcular_capacidade_modelo
+# FUNÇÃO: calcular_todas_capacidades
+# FUNÇÃO: calcular_otimizacao
+# ====================================================================

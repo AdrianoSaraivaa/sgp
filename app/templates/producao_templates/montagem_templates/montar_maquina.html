@@ -4,6 +4,11 @@
 {% block title %}Painel de Montagem — Pneumark SGP{% endblock %}
 {% block module_name %}Produção — Montagem{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] head_extra
+[RESPONSABILIDADE] Definir estilos específicos da tela de montagem e componentes (cards, tabela, modais, botões)
+==================================================================== -->
 {% block head_extra %}
   <style>
     /* Layout específico desta tela (sem conflitar com app.css) */
@@ -104,7 +109,15 @@
     .hint{ color:var(--muted); font-size:12px }
   </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] toolbar
+[RESPONSABILIDADE] Renderizar barra superior, breadcrumb e campo de busca desabilitado para contexto da tela
+==================================================================== -->
 {% block toolbar %}
   <div class="toolbar">
     <div class="breadcrumb" aria-label="Você está em">
@@ -120,13 +133,19 @@
     </div>
   </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] toolbar
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] content
+[RESPONSABILIDADE] Estruturar a página: cards por modelo, plano otimizado, tabela de montadas e modais de impressão
+==================================================================== -->
 {% block content %}
-  <!-- CARDS POR MODELO -->
-  <section class="grid-montagem" id="cards-modelos"></section>
+    <section class="grid-montagem" id="cards-modelos"></section>
 
-  <!-- PLANO OTIMIZADO -->
-  <section class="card-montagem card-wide" style="margin-top:14px">
+    <section class="card-montagem card-wide" style="margin-top:14px">
     <h2 style="margin:0 0 8px 0">Plano Otimizado (Quantidade Ideal por Modelo)</h2>
     <div class="otimizacao" id="otimizacao-boxes"></div>
     <div class="actions">
@@ -135,8 +154,7 @@
     <div class="crit" id="criterio-info"></div>
   </section>
 
-  <!-- LISTA DE MÁQUINAS MONTADAS -->
-  <section class="montadas" id="montadas">
+    <section class="montadas" id="montadas">
     <div class="montadas-header">
       <h2>Máquinas montadas</h2>
       <div style="display:flex; gap:8px; align-items:center">
@@ -164,8 +182,7 @@
     </div>
   </section>
 
-  <!-- Modal: Preview/Impressão -->
-  <div class="modal-backdrop" id="modal-preview">
+    <div class="modal-backdrop" id="modal-preview">
     <div class="modal">
       <header>
         <h3 id="modal-title">Imprimir etiqueta</h3>
@@ -177,15 +194,14 @@
         </div>
         <iframe class="preview-frame" id="preview-frame" src=""></iframe>
       </div>
-      <div class="footer">
+       <div class="footer">
         <button class="btn" data-close="#modal-preview">Cancelar</button>
+        <button class="btn-secondary" id="btn-imprimir-preview">Imprimir</button>
         <button class="btn primary" id="btn-confirmar-print">Confirmar impressão</button>
       </div>
     </div>
   </div>
-
-  <!-- Modal: Reimpressão -->
-  <div class="modal-backdrop" id="modal-reprint">
+    <div class="modal-backdrop" id="modal-reprint">
     <div class="modal">
       <header>
         <h3>Reimprimir etiqueta</h3>
@@ -203,6 +219,7 @@
       </div>
       <div class="footer">
         <button class="btn" data-close="#modal-reprint">Cancelar</button>
+        <button class="btn-secondary" id="btn-imprimir-reprint">Imprimir</button>
         <button class="btn danger" id="btn-confirmar-reprint">Confirmar reimpressão</button>
       </div>
     </div>
@@ -210,9 +227,22 @@
 
   <div class="toast" id="toast"></div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] scripts_extra
+[RESPONSABILIDADE] Implementar lógica de tela: carregamento de dados, renderização, validação, montagem e fluxo de impressão/reimpressão
+==================================================================== -->
 {% block scripts_extra %}
 <script>
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Utils
+  // [RESPONSABILIDADE] Helpers de fetch, seletores, clamp e toasts/modais
+  // ====================================================================
   // -------------------- Utils --------------------
   async function jfetch(url, opts={}) {
     const res = await fetch(url, {
@@ -234,7 +264,15 @@
   }
   function openModal(id){ const el = document.getElementById(id); if (el) el.style.display='flex'; }
   function closeModal(id){ const el = document.getElementById(id); if (el) el.style.display='none'; }
+  // ====================================================================
+  // [FIM BLOCO] Utils
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_API
+  // [NOME] Endpoints (Flask)
+  // [RESPONSABILIDADE] Centralizar URLs de endpoints usados pela tela (capacidade, otimização, montagem, log e etiqueta)
+  // ====================================================================
   // -------------------- Endpoints (Flask) --------------------
   const endpoints = {
     capacidade: "{{ url_for('maquinas_bp.api_capacidade') }}",
@@ -247,8 +285,16 @@
     etiquetaConfirm: "{{ url_for('imprimir_etiqueta_bp.confirmar_primeira_impressao', assembly_id='__ID__') }}", // POST
     etiquetaReprint: "{{ url_for('imprimir_etiqueta_bp.reimprimir_label', assembly_id='__ID__') }}"   // GET/POST
   };
+  // ====================================================================
+  // [FIM BLOCO] Endpoints (Flask)
+  // ====================================================================
   
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] State & Elements
+  // [RESPONSABILIDADE] Definir estado da aplicação no front e cache de elementos do DOM
+  // ====================================================================
   // -------------------- State & Elements --------------------
   const state = {
     modelos: ["PM2100","PM2200","PM700"],
@@ -264,7 +310,15 @@
   const elOtz      = document.getElementById("otimizacao-boxes");
   const elCrit     = document.getElementById("criterio-info");
   const elLogBody  = document.getElementById("montadas-body");
+  // ====================================================================
+  // [FIM BLOCO] State & Elements
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] renderCapacidades
+  // [RESPONSABILIDADE] Atualizar rapidamente os números de capacidade exibidos nas cards
+  // ====================================================================
   // -------------------- Render: Capacidade quick update --------------------
   function renderCapacidades(capFlat){
     if (!capFlat) return;
@@ -273,7 +327,15 @@
       if (el && typeof capFlat[m] !== "undefined") el.textContent = capFlat[m];
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] renderCapacidades
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] renderCards
+  // [RESPONSABILIDADE] Renderizar cards por modelo e conectar eventos (toggle gargalos, steppers, input e montar)
+  // ====================================================================
   // -------------------- Render: Cards --------------------
   function renderCards(){
     elCards.innerHTML = "";
@@ -384,7 +446,16 @@
       btn.addEventListener("click", ()=> montarModelo(btn.getAttribute("data-m")));
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] renderCards
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] validateInline
+  // [RESPONSABILIDADE] Validar quantidade digitada contra a capacidade e exibir/ocultar mensagem de erro
+  // ====================================================================
+  // -------------------- Render: Validação inline --------------------
   function validateInline(modelo){
     const cap = (state.capacidade[modelo]?.capacidade) ?? 0;
     const v   = state.montar[modelo] ?? 0;
@@ -397,7 +468,15 @@
       elErr.textContent = "";
     }
   }
+  // ====================================================================
+  // [FIM BLOCO] validateInline
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] renderOtimizacao
+  // [RESPONSABILIDADE] Renderizar boxes do plano otimizado e critério de sugestão
+  // ====================================================================
   // -------------------- Render: Otimização --------------------
   function renderOtimizacao(){
     elOtz.innerHTML = "";
@@ -417,7 +496,15 @@
     });
     elCrit.textContent = state.otimizacao?.criterio ? `Critério: ${state.otimizacao.criterio}` : "";
   }
+  // ====================================================================
+  // [FIM BLOCO] renderOtimizacao
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] renderMontadas
+  // [RESPONSABILIDADE] Renderizar tabela de montadas e estado de impressão com botões de imprimir/reimprimir
+  // ====================================================================
   // -------------------- Render: Montadas (tabela) --------------------
   function renderMontadas(){
     elLogBody.innerHTML = "";
@@ -454,7 +541,15 @@
       elLogBody.appendChild(tr);
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] renderMontadas
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] buildPreviewURL
+  // [RESPONSABILIDADE] Construir URL de preview da etiqueta com querystring para compatibilidade (pdf/png e dados básicos)
+  // ====================================================================
   // -------------------- Etiqueta: helpers --------------------
   function buildPreviewURL(item, format='pdf'){
     // Usa rota com assembly_id + querystring (modelo, serial, dt) para o stub funcionar desde já
@@ -467,7 +562,15 @@
     if (format) params.set('format', format); // 'pdf' (se reportlab) ou 'png'
     return `${url}?${params.toString()}`;
   }
+  // ====================================================================
+  // [FIM BLOCO] buildPreviewURL
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] confirmarImpressao
+  // [RESPONSABILIDADE] Registrar confirmação de primeira impressão via endpoint Flask
+  // ====================================================================
   async function confirmarImpressao(item){
     const id = encodeURIComponent(item.id || item.assembly_id || item.serie);
     const url = endpoints.etiquetaConfirm.replace('__ID__', id);
@@ -476,7 +579,15 @@
     }).then(r=>r.json());
     return resp;
   }
+  // ====================================================================
+  // [FIM BLOCO] confirmarImpressao
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] efetivarReimpressao
+  // [RESPONSABILIDADE] Registrar reimpressão via endpoint Flask com motivo e usuário
+  // ====================================================================
   async function efetivarReimpressao(item, motivo){
     const id = encodeURIComponent(item.id || item.assembly_id || item.serie);
     const url = endpoints.etiquetaReprint.replace('__ID__', id);
@@ -485,7 +596,15 @@
     }).then(r=>r.json());
     return resp;
   }
+  // ====================================================================
+  // [FIM BLOCO] efetivarReimpressao
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] montarModelo
+  // [RESPONSABILIDADE] Disparar montagem por modelo, tratar retorno, atualizar UI e recarregar dados
+  // ====================================================================
   // -------------------- Actions --------------------
   async function montarModelo(modelo, quantidade=null){
     const qtd = quantidade ?? (state.montar[modelo] ?? 0);
@@ -520,7 +639,15 @@
       toast("Erro ao montar.");
     }
   }
+  // ====================================================================
+  // [FIM BLOCO] montarModelo
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] validarGeral
+  // [RESPONSABILIDADE] Validar quantidades de montagem no backend e reportar inconsistências
+  // ====================================================================
   async function validarGeral(){
     const r = await fetch(endpoints.validar,{
       method:"POST",
@@ -533,7 +660,15 @@
       throw new Error("validação falhou");
     }
   }
+  // ====================================================================
+  // [FIM BLOCO] validarGeral
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] loadCapacidadeEOtimizacao
+  // [RESPONSABILIDADE] Carregar capacidade e plano otimizado, mantendo entradas do usuário quando aplicável
+  // ====================================================================
   // -------------------- Loaders --------------------
   async function loadCapacidadeEOtimizacao(){
     const [cap, otz] = await Promise.all([
@@ -549,7 +684,15 @@
       }
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] loadCapacidadeEOtimizacao
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] loadMontadas
+  // [RESPONSABILIDADE] Carregar registros de montadas e atualizar tabela/handlers
+  // ====================================================================
   async function loadMontadas(){
     try{
       const dados = await fetch(endpoints.montadas).then(r=>r.json());
@@ -560,14 +703,30 @@
       // silencia se endpoint ainda não existir
     }
   }
+  // ====================================================================
+  // [FIM BLOCO] loadMontadas
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] bindPrintButtons
+  // [RESPONSABILIDADE] Conectar handlers de clique nos botões de imprimir/reimprimir da tabela
+  // ====================================================================
   // -------------------- Print buttons binding --------------------
   function bindPrintButtons(){
     qsa(".print-btn", elLogBody).forEach(btn=>{
       btn.addEventListener("click", onPrintButtonClick);
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] bindPrintButtons
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] onPrintButtonClick
+  // [RESPONSABILIDADE] Abrir modal correto (print/reprint) e carregar preview da etiqueta no iframe
+  // ====================================================================
   function onPrintButtonClick(ev){
     const b = ev.currentTarget;
     const action = b.getAttribute("data-action"); // 'print' ou 'reprint'
@@ -579,30 +738,93 @@
       data_hora: b.getAttribute("data-dt"),
       usuario: 'Operador'
     };
+
+    // ✅ mantém PDF no iframe
+    const url = buildPreviewURL(item, 'pdf');
+
     if (action === 'print'){
       state.currentPrint = item;
-      // carrega preview (PDF se disponível; o backend decide pelo ?format=pdf)
-      const url = buildPreviewURL(item, 'pdf');
       document.getElementById("preview-frame").src = url;
-      document.getElementById("modal-title").textContent = `Imprimir etiqueta — ${item.modelo} ${item.serie}`;
+      document.getElementById("modal-title").textContent =
+        `Imprimir etiqueta — ${item.modelo} ${item.serie}`;
       openModal("modal-preview");
-    } else {
-      state.currentReprint = item;
-      const url = buildPreviewURL(item, 'pdf');
-      document.getElementById("reprint-frame").src = url;
-      openModal("modal-reprint");
+      return;
     }
+
+    state.currentReprint = item;
+    document.getElementById("reprint-frame").src = url;
+    openModal("modal-reprint");
   }
 
-  // Modal: Fechar
+  // [BLOCO] botão "Imprimir" do modal (substituir handler)
+  document.getElementById("btn-imprimir-modal")?.addEventListener("click", () => {
+    const f = document.getElementById("preview-frame");
+    if (!f || !f.contentWindow) return;
+
+    // ✅ imprime o conteúdo do iframe (PDF) e não a página about:blank
+    f.contentWindow.focus();
+    f.contentWindow.print();
+  });
+  // ====================================================================
+  // [FIM BLOCO] onPrintButtonClick
+  // ====================================================================
+
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Modal: Fechar
+  // [RESPONSABILIDADE] Fechar modais via atributos data-close
+  // ====================================================================
+  // -------------------- Modal: Fechar --------------------
   qsa("[data-close]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const target = btn.getAttribute("data-close");
       closeModal(target.replace('#',''));
     });
   });
+  // ====================================================================
+  // [FIM BLOCO] Modal: Fechar
+  // ====================================================================
 
-  // Confirmar primeira impressão
+ function printFromIframe(iframeId) {
+  const frame = document.getElementById(iframeId);
+  if (!frame) { toast("Iframe não encontrado."); return; }
+
+  const src = frame.getAttribute("src") || frame.src || "";
+  if (!src) { toast("Preview ainda não carregou."); return; }
+
+  // ✅ abre o arquivo (PNG/PDF) direto (SEM about:blank)
+  const w = window.open(src, "_blank", "noopener,noreferrer");
+  if (!w) {
+    toast("Pop-up bloqueado. Permita pop-ups para imprimir.");
+    return;
+  }
+
+  // opcional: instrução ao operador
+  toast("Etiqueta aberta em nova aba. Use Ctrl+P (ou Ctrl+Shift+P para a caixa do sistema).");
+}
+
+
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Liga botões de imprimir
+  // [RESPONSABILIDADE] Conectar botões de impressão dos modais ao helper de impressão
+  // ====================================================================
+  // liga os botões (se existirem no DOM)
+  const btnPrev = document.getElementById("btn-imprimir-preview");
+  if (btnPrev) btnPrev.addEventListener("click", () => printFromIframe("preview-frame"));
+
+  const btnRep = document.getElementById("btn-imprimir-reprint");
+  if (btnRep) btnRep.addEventListener("click", () => printFromIframe("reprint-frame"));
+  // ====================================================================
+  // [FIM BLOCO] Liga botões de imprimir
+  // ====================================================================
+
+  // ====================================================================
+  // [BLOCO] BLOCO_API
+  // [NOME] Confirmar primeira impressão
+  // [RESPONSABILIDADE] Enviar confirmação ao backend, atualizar UI e fechar modal
+  // ====================================================================
+  // -------------------- Confirmar primeira impressão --------------------
   document.getElementById("btn-confirmar-print").addEventListener("click", async ()=>{
     if (!state.currentPrint){ closeModal("modal-preview"); return; }
     try{
@@ -619,8 +841,16 @@
       toast("Erro ao confirmar impressão.");
     }
   });
+  // ====================================================================
+  // [FIM BLOCO] Confirmar primeira impressão
+  // ====================================================================
 
-  // Confirmar reimpressão
+  // ====================================================================
+  // [BLOCO] BLOCO_API
+  // [NOME] Confirmar reimpressão
+  // [RESPONSABILIDADE] Validar motivo, enviar registro ao backend, atualizar UI e fechar modal
+  // ====================================================================
+  // -------------------- Confirmar reimpressão --------------------
   document.getElementById("btn-confirmar-reprint").addEventListener("click", async ()=>{
     if (!state.currentReprint){ closeModal("modal-reprint"); return; }
     const motivo = (document.getElementById("reprint-motivo").value || "").trim();
@@ -640,7 +870,15 @@
       toast("Erro ao registrar reimpressão.");
     }
   });
+  // ====================================================================
+  // [FIM BLOCO] Confirmar reimpressão
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Handlers fixos
+  // [RESPONSABILIDADE] Conectar botões globais da tela (reset e refresh)
+  // ====================================================================
   // -------------------- Handlers fixos --------------------
   document.getElementById("btn-reset").addEventListener("click", ()=>{
     state.modelos.forEach(m=>{
@@ -651,7 +889,15 @@
     });
   });
   document.getElementById("btn-refresh-log").addEventListener("click", loadMontadas);
+  // ====================================================================
+  // [FIM BLOCO] Handlers fixos
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Boot
+  // [RESPONSABILIDADE] Inicializar tela: carregar dados, renderizar cards/otimização e listar montadas
+  // ====================================================================
   // -------------------- Boot --------------------
   (async function init(){
     await loadCapacidadeEOtimizacao();
@@ -659,5 +905,44 @@
     renderOtimizacao();
     await loadMontadas();
   })();
+  // ====================================================================
+  // [FIM BLOCO] Boot
+  // ====================================================================
 </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] scripts_extra
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: head_extra
+DOCUMENTO_HTML: toolbar
+DOCUMENTO_HTML: content
+DOCUMENTO_HTML: scripts_extra
+BLOCO_UTIL: Utils
+BLOCO_API: Endpoints (Flask)
+BLOCO_UTIL: State & Elements
+FUNÇÃO: renderCapacidades
+FUNÇÃO: renderCards
+FUNÇÃO: validateInline
+FUNÇÃO: renderOtimizacao
+FUNÇÃO: renderMontadas
+FUNÇÃO: buildPreviewURL
+FUNÇÃO: confirmarImpressao
+FUNÇÃO: efetivarReimpressao
+FUNÇÃO: montarModelo
+FUNÇÃO: validarGeral
+FUNÇÃO: loadCapacidadeEOtimizacao
+FUNÇÃO: loadMontadas
+FUNÇÃO: bindPrintButtons
+FUNÇÃO: onPrintButtonClick
+BLOCO_UTIL: Modal: Fechar
+FUNÇÃO: printFromIframe
+BLOCO_UTIL: Liga botões de imprimir
+BLOCO_API: Confirmar primeira impressão
+BLOCO_API: Confirmar reimpressão
+BLOCO_UTIL: Handlers fixos
+BLOCO_UTIL: Boot
+==================================================================== -->

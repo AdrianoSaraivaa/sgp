@@ -1,6 +1,6 @@
-
 # app/routes/producao_routes/maquinas_routes/imprimir_etiqueta.py
 from __future__ import annotations
+
 import io
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 from flask import Blueprint, request, jsonify, send_file, abort
 
 from app import db
+
 # Use the SQLAlchemy models instead of the dataclasses. Import from the
 # auto-generated models_sqla package to ensure that ``.query`` is available.
 from app.models_sqla import Montagem, LabelReprintLog
@@ -22,68 +23,72 @@ import qrcode.constants
 try:
     from reportlab.lib.pagesizes import mm
     from reportlab.pdfgen import canvas as pdf_canvas
-    
+
+    REPORTLAB_OK = True
 except Exception:
     REPORTLAB_OK = False
 
 imprimir_etiqueta_bp = Blueprint(
-    "imprimir_etiqueta_bp",
-    __name__,
-    url_prefix="/producao/etiqueta"
+    "imprimir_etiqueta_bp", __name__, url_prefix="/producao/etiqueta"
 )
 
 # ----------------------------------------------------------------------
-# CONFIG PADRÃO DA ETIQUETA (PASSO 1)
+# CONFIG PADRÃO DA ETIQUETA
 # ----------------------------------------------------------------------
-# --- CONFIG PADRÃO DA ETIQUETA ---
-DPI_DEFAULT = 300                  # Elgin L42 = 203 dpi (8 dpmm)
-LABEL_W_MM  = 40                   # 40 x 25 mm  (igual ao BarTender)
-LABEL_H_MM  = 25
+# Elgin L42 PRO = 203 DPI (8 dpmm)
+DPI_DEFAULT = 203
 
-# Conversões p/ pixels no DPI da impressora
-LABEL_W_PX = int(LABEL_W_MM / 25.4 * DPI_DEFAULT)
-LABEL_H_PX = int(LABEL_H_MM / 25.4 * DPI_DEFAULT)
+LABEL_W_MM = 40  # 40 x 25 mm
+LABEL_H_MM = 25
+
+# Conversões exatas mm → px no DPI real da impressora
+LABEL_W_PX = round(LABEL_W_MM / 25.4 * DPI_DEFAULT)
+LABEL_H_PX = round(LABEL_H_MM / 25.4 * DPI_DEFAULT)
 
 # Tamanhos relativos
-QR_SIZE_PX = int(LABEL_H_PX * 0.80)     # QR = 80% da altura (mais seguro pra leitura)
-MARGIN_PX  = max(2, LABEL_H_PX // 40)   # margens mínimas
+QR_SIZE_PX = round(LABEL_H_PX * 0.80)  # QR = 80% da altura
+MARGIN_PX = max(2, round(LABEL_H_PX / 40))  # margens mínimas
+FONT_PX = max(10, round(LABEL_H_PX * 0.09))
 
-# Tipografia (mais fina, boa legibilidade a 203 dpi)
-FONT_PX    = max(10, int(LABEL_H_PX * 0.09))  # ~10% da altura
+# Força saída em 1-bit para nitidez térmica
+SAVE_1BIT_BW = True
 
-# Salvar arte final em 1-bit? (às vezes fica mais nítido; teste no seu driver)
-SAVE_1BIT_BW = False
+TEXT_OFFSET_MM = -1.0
+TEXT_OFFSET_PX = round(TEXT_OFFSET_MM / 25.4 * DPI_DEFAULT)
 
-TEXT_OFFSET_MM = -1.0  # valor negativo aproxima, positivo afasta
-TEXT_OFFSET_PX = int(TEXT_OFFSET_MM / 25.4 * DPI_DEFAULT)
-
-
-
-# Pastas de saída (serão criadas se não existirem)
-STATIC_DIR  = Path("app/static")
+# ----------------------------------------------------------------------
+# PASTAS DE SAÍDA (CORRIGIDO: sem depender do cwd)
+# ----------------------------------------------------------------------
+# Este arquivo está em:
+# app/routes/producao_routes/maquinas_routes/imprimir_etiqueta.py
+# parents:
+# [0]=maquinas_routes, [1]=producao_routes, [2]=routes, [3]=app
+APP_DIR = Path(__file__).resolve().parents[3]  # .../SGP/app
+STATIC_DIR = APP_DIR / "static"  # .../SGP/app/static
 QRCODES_DIR = STATIC_DIR / "qrcodes"
-LABELS_DIR  = STATIC_DIR / "labels"
+LABELS_DIR = STATIC_DIR / "labels"
+
 for d in (STATIC_DIR, QRCODES_DIR, LABELS_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
 
 # ----------------------------------------------------------------------
 # UTIL
 # ----------------------------------------------------------------------
-def ensure_dirs():
+def ensure_dirs() -> None:
     QRCODES_DIR.mkdir(parents=True, exist_ok=True)
     LABELS_DIR.mkdir(parents=True, exist_ok=True)
 
+
 def _load_font(size_px: int) -> ImageFont.FreeTypeFont:
     """
-    Tenta Arial do Windows; depois alternativas; por fim, bitmap default.
-    (PASSO 1: garantir TTF para não “estourar/borrar”)
+    Usa versão bold da fonte para melhorar contraste térmico.
     """
     candidates = [
-        "C:/Windows/Fonts/arial.ttf",  # caminho padrão no Windows
-        "arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-        str(Path.cwd() / "arial.ttf"),
+        "C:/Windows/Fonts/arialbd.ttf",  # Arial Bold
+        "C:/Windows/Fonts/ARIALBD.TTF",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        str(Path.cwd() / "arialbd.ttf"),
     ]
     for fp in candidates:
         try:
@@ -91,6 +96,7 @@ def _load_font(size_px: int) -> ImageFont.FreeTypeFont:
         except Exception:
             continue
     return ImageFont.load_default()
+
 
 def get_assembly_by_id(assembly_id: str) -> Optional[dict]:
     """
@@ -120,6 +126,7 @@ def get_assembly_by_id(assembly_id: str) -> Optional[dict]:
     usuario = request.args.get("usuario", "Operador")
     if not (modelo and serial):
         return None
+
     if dt:
         try:
             dt_obj = datetime.fromisoformat(dt.replace("T", " "))
@@ -130,6 +137,7 @@ def get_assembly_by_id(assembly_id: str) -> Optional[dict]:
                 dt_obj = datetime.now()
     else:
         dt_obj = datetime.now()
+
     return {
         "id": assembly_id,
         "modelo": modelo.strip(),
@@ -140,78 +148,57 @@ def get_assembly_by_id(assembly_id: str) -> Optional[dict]:
         "label_print_count": 0,
     }
 
+
 # ----------------------------------------------------------------------
 # COMPOSIÇÃO DA ETIQUETA
 # ----------------------------------------------------------------------
-
-
-
-
 def _compose_png(modelo: str, serial: str, dt_obj: datetime) -> Image.Image:
     """
-    Monta a etiqueta final em PNG (40x25 mm @ 203dpi) com:
+    Monta a etiqueta final em PNG (40x25 mm) com:
     - QR (somente o serial)
     - Texto: modelo, serial, data/hora (pt-BR)
     """
-    # Gera QR com qualidade equilibrada
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=2,     # pequeno; escalamos para QR_SIZE_PX
-        border=2,       # quiet zone mínima
+        box_size=2,
+        border=2,
     )
     qr.add_data(serial)
     qr.make(fit=True)
     qr_img_small = qr.make_image(fill_color="black", back_color="white").convert("L")
-
-    # Escala do QR para o tamanho exato, preservando nitidez
     qr_img = qr_img_small.resize((QR_SIZE_PX, QR_SIZE_PX), Image.NEAREST)
 
-    # Canvas da etiqueta
     etq = Image.new("L", (LABEL_W_PX, LABEL_H_PX), color=255)
     draw = ImageDraw.Draw(etq)
 
-    # Posiciona QR à esquerda, centralizado verticalmente
     qr_x = MARGIN_PX
     qr_y = (LABEL_H_PX - QR_SIZE_PX) // 2
     etq.paste(qr_img, (qr_x, qr_y))
 
-    # Área de texto à direita do QR
     text_x = qr_x + QR_SIZE_PX + MARGIN_PX + TEXT_OFFSET_PX
-    text_w = LABEL_W_PX - text_x - MARGIN_PX
+    _text_w = LABEL_W_PX - text_x - MARGIN_PX  # reservado (se quiser auto-fit)
 
-    # Fonte
     font = _load_font(FONT_PX)
 
-    # Linhas
     dt_str = dt_obj.strftime("%d/%m/%Y %H:%M")
     lines = [modelo, serial, dt_str]
 
-    # Altura de linha com leve leading
     if hasattr(font, "getmetrics"):
         ascent, descent = font.getmetrics()
     else:
         ascent, descent = (FONT_PX, 0)
-    line_h = ascent + descent + max(1, FONT_PX // 6)
 
+    line_h = ascent + descent + max(1, FONT_PX // 6)
     total_text_h = len(lines) * line_h
     start_y = max(MARGIN_PX, (LABEL_H_PX - total_text_h) // 2)
 
-    # Render básico (sem quebra automática)
     y = start_y
     for line in lines:
-        # Se quiser proteção contra overflow horizontal, pode reduzir fonte quando for maior que text_w
         draw.text((text_x, y), line, font=font, fill=0)
         y += line_h
 
     return etq
-
-
-
-
-
-
-
 
 
 def _output_png(modelo: str, serial: str, dt_obj: datetime) -> Tuple[Path, Path]:
@@ -225,7 +212,6 @@ def _output_png(modelo: str, serial: str, dt_obj: datetime) -> Tuple[Path, Path]
     (QRCODES_DIR / ano).mkdir(exist_ok=True, parents=True)
     (LABELS_DIR / ano).mkdir(exist_ok=True, parents=True)
 
-    # QR “solto” para rastreabilidade
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -239,30 +225,22 @@ def _output_png(modelo: str, serial: str, dt_obj: datetime) -> Tuple[Path, Path]
     qr_path = QRCODES_DIR / ano / f"{serial}.png"
     qr_img.save(qr_path, "PNG", optimize=True, dpi=(DPI_DEFAULT, DPI_DEFAULT))
 
-    # Etiqueta final
-    
     etq_img = _compose_png(modelo, serial, dt_obj)
     label_path = LABELS_DIR / ano / f"{modelo}_{serial}.png"
 
-    # Força conversão para preto e branco 1-bit (texto sai bem nítido, sem borrado)
-    etq_bw = etq_img.convert("1")
-    etq_bw.save(label_path, "PNG",
-                optimize=True,
-                dpi=(DPI_DEFAULT, DPI_DEFAULT))
+    if SAVE_1BIT_BW:
+        etq_to_save = etq_img.convert("1")
+    else:
+        etq_to_save = etq_img  # "L"
+
+    etq_to_save.save(label_path, "PNG", optimize=True, dpi=(DPI_DEFAULT, DPI_DEFAULT))
 
     return qr_path, label_path
-
-
-
-
-
-
 
 
 def _output_pdf_from_png(label_png: Path) -> bytes:
     """
     Converte a etiqueta PNG em um PDF no tamanho exato (40x25mm).
-    Use o PDF no preview e imprima em 'Tamanho real (100%)' para evitar scaling.
     """
     if not REPORTLAB_OK:
         raise RuntimeError("reportlab indisponível")
@@ -272,28 +250,18 @@ def _output_pdf_from_png(label_png: Path) -> bytes:
 
     buffer = io.BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=(w_pt, h_pt))
-    c.drawImage(str(label_png), 0, 0, width=w_pt, height=h_pt,
-                preserveAspectRatio=False, mask='auto')
+    c.drawImage(
+        str(label_png),
+        0,
+        0,
+        width=w_pt,
+        height=h_pt,
+        preserveAspectRatio=False,
+        mask="auto",
+    )
     c.showPage()
     c.save()
     return buffer.getvalue()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ----------------------------------------------------------------------
@@ -301,10 +269,7 @@ def _output_pdf_from_png(label_png: Path) -> bytes:
 # ----------------------------------------------------------------------
 @imprimir_etiqueta_bp.route("/<assembly_id>/preview", methods=["GET"])
 def preview_label(assembly_id):
-    """
-    Gera/mostra a etiqueta. Se reportlab estiver disponível, prioriza PDF (tamanho exato).
-    Caso contrário, retorna PNG com DPI correto.
-    """
+
     data = get_assembly_by_id(assembly_id)
     if not data:
         return abort(400, "Parâmetros insuficientes (modelo/serial).")
@@ -313,15 +278,13 @@ def preview_label(assembly_id):
     serial = data["serial"]
     dt_obj = data["dt_obj"]
 
-    # Gera arquivos (salva para rastreabilidade)
+    # Gera PNG base
     _, label_png = _output_png(modelo, serial, dt_obj)
 
-    # Se o usuário pedir explicitamente ?format=png, honramos.
-    out_format = request.args.get("format", "").lower()
-
-    if REPORTLAB_OK and out_format != "png":
-        # Prioriza PDF quando possível (tamanho exato 40 x 25 mm)
+    # 🔥 PRIORIDADE: sempre gerar PDF físico 40x25mm
+    if REPORTLAB_OK:
         pdf_bytes = _output_pdf_from_png(label_png)
+
         return send_file(
             io.BytesIO(pdf_bytes),
             mimetype="application/pdf",
@@ -329,20 +292,19 @@ def preview_label(assembly_id):
             as_attachment=False,
         )
 
-    # PNG (com DPI correto)
+    # Fallback caso reportlab não exista
     return send_file(
         str(label_png),
         mimetype="image/png",
-        download_name=f"{modelo}_{serial}.png",
         as_attachment=False,
     )
+
 
 @imprimir_etiqueta_bp.route("/<assembly_id>/confirmar", methods=["POST"])
 def confirmar_primeira_impressao(assembly_id):
     payload = request.get_json() or {}
     usuario = (payload.get("usuario") or "Operador").strip()
 
-    # Carrega montagem real
     m = None
     if assembly_id.isdigit():
         m = Montagem.query.get(int(assembly_id))
@@ -356,14 +318,16 @@ def confirmar_primeira_impressao(assembly_id):
     if m.label_printed:
         return abort(409, "Etiqueta já havia sido confirmada. Use reimpressão.")
 
-    # marca impressa
     m.label_printed = True
     m.label_printed_at = datetime.utcnow()
     m.label_printed_by = usuario
-    m.label_print_count = max(1, (m.label_print_count or 0) + 1)  # primeira impressão conta 1
+    m.label_print_count = max(1, (m.label_print_count or 0) + 1)
     db.session.commit()
 
-    return jsonify({"ok": True, "message": "Impressão confirmada.", "assembly_id": m.id})
+    return jsonify(
+        {"ok": True, "message": "Impressão confirmada.", "assembly_id": m.id}
+    )
+
 
 @imprimir_etiqueta_bp.route("/<assembly_id>/reimprimir", methods=["POST", "GET"])
 def reimprimir_label(assembly_id):
@@ -373,7 +337,6 @@ def reimprimir_label(assembly_id):
             resp.headers["X-Reprint-Preview"] = "1"
         return resp
 
-    # POST
     payload = request.get_json() or {}
     motivo = (payload.get("motivo") or "").strip()
     usuario = (payload.get("usuario") or "Operador").strip()
@@ -389,14 +352,16 @@ def reimprimir_label(assembly_id):
     if not m:
         return abort(404, "Montagem não encontrada.")
 
-    # Se nunca confirmou, trate como primeira (mas pedimos usar confirmar)
     if not m.label_printed:
-        return abort(409, "Etiqueta ainda não confirmada. Confirme a primeira impressão.")
+        return abort(
+            409, "Etiqueta ainda não confirmada. Confirme a primeira impressão."
+        )
 
-    # registra log + incrementa contador
     log = LabelReprintLog(montagem_id=m.id, motivo=motivo, reprint_by=usuario)
     m.label_print_count = (m.label_print_count or 1) + 1
     db.session.add(log)
     db.session.commit()
 
-    return jsonify({"ok": True, "message": "Reimpressão registrada.", "assembly_id": m.id})
+    return jsonify(
+        {"ok": True, "message": "Reimpressão registrada.", "assembly_id": m.id}
+    )

@@ -3,15 +3,47 @@
 {% block title %}Demo do Base · Pneumark SGP{% endblock %}
 {% block module_name %}Demonstração{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] module_nav
+[RESPONSABILIDADE] Definir navegação específica do módulo (links do header)
+==================================================================== -->
 {% block module_nav %}
   <a class="active" href="#" data-no-fade>Home</a>
 
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] module_nav
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] toolbar
+[RESPONSABILIDADE] Área opcional para ações rápidas do módulo (filtros, botões, etc.)
+==================================================================== -->
 {% block toolbar %}
  
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] toolbar
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] content
+[RESPONSABILIDADE] Conteúdo principal da página de demonstração do layout base
+==================================================================== -->
 {% block content %}
   
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+BLOCO_UTIL: module_nav
+BLOCO_UTIL: toolbar
+DOCUMENTO_HTML: content
+==================================================================== -->

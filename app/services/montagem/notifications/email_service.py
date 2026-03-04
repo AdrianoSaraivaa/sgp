@@ -10,8 +10,15 @@ Fallback: se Outlook falhar e houver SMTP configurado, tenta SMTP.
 import os
 import sys
 
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _send_via_outlook
+# [RESPONSABILIDADE] Enviar e-mail via Outlook (COM) com opção de apenas exibir a janela
+# ====================================================================
 def _send_via_outlook(to: str, subject: str, body: str, cc=None, bcc=None) -> bool:
     import win32com.client as win32  # requer pywin32
+
     outlook = win32.Dispatch("Outlook.Application")
     mail = outlook.CreateItem(0)  # 0 = olMailItem
 
@@ -29,10 +36,20 @@ def _send_via_outlook(to: str, subject: str, body: str, cc=None, bcc=None) -> bo
     if display_only:
         mail.Display(False)  # abre a janela do Outlook
     else:
-        mail.Send()          # envia direto
+        mail.Send()  # envia direto
     return True
 
 
+# ====================================================================
+# [FIM BLOCO] _send_via_outlook
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] _send_via_smtp
+# [RESPONSABILIDADE] Enviar e-mail via SMTP como fallback usando variáveis de ambiente
+# ====================================================================
 def _send_via_smtp(to: str, subject: str, body: str, cc=None, bcc=None) -> bool:
     """Fallback SMTP (usa as mesmas envs que você já tinha; opcional)."""
     import smtplib
@@ -41,7 +58,7 @@ def _send_via_smtp(to: str, subject: str, body: str, cc=None, bcc=None) -> bool:
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", "25"))
     user = os.getenv("SMTP_USER")
-    pwd  = os.getenv("SMTP_PASS")
+    pwd = os.getenv("SMTP_PASS")
     from_addr = os.getenv("SMTP_FROM", "sgp@pneumark.com.br")
     use_tls = os.getenv("SMTP_STARTTLS", "1") == "1"
 
@@ -56,22 +73,36 @@ def _send_via_smtp(to: str, subject: str, body: str, cc=None, bcc=None) -> bool:
     rcpts = [to]
     if cc:
         if isinstance(cc, (list, tuple)):
-            msg["Cc"] = ", ".join(cc); rcpts += list(cc)
+            msg["Cc"] = ", ".join(cc)
+            rcpts += list(cc)
         else:
-            msg["Cc"] = cc; rcpts.append(cc)
+            msg["Cc"] = cc
+            rcpts.append(cc)
     if bcc:
-        rcpts += (list(bcc) if isinstance(bcc, (list, tuple)) else [bcc])
+        rcpts += list(bcc) if isinstance(bcc, (list, tuple)) else [bcc]
 
     with smtplib.SMTP(host, port, timeout=15) as s:
         if use_tls:
-            try: s.starttls()
-            except Exception: pass
+            try:
+                s.starttls()
+            except Exception:
+                pass
         if user:
             s.login(user, pwd or "")
         s.sendmail(from_addr, rcpts, msg.as_string())
     return True
 
 
+# ====================================================================
+# [FIM BLOCO] _send_via_smtp
+# ====================================================================
+
+
+# ====================================================================
+# [BLOCO] FUNÇÃO
+# [NOME] send_email
+# [RESPONSABILIDADE] API pública de envio: tenta Outlook, depois SMTP, e por fim fallback sem quebrar fluxo
+# ====================================================================
 def send_email(to: str, subject: str, body: str, *, cc=None, bcc=None):
     """
     API usada pelo restante do sistema.
@@ -99,6 +130,19 @@ def send_email(to: str, subject: str, body: str, *, cc=None, bcc=None):
     print(
         "[EMAIL][FAKE] Sem Outlook/SMTP. Conteúdo abaixo:\n"
         f"TO: {to}\nSUBJECT: {subject}\n\n{body}\n",
-        file=sys.stderr
+        file=sys.stderr,
     )
     return False
+
+
+# ====================================================================
+# [FIM BLOCO] send_email
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# FUNÇÃO: _send_via_outlook
+# FUNÇÃO: _send_via_smtp
+# FUNÇÃO: send_email
+# ====================================================================

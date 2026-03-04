@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <title>Cadastrar Peça ou Conjunto</title>
     <style>
+        /* ====================================================================
+        [BLOCO] DOCUMENTO_HTML
+        [NOME] style
+        [RESPONSABILIDADE] Definir estilos visuais da página, formulário e modal
+        ==================================================================== */
         body {
             font-family: Arial, sans-serif;
             background-color: #f9f9f9;
@@ -129,19 +134,36 @@
             margin-bottom: 10px;
         }
 
+        /* ====================================================================
+        [FIM BLOCO] style
+        ==================================================================== */
+
     </style>
 </head>
 <body>
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] header
+[RESPONSABILIDADE] Exibir cabeçalho com navegação e título da página
+==================================================================== -->
 <header style="background:#222; color:white; padding:15px; display:flex; justify-content:space-between; align-items:center;">
     
     <button onclick=window.location.href="{{ url_for('estoque_bp.tela_estoque') }}" style="background:#e60000; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">← Voltar</button>
 
     <h2 style="margin:0;">Cadastro de Peça ou Conjunto</h2>
 </header>
+<!-- ====================================================================
+[FIM BLOCO] header
+==================================================================== -->
 
 <h1>Cadastrar Peça ou Conjunto</h1>
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] form_cadastro_peca_ou_conjunto
+[RESPONSABILIDADE] Coletar dados do item e fornecedores e enviar para cadastro
+==================================================================== -->
 <form method="POST" action="{{ url_for('cadastrar_peca_bp.cadastrar_peca') }}">
     <div class="linha">
         <div class="campo">
@@ -200,7 +222,15 @@
     <input type="hidden" name="estrutura_conjunto" id="estrutura_conjunto">
     <button type="submit" class="botao">Salvar Peça</button>
 </form>
+<!-- ====================================================================
+[FIM BLOCO] form_cadastro_peca_ou_conjunto
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] modal_estrutura_conjunto
+[RESPONSABILIDADE] Permitir montar e salvar a estrutura (itens) de um conjunto
+==================================================================== -->
 <!-- MODAL -->
 <div id="modal_estrutura">
     <div class="modal-conteudo">
@@ -223,22 +253,54 @@
         <button type="button" class="botao" onclick="fecharModal()">Salvar Estrutura</button>
     </div>
 </div>
+<!-- ====================================================================
+[FIM BLOCO] modal_estrutura_conjunto
+==================================================================== -->
 
 <script>
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] verificarTipo
+[RESPONSABILIDADE] Alternar exibição do botão de montagem conforme tipo selecionado
+==================================================================== */
 function verificarTipo() {
     let tipo = document.getElementById("tipo_item").value;
     document.getElementById("botao_conjunto").style.display = tipo === "conjunto" ? "block" : "none";
 }
+/* ====================================================================
+[FIM BLOCO] verificarTipo
+==================================================================== */
 window.onload = verificarTipo;
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] abrirModal
+[RESPONSABILIDADE] Exibir o modal de montagem da estrutura do conjunto
+==================================================================== */
 function abrirModal() {
     document.getElementById("modal_estrutura").style.display = "block";
 }
+/* ====================================================================
+[FIM BLOCO] abrirModal
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] fecharModal
+[RESPONSABILIDADE] Ocultar o modal de montagem da estrutura do conjunto
+==================================================================== */
 function fecharModal() {
     document.getElementById("modal_estrutura").style.display = "none";
 }
+/* ====================================================================
+[FIM BLOCO] fecharModal
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] sugerirPecas
+[RESPONSABILIDADE] Buscar e exibir sugestões de peças via autocomplete
+==================================================================== */
 function sugerirPecas() {
     const termo = document.getElementById("input_peca").value;
     
@@ -257,13 +319,29 @@ function sugerirPecas() {
             document.getElementById("sugestoes_peca").innerHTML = html;
         });
 }
+/* ====================================================================
+[FIM BLOCO] sugerirPecas
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] selecionarPeca
+[RESPONSABILIDADE] Preencher campos da peça selecionada e limpar sugestões
+==================================================================== */
 function selecionarPeca(descricao, codigo) {
     document.getElementById("input_peca").value = descricao;
     document.getElementById("input_codigo").value = codigo;
     document.getElementById("sugestoes_peca").innerHTML = "";
 }
+/* ====================================================================
+[FIM BLOCO] selecionarPeca
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] adicionarPecaConjunto
+[RESPONSABILIDADE] Adicionar item na lista do conjunto e persistir no campo oculto
+==================================================================== */
 function adicionarPecaConjunto() {
     let nome = document.getElementById("input_peca").value;
     let codigo = document.getElementById("input_codigo").value;
@@ -282,7 +360,15 @@ function adicionarPecaConjunto() {
         document.getElementById("input_quantidade").value = '';
     }
 }
+/* ====================================================================
+[FIM BLOCO] adicionarPecaConjunto
+==================================================================== */
 
+/* ====================================================================
+[BLOCO] FUNÇÃO
+[NOME] calcularCustoTotal
+[RESPONSABILIDADE] Somar preços e aplicar margem para exibir custo total
+==================================================================== */
 function calcularCustoTotal() {
     let total = 0;
     document.querySelectorAll('.preco').forEach(p => {
@@ -292,7 +378,26 @@ function calcularCustoTotal() {
     let final = total + (total * margem / 100);
     document.getElementById("total_custo").innerText = `Custo total: R$ ${final.toFixed(2)}`;
 }
+/* ====================================================================
+[FIM BLOCO] calcularCustoTotal
+==================================================================== */
 </script>
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: style
+DOCUMENTO_HTML: header
+DOCUMENTO_HTML: form_cadastro_peca_ou_conjunto
+DOCUMENTO_HTML: modal_estrutura_conjunto
+FUNÇÃO: verificarTipo
+FUNÇÃO: abrirModal
+FUNÇÃO: fecharModal
+FUNÇÃO: sugerirPecas
+FUNÇÃO: selecionarPeca
+FUNÇÃO: adicionarPecaConjunto
+FUNÇÃO: calcularCustoTotal
+==================================================================== -->
 
 </body>
 </html>

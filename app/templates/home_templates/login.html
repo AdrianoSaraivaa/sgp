@@ -1,7 +1,30 @@
 {% extends "_base.html" %}
-{% block title %}Login — Pneumark SGP{% endblock %}
-{% block subtitle %}Acesso ao Sistema{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Login — Pneumark SGP{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_subtitle
+[RESPONSABILIDADE] Definir o subtítulo exibido no layout
+==================================================================== -->
+{% block subtitle %}Acesso ao Sistema{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_subtitle
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Estilos específicos da tela de login (layout, inputs, botão e links)
+==================================================================== -->
 {% block head_extra %}
 <style>
   /* ====== Estilos específicos da página de login ====== */
@@ -78,7 +101,15 @@
   .auth-err{ margin-top:10px }
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar o card de login, formulário, mensagem de erro e link para registro
+==================================================================== -->
 {% block content %}
 <div class="auth-wrap">
   <section class="auth-card" role="form" aria-label="Formulário de Login">
@@ -93,12 +124,14 @@
     <form class="auth-form" method="POST">
       <div class="auth-field">
         <label for="usuario">Usuário</label>
-        <input class="auth-input" id="usuario" name="usuario" type="text" placeholder="Seu usuário" autocomplete="username" required>
+        <input class="auth-input" id="usuario" name="usuario" type="text"
+               placeholder="Seu usuário" autocomplete="username" required>
       </div>
 
       <div class="auth-field">
         <label for="senha">Senha</label>
-        <input class="auth-input" id="senha" name="senha" type="password" placeholder="Sua senha" autocomplete="current-password" required>
+        <input class="auth-input" id="senha" name="senha" type="password"
+               placeholder="Sua senha" autocomplete="current-password" required>
       </div>
 
       <button class="auth-btn" type="submit">
@@ -123,14 +156,33 @@
   </section>
 </div>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts
+[RESPONSABILIDADE] UX: focar no campo usuário e permitir Enter na senha (submeter form)
+==================================================================== -->
 {% block scripts %}
 <script>
-  // Foco inicial no usuário
+  // ====================================================================
+  // [BLOCO] UX
+  // [NOME] foco_inicial_usuario
+  // [RESPONSABILIDADE] Colocar foco no campo "usuario" ao abrir a página
+  // ====================================================================
   const u = document.getElementById('usuario');
   if (u) { setTimeout(()=> u.focus(), 80); }
+  // ====================================================================
+  // [FIM BLOCO] foco_inicial_usuario
+  // ====================================================================
 
-  // Enter no campo senha envia o form
+  // ====================================================================
+  // [BLOCO] UX
+  // [NOME] enter_na_senha_submete
+  // [RESPONSABILIDADE] Capturar Enter no campo senha e enviar o formulário
+  // ====================================================================
   const s = document.getElementById('senha');
   s?.addEventListener('keydown', (e)=> {
     if (e.key === 'Enter') {
@@ -138,5 +190,23 @@
       s.form?.submit();
     }
   });
+  // ====================================================================
+  // [FIM BLOCO] enter_na_senha_submete
+  // ====================================================================
 </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_subtitle
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts
+UX: foco_inicial_usuario
+UX: enter_na_senha_submete
+==================================================================== -->

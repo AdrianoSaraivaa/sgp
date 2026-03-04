@@ -1,6 +1,20 @@
 {% extends "_base.html" %}
-{% block title %}Setup de Roteiro — Produção{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}Setup de Roteiro — Produção{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Definir estilos específicos para a matriz de roteiro, cards de bancada e modal
+==================================================================== -->
 {% block head_extra %}
 <style>
   /* MATRIZ: coluna fixa para ESTOQUE + 4 colunas de bancadas, 2 linhas */
@@ -70,7 +84,15 @@
   .attach input[type="file"]{ max-width:100%; }
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar toolbar de modelo, matriz de bancadas e modal de detalhes
+==================================================================== -->
 {% block content %}
 <div class="toolbar-line">
   <div class="left">
@@ -255,10 +277,24 @@
   </footer>
 </dialog>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_scripts_extra
+[RESPONSABILIDADE] Inicializar estado do roteiro, eventos de UI, modal e integrações com backend (load/save)
+==================================================================== -->
 {% block scripts_extra %}
 
 <script>
+
+/* ====================================================================
+[BLOCO] BLOCO_UTIL
+[NOME] DOMContentLoaded_setup_roteiro
+[RESPONSABILIDADE] Inicializar estado, binds e fluxo de carregamento/salvamento do setup de roteiro
+==================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
   console.debug('[setup-roteiro] scripts ativos');
 
@@ -297,6 +333,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentBench = null; // 'sep', 'b1'...'b8'
 
   // ========= FUNÇÕES =========
+
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] setCardActive
+  [RESPONSABILIDADE] Atualizar estado visual do card (ativo) e sincronizar checkbox quando existir
+  ==================================================================== */
   function setCardActive(benchId, active){
     const card = matrix.querySelector(`.bench-card[data-bench="${benchId}"]`);
     if (!card) return;
@@ -304,7 +346,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const cb = card.querySelector('.bench-toggle');
     if (cb) cb.checked = !!active;
   }
+  /* ====================================================================
+  [FIM BLOCO] setCardActive
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] serialize
+  [RESPONSABILIDADE] Serializar estado atual do roteiro em payload para envio ao backend
+  ==================================================================== */
   function serialize(){
     const out = {
       modelo: state.modelo,
@@ -324,7 +374,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     return out;
   }
+  /* ====================================================================
+  [FIM BLOCO] serialize
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] openModal
+  [RESPONSABILIDADE] Abrir modal de detalhes e preencher campos conforme bancada selecionada
+  ==================================================================== */
   function openModal(benchId){
     currentBench = benchId;
     const card = matrix.querySelector(`.bench-card[data-bench="${benchId}"]`);
@@ -344,8 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof modal.showModal === 'function') modal.showModal();
     else modal.setAttribute('open','');
   }
+  /* ====================================================================
+  [FIM BLOCO] openModal
+  ==================================================================== */
 
-  // >>> Carregar do backend ao abrir/trocar modelo <<<
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] loadModelo
+  [RESPONSABILIDADE] Carregar configuração do roteiro do backend e aplicar no estado/UI
+  ==================================================================== */
   async function loadModelo(modelo) {
     try {
       const r = await fetch(`/producao/gp/setup/load?modelo=${encodeURIComponent(modelo)}`, {cache: 'no-store'});
@@ -369,6 +434,9 @@ document.addEventListener('DOMContentLoaded', () => {
       msg.textContent = `Não foi possível carregar a configuração de ${modelo}.`;
     }
   }
+  /* ====================================================================
+  [FIM BLOCO] loadModelo
+  ==================================================================== */
 
   // ===== Inicialização =====
   Object.keys(state.benches).forEach(k => setCardActive(k, state.benches[k].ativo));
@@ -463,6 +531,27 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(() => { msg.textContent = "Falha ao salvar o roteiro."; });
   });
 });
+/* ====================================================================
+[FIM BLOCO] DOMContentLoaded_setup_roteiro
+==================================================================== */
+
 </script>
 
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_scripts_extra
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+DOCUMENTO_HTML: block_scripts_extra
+FUNÇÃO: setCardActive
+FUNÇÃO: serialize
+FUNÇÃO: openModal
+FUNÇÃO: loadModelo
+BLOCO_UTIL: DOMContentLoaded_setup_roteiro
+==================================================================== -->

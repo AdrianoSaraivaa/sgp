@@ -1,23 +1,78 @@
 {% extends "_base.html" %}
 
 {% block title %}Acesso à Rastreabilidade{% endblock %}
-{% block module_name %}Rastreabilidade — Acesso{% endblock %}
+{% block module_name %}Rastreabilidade — Acesso Restrito{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:420px;margin:40px auto;padding:24px;text-align:center;">
-  <h2>Área Restrita</h2>
-  <p>Digite a senha para acessar a rastreabilidade completa das máquinas.</p>
+<!-- ==================================================================== -->
+<!-- DOCUMENTO_HTML: Tela de autenticação da rastreabilidade              -->
+<!-- ==================================================================== -->
 
-  <form method="POST" action="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_senha') }}" style="margin-top:20px;">
-    <input type="password" name="senha" placeholder="Senha" required
-           style="padding:10px;width:100%;margin-bottom:14px;border:1px solid #ccc;border-radius:8px;">
-    <button type="submit" class="btn primary" style="width:100%;">Entrar</button>
-  </form>
+<div class="card" style="max-width:460px;margin:60px auto;padding:28px;">
 
-  {% with msgs = get_flashed_messages(category_filter=['error']) %}
+  <div style="text-align:center;margin-bottom:20px;">
+    <h2 style="margin-bottom:6px;">🔐 Área Restrita</h2>
+    <p class="muted" style="font-size:0.9rem;">
+      Digite a senha para acessar os relatórios completos de rastreabilidade.
+    </p>
+  </div>
+
+  <!-- ======================= FLASH MESSAGES ========================== -->
+  {% with msgs = get_flashed_messages(with_categories=true) %}
     {% if msgs %}
-      <div class="alert" style="margin-top:15px;color:#c00;">{{ msgs[0] }}</div>
+      {% for category, message in msgs %}
+        <div style="
+            margin-bottom:14px;
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:0.9rem;
+            {% if category in ['danger','error'] %}
+              background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca;
+            {% elif category == 'success' %}
+              background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;
+            {% else %}
+              background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;
+            {% endif %}
+        ">
+          {{ message }}
+        </div>
+      {% endfor %}
     {% endif %}
   {% endwith %}
+  <!-- ================================================================ -->
+
+  <!-- =========================== FORM ================================ -->
+  <form method="POST"
+        action="{{ url_for('gp_rastreabilidade_bp.rastreabilidade_senha') }}"
+        autocomplete="off">
+
+    <div style="margin-bottom:16px;">
+      <input
+        type="password"
+        name="senha"
+        placeholder="Digite a senha"
+        required
+        autofocus
+        style="
+          width:100%;
+          padding:12px;
+          border:1px solid #cbd5e1;
+          border-radius:10px;
+          font-size:0.95rem;
+          outline:none;
+        "
+      >
+    </div>
+
+    <button type="submit"
+            class="btn primary"
+            style="width:100%;padding:12px;border-radius:10px;">
+      Entrar
+    </button>
+
+  </form>
+  <!-- ================================================================ -->
+
 </div>
+
 {% endblock %}

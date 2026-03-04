@@ -1,11 +1,56 @@
 {% extends "_base.html" %}
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
 {% block title %}HiPot • Perfil por modelo{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
 {% block module_name %}Produção · HiPot{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_nav
+[RESPONSABILIDADE] Definir navegação complementar do módulo (link para Setup quando disponível)
+==================================================================== -->
 {% block module_nav %}
   <a href="{{ url_for('gerenciamento_bp.setup_index') if 'gerenciamento_bp' in current_app.blueprints else '#' }}">Setup</a>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_nav
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar placeholder da tela de perfil do HiPot por modelo
+==================================================================== -->
 {% block content %}
   <h1>HiPot — Perfil por modelo</h1>
   <p class="muted">Tela vazia (placeholder). Aqui vamos configurar: modo de coleta, campos do relatório e padrões.</p>
   <p>URL atual: <code>/producao/gp/hipot/perfil</code></p>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_module_nav
+DOCUMENTO_HTML: block_content
+==================================================================== -->

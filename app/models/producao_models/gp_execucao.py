@@ -1,4 +1,3 @@
-
 """Legacy module for GP execution logic.
 
 This module historically provided access to GP-related model classes such
@@ -22,8 +21,24 @@ from app.models_sqla import (
     GPChecklistItem,
 )
 
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] ReexportGPExecucaoModels
+# [RESPONSABILIDADE] Reexportar modelos SQLAlchemy GP para manter compatibilidade com imports legados
+# ====================================================================
+
 # Re-export for backwards compatibility.  When wildcard importing from
 # this module, only the names defined here will be exposed.
+
+# ====================================================================
+# [FIM BLOCO] ReexportGPExecucaoModels
+# ====================================================================
+
+# ====================================================================
+# [BLOCO] BLOCO_UTIL
+# [NOME] __all__
+# [RESPONSABILIDADE] Definir símbolos públicos exportados pelo módulo para importações compatíveis
+# ====================================================================
 __all__ = [
     "GPWorkOrder",
     "GPWorkStage",
@@ -32,3 +47,13 @@ __all__ = [
     "GPChecklistTemplate",
     "GPChecklistItem",
 ]
+# ====================================================================
+# [FIM BLOCO] __all__
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# BLOCO_UTIL: ReexportGPExecucaoModels
+# BLOCO_UTIL: __all__
+# ====================================================================

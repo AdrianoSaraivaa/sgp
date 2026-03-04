@@ -1,9 +1,36 @@
+// ====================================================================
+// [BLOCO] BLOCO_UTIL
+// [NOME] IIFE (Immediately Invoked Function Expression)
+// [RESPONSABILIDADE] Encapsular escopo do script, inicializar estado e registrar handlers da UI
+// ====================================================================
 (function () {
   "use strict";
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] MODELOS
+  // [RESPONSABILIDADE] Definir lista fixa de modelos disponíveis no select
+  // ====================================================================
   const MODELOS = ["PM700", "PM2100", "PM2200"];
-  const MAX_ITENS = 10;
+  // ====================================================================
+  // [FIM BLOCO] MODELOS
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] MAX_ITENS
+  // [RESPONSABILIDADE] Definir limite máximo de itens de checklist no editor
+  // ====================================================================
+  const MAX_ITENS = 10;
+  // ====================================================================
+  // [FIM BLOCO] MAX_ITENS
+  // ====================================================================
+
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Referências DOM (select/tabela/botões)
+  // [RESPONSABILIDADE] Capturar elementos de UI usados para renderização e ações
+  // ====================================================================
   const selModelo = document.getElementById("modeloSel");
   const tbody = document.getElementById("tbody");
   // const btnAddItem = document.getElementById("btnAddItem");
@@ -12,10 +39,26 @@
   // const btnSalvar = document.getElementById("btnSalvar");
   const btnSalvar2 = document.getElementById("btnSalvar2");
   // const btnAbrir = document.getElementById("btnAbrir");
+  // ====================================================================
+  // [FIM BLOCO] Referências DOM (select/tabela/botões)
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] itens
+  // [RESPONSABILIDADE] Armazenar estado local dos itens do checklist em edição
+  // ====================================================================
   let itens = []; 
   // { descricao, tempo_alvo, min, max, bloqueante, exigeNota, ativo }
+  // ====================================================================
+  // [FIM BLOCO] itens
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] init
+  // [RESPONSABILIDADE] Inicializar select de modelos, listeners e seleção inicial via URL ou padrão
+  // ====================================================================
   function init() {
 
 
@@ -64,14 +107,30 @@
     }
 
   }
+  // ====================================================================
+  // [FIM BLOCO] init
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] render
+  // [RESPONSABILIDADE] Renderizar tabela de itens a partir do estado local
+  // ====================================================================
   function render() {
     tbody.innerHTML = "";
     itens.forEach((it, idx) => {
       tbody.appendChild(renderRow(it, idx));
     });
   }
+  // ====================================================================
+  // [FIM BLOCO] render
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] renderRow
+  // [RESPONSABILIDADE] Construir linha da tabela com campos editáveis e ações para um item
+  // ====================================================================
   function renderRow(item, index) {
     const tr = document.createElement("tr");
 
@@ -87,6 +146,11 @@
     ta.addEventListener("input", () => item.descricao = ta.value);
     tdDesc.appendChild(ta);
 
+    // ====================================================================
+    // [BLOCO] FUNÇÃO
+    // [NOME] numCell
+    // [RESPONSABILIDADE] Criar célula numérica vinculada a uma propriedade do item
+    // ====================================================================
     function numCell(prop, placeholder) {
       const td = document.createElement("td");
       const inp = document.createElement("input");
@@ -101,7 +165,15 @@
       td.appendChild(inp);
       return td;
     }
+    // ====================================================================
+    // [FIM BLOCO] numCell
+    // ====================================================================
 
+    // ====================================================================
+    // [BLOCO] FUNÇÃO
+    // [NOME] chkCell
+    // [RESPONSABILIDADE] Criar célula checkbox vinculada a uma propriedade booleana do item
+    // ====================================================================
     function chkCell(prop) {
       const td = document.createElement("td");
       const chk = document.createElement("input");
@@ -111,6 +183,9 @@
       td.appendChild(chk);
       return td;
     }
+    // ====================================================================
+    // [FIM BLOCO] chkCell
+    // ====================================================================
 
     const tdRem = document.createElement("td");
     const btn = document.createElement("button");
@@ -131,7 +206,15 @@
 
     return tr;
   }
+  // ====================================================================
+  // [FIM BLOCO] renderRow
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] addItem
+  // [RESPONSABILIDADE] Adicionar novo item ao estado local respeitando limite e re-renderizar
+  // ====================================================================
   function addItem() {
     if (itens.length >= MAX_ITENS) {
       alert("Limite de 10 itens atingido.");
@@ -140,13 +223,29 @@
     itens.push({ descricao:"", tempo_alvo:null, min:null, max:null, bloqueante:false, exigeNota:false, ativo:true });
     render();
   }
+  // ====================================================================
+  // [FIM BLOCO] addItem
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] limpar
+  // [RESPONSABILIDADE] Limpar itens do checklist mediante confirmação e reiniciar com item padrão
+  // ====================================================================
   function limpar() {
     if (!confirm("Limpar todos os itens?")) return;
     itens = [];
     addItem();
   }
+  // ====================================================================
+  // [FIM BLOCO] limpar
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] montarPayload
+  // [RESPONSABILIDADE] Validar dados do formulário e montar payload JSON para API de template
+  // ====================================================================
   function montarPayload() {
     const modelo = selModelo.value || "";
     const errors = [];
@@ -175,7 +274,15 @@
       }))
     };
   }
+  // ====================================================================
+  // [FIM BLOCO] montarPayload
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_API
+  // [NOME] salvarNoSistema
+  // [RESPONSABILIDADE] Enviar payload para API e persistir template de checklist do modelo
+  // ====================================================================
   async function salvarNoSistema() {
     const payload = montarPayload();
     if (!payload) return;
@@ -190,7 +297,15 @@
       alert("Checklist salvo para o modelo " + payload.modelo);
     } catch(err){ alert("Erro: "+err.message); }
   }
+  // ====================================================================
+  // [FIM BLOCO] salvarNoSistema
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_API
+  // [NOME] abrirDoSistema
+  // [RESPONSABILIDADE] Buscar template do modelo na API e aplicar no editor
+  // ====================================================================
   async function abrirDoSistema() {
     const modelo = selModelo.value || "";
     if (!modelo) { alert("Selecione o modelo"); return; }
@@ -201,7 +316,15 @@
       aplicarDoServidor(data.data);
     } catch(err){ alert("Erro: "+err.message); }
   }
+  // ====================================================================
+  // [FIM BLOCO] abrirDoSistema
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] FUNÇÃO
+  // [NOME] aplicarDoServidor
+  // [RESPONSABILIDADE] Normalizar template recebido e atualizar estado local + renderização
+  // ====================================================================
   function aplicarDoServidor(template) {
     itens = (template.itens||[]).slice(0,MAX_ITENS).map(it=>({
       descricao: it.descricao||"",
@@ -216,6 +339,43 @@
     if (itens.length===0) addItem();
     render();
   }
+  // ====================================================================
+  // [FIM BLOCO] aplicarDoServidor
+  // ====================================================================
 
+  // ====================================================================
+  // [BLOCO] BLOCO_UTIL
+  // [NOME] Bootstrap do módulo
+  // [RESPONSABILIDADE] Executar inicialização do editor no carregamento do script
+  // ====================================================================
   init();
+  // ====================================================================
+  // [FIM BLOCO] Bootstrap do módulo
+  // ====================================================================
+
 })();
+// ====================================================================
+// [FIM BLOCO] IIFE (Immediately Invoked Function Expression)
+// ====================================================================
+
+// ====================================================================
+// MAPA DO ARQUIVO
+// --------------------------------------------------------------------
+// BLOCO_UTIL: IIFE (Immediately Invoked Function Expression)
+// BLOCO_UTIL: MODELOS
+// BLOCO_UTIL: MAX_ITENS
+// BLOCO_UTIL: Referências DOM (select/tabela/botões)
+// BLOCO_UTIL: itens
+// FUNÇÃO: init
+// FUNÇÃO: render
+// FUNÇÃO: renderRow
+// FUNÇÃO: numCell
+// FUNÇÃO: chkCell
+// FUNÇÃO: addItem
+// FUNÇÃO: limpar
+// FUNÇÃO: montarPayload
+// BLOCO_API: salvarNoSistema
+// BLOCO_API: abrirDoSistema
+// FUNÇÃO: aplicarDoServidor
+// BLOCO_UTIL: Bootstrap do módulo
+// ====================================================================

@@ -1,11 +1,42 @@
 {% extends "_base.html" %}
-{% block title %}HiPot • Execução manual{% endblock %}
-{% block module_name %}Produção · HiPot{% endblock %}
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_title
+[RESPONSABILIDADE] Definir o título da página no template base
+==================================================================== -->
+{% block title %}HiPot • Execução manual{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_title
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_name
+[RESPONSABILIDADE] Definir o nome do módulo exibido no template base
+==================================================================== -->
+{% block module_name %}Produção · HiPot{% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_name
+==================================================================== -->
+
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_module_nav
+[RESPONSABILIDADE] Definir navegação complementar do módulo no template base
+==================================================================== -->
 {% block module_nav %}
   <a href="{{ url_for('gp_hipot_bp.perfil_editor') }}">Perfil</a>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_module_nav
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_head_extra
+[RESPONSABILIDADE] Definir estilos específicos para layout, cards e estados de validação
+==================================================================== -->
 {% block head_extra %}
 <style>
   :root{
@@ -55,7 +86,15 @@
   body{background:var(--bg);}
 </style>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_head_extra
+==================================================================== -->
 
+<!-- ====================================================================
+[BLOCO] DOCUMENTO_HTML
+[NOME] block_content
+[RESPONSABILIDADE] Renderizar formulário de execução manual HiPot e script de envio para API
+==================================================================== -->
 {% block content %}
 <div class="wrap">
   <h1>HiPot — Execução manual (Passo 1 — sem salvar)</h1>
@@ -129,6 +168,12 @@
 
 <!-- SCRIPT SUBSTITUÍDO -->
 <script>
+
+  /* ====================================================================
+  [BLOCO] FUNÇÃO
+  [NOME] salvarExecucao
+  [RESPONSABILIDADE] Validar campos, montar payload e enviar execução HiPot para API
+  ==================================================================== */
   async function salvarExecucao() {
     const gbOK = document.getElementById('gb_ok').value === 'true';
     const hpOK = document.getElementById('hp_ok').value === 'true';
@@ -177,7 +222,34 @@
       el.innerHTML = "<span class='nok'>Erro: " + (out.error || "Falha ao salvar") + "</span>";
     }
   }
+  /* ====================================================================
+  [FIM BLOCO] salvarExecucao
+  ==================================================================== */
 
+  /* ====================================================================
+  [BLOCO] BLOCO_UTIL
+  [NOME] listener_btnSalvar
+  [RESPONSABILIDADE] Associar clique do botão salvar à função de envio da execução
+  ==================================================================== */
   document.getElementById('btnSalvar').addEventListener('click', salvarExecucao);
+  /* ====================================================================
+  [FIM BLOCO] listener_btnSalvar
+  ==================================================================== */
+
 </script>
 {% endblock %}
+<!-- ====================================================================
+[FIM BLOCO] block_content
+==================================================================== -->
+
+<!-- ====================================================================
+MAPA DO ARQUIVO
+--------------------------------------------------------------------
+DOCUMENTO_HTML: block_title
+DOCUMENTO_HTML: block_module_name
+DOCUMENTO_HTML: block_module_nav
+DOCUMENTO_HTML: block_head_extra
+DOCUMENTO_HTML: block_content
+FUNÇÃO: salvarExecucao
+BLOCO_UTIL: listener_btnSalvar
+==================================================================== -->

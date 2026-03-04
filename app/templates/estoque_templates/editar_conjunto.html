@@ -5,6 +5,11 @@
   <title>Editar Conjunto — {{ conjunto.descricao }}</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
+    /* ====================================================================
+    [BLOCO] DOCUMENTO_HTML
+    [NOME] style
+    [RESPONSABILIDADE] Definir estilos visuais do layout, cards, tabelas e autocomplete
+    ==================================================================== */
     :root{
       --brand:#e60000;
       --brand-dark:#b30000;
@@ -91,11 +96,19 @@
     .sugestoes div{padding:10px 12px;cursor:pointer}
     .sugestoes div:hover{background:#f6f6f6}
     .rel{position:relative}
+    /* ====================================================================
+    [FIM BLOCO] style
+    ==================================================================== */
   </style>
 </head>
 <body>
   <div class="shell">
 
+    <!-- ====================================================================
+    [BLOCO] DOCUMENTO_HTML
+    [NOME] header_hero
+    [RESPONSABILIDADE] Exibir cabeçalho da página com identificação do conjunto
+    ==================================================================== -->
     <!-- Cabeçalho -->
     <div class="hero">
       <div>
@@ -107,7 +120,15 @@
         <span>Conjunto • Ponto de Pedido & Estoques</span>
       </div>
     </div>
+    <!-- ====================================================================
+    [FIM BLOCO] header_hero
+    ==================================================================== -->
 
+    <!-- ====================================================================
+    [BLOCO] DOCUMENTO_HTML
+    [NOME] form_parametros_conjunto
+    [RESPONSABILIDADE] Editar e salvar parâmetros de cadastro do conjunto
+    ==================================================================== -->
     <!-- 1) Parâmetros do Conjunto -->
     <form class="card" method="POST" action="{{ url_for('editar_peca_bp.editar_peca', peca_id=conjunto.id) }}">
       <h3>Parâmetros do conjunto</h3>
@@ -159,7 +180,15 @@
         <span class="muted">Os parâmetros acima são gravados diretamente no cadastro desta peça do tipo <em>conjunto</em>.</span>
       </div>
     </form>
+    <!-- ====================================================================
+    [FIM BLOCO] form_parametros_conjunto
+    ==================================================================== -->
 
+    <!-- ====================================================================
+    [BLOCO] DOCUMENTO_HTML
+    [NOME] form_estrutura_bom
+    [RESPONSABILIDADE] Editar e salvar a estrutura (BOM) do conjunto com autocomplete
+    ==================================================================== -->
     <!-- 2) Estrutura (BOM) -->
     <form class="card" method="POST" action="{{ url_for('editar_peca_bp.salvar_estrutura_conjunto', peca_id=conjunto.id) }}">
       <h3>Estrutura do conjunto (BOM)</h3>
@@ -216,10 +245,18 @@
         <span class="muted">Ao salvar, a estrutura antiga é substituída pela lista atual.</span>
       </div>
     </form>
+    <!-- ====================================================================
+    [FIM BLOCO] form_estrutura_bom
+    ==================================================================== -->
 
   </div>
 
   <script>
+    /* ====================================================================
+    [BLOCO] BLOCO_UTIL
+    [NOME] variaveis_dom_autocomplete
+    [RESPONSABILIDADE] Mapear elementos do DOM e variáveis de controle do autocomplete
+    ==================================================================== */
     // ====== AUTOCOMPLETE POR DESCRIÇÃO ======
     const boxSugestoes = document.getElementById('sugestoes_autocomplete');
     const inputDesc = document.getElementById('nova_descricao');
@@ -229,7 +266,15 @@
 
     let cacheBusca = [];
     let debounceT;
+    /* ====================================================================
+    [FIM BLOCO] variaveis_dom_autocomplete
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] BLOCO_UTIL
+    [NOME] listeners_autocomplete
+    [RESPONSABILIDADE] Controlar eventos de input/focus/click para exibição de sugestões
+    ==================================================================== */
     inputDesc.addEventListener('input', () => {
       clearTimeout(debounceT);
       const termo = inputDesc.value.trim();
@@ -249,7 +294,15 @@
         boxSugestoes.style.display = 'none';
       }
     });
+    /* ====================================================================
+    [FIM BLOCO] listeners_autocomplete
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] consultarAutocomplete
+    [RESPONSABILIDADE] Consultar endpoint de autocomplete e atualizar lista de sugestões
+    ==================================================================== */
     function consultarAutocomplete(termo){
       fetch(`/api/pecas_autocomplete?termo=${encodeURIComponent(termo)}`)
         .then(r => r.json())
@@ -259,7 +312,15 @@
         })
         .catch(()=>{ cacheBusca=[]; renderSugestoes([]); });
     }
+    /* ====================================================================
+    [FIM BLOCO] consultarAutocomplete
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] renderSugestoes
+    [RESPONSABILIDADE] Renderizar sugestões de autocomplete no popover
+    ==================================================================== */
     function renderSugestoes(lista){
       if (!lista.length){
         boxSugestoes.style.display = 'none';
@@ -273,7 +334,15 @@
       `).join('');
       boxSugestoes.style.display = 'block';
     }
+    /* ====================================================================
+    [FIM BLOCO] renderSugestoes
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] selecionarPeca
+    [RESPONSABILIDADE] Preencher descrição e código da peça selecionada no autocomplete
+    ==================================================================== */
     function selecionarPeca(desc, cod){
       inputDesc.value = unescapeHtml(desc);
       inputCod.value = unescapeHtml(cod);
@@ -281,13 +350,29 @@
       boxSugestoes.style.display = 'none';
       inputQtd.focus();
     }
+    /* ====================================================================
+    [FIM BLOCO] selecionarPeca
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] removerLinha
+    [RESPONSABILIDADE] Remover uma linha da tabela de estrutura (BOM)
+    ==================================================================== */
     // ====== MANIPULAÇÃO DA TABELA ======
     function removerLinha(btn){
       const tr = btn.closest('tr');
       tr?.remove();
     }
+    /* ====================================================================
+    [FIM BLOCO] removerLinha
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] adicionarPeca
+    [RESPONSABILIDADE] Adicionar uma nova peça na tabela de estrutura (BOM)
+    ==================================================================== */
     function adicionarPeca(){
       const desc = inputDesc.value.trim();
       const cod  = inputCod.value.trim();
@@ -312,11 +397,60 @@
       inputQtd.value = '';
       inputDesc.focus();
     }
+    /* ====================================================================
+    [FIM BLOCO] adicionarPeca
+    ==================================================================== */
 
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] escapeHtml
+    [RESPONSABILIDADE] Escapar caracteres para uso seguro em HTML
+    ==================================================================== */
     // ====== HELPERS DE ESCAPE ======
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    /* ====================================================================
+    [FIM BLOCO] escapeHtml
+    ==================================================================== */
+
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] unescapeHtml
+    [RESPONSABILIDADE] Converter entidades HTML em texto para preencher inputs
+    ==================================================================== */
     function unescapeHtml(s){ const t=document.createElement('textarea'); t.innerHTML=s; return t.value; }
+    /* ====================================================================
+    [FIM BLOCO] unescapeHtml
+    ==================================================================== */
+
+    /* ====================================================================
+    [BLOCO] FUNÇÃO
+    [NOME] escapeAttr
+    [RESPONSABILIDADE] Escapar valores para uso seguro em atributos HTML
+    ==================================================================== */
     function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+    /* ====================================================================
+    [FIM BLOCO] escapeAttr
+    ==================================================================== */
   </script>
+
+  <!-- ====================================================================
+  MAPA DO ARQUIVO
+  --------------------------------------------------------------------
+  DOCUMENTO_HTML: style
+  DOCUMENTO_HTML: header_hero
+  DOCUMENTO_HTML: form_parametros_conjunto
+  DOCUMENTO_HTML: form_estrutura_bom
+  BLOCO_UTIL: variaveis_dom_autocomplete
+  BLOCO_UTIL: listeners_autocomplete
+  FUNÇÃO: consultarAutocomplete
+  FUNÇÃO: renderSugestoes
+  FUNÇÃO: selecionarPeca
+  FUNÇÃO: removerLinha
+  FUNÇÃO: adicionarPeca
+  FUNÇÃO: escapeHtml
+  FUNÇÃO: unescapeHtml
+  FUNÇÃO: escapeAttr
+  ==================================================================== -->
+
 </body>
 </html>

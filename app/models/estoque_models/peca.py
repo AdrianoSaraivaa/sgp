@@ -14,6 +14,11 @@ from typing import Optional
 from ..base_model import BaseModel
 
 
+# ====================================================================
+# [BLOCO] CLASSE
+# [NOME] Peca
+# [RESPONSABILIDADE] Representar peça/conjunto no estoque mapeado para a tabela "pecas"
+# ====================================================================
 @dataclass
 class Peca(BaseModel):
     """Represents a part in inventory."""
@@ -32,5 +37,26 @@ class Peca(BaseModel):
     margem: Optional[float] = field(default=None)
     custo: Optional[float] = field(default=None)
 
+    # ====================================================================
+    # [BLOCO] MÉTODO
+    # [NOME] __repr__
+    # [RESPONSABILIDADE] Retornar representação textual resumida da peça para debug/log
+    # ====================================================================
     def __repr__(self) -> str:
         return f"<Peca {self.codigo_pneumark or self.id}>"
+
+    # ====================================================================
+    # [FIM BLOCO] __repr__
+    # ====================================================================
+
+
+# ====================================================================
+# [FIM BLOCO] Peca
+# ====================================================================
+
+# ====================================================================
+# MAPA DO ARQUIVO
+# --------------------------------------------------------------------
+# CLASSE: Peca
+# MÉTODO: __repr__
+# ====================================================================

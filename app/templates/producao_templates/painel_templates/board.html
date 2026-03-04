@@ -636,6 +636,13 @@
       border: 3px solid #ef4444 !important;
   }
 
+  /* Selecionado RETRABALHO: Fundo Branco, Texto Âmbar, Borda Âmbar */
+  input[value="retrabalho"]:checked + .btn-checklist {
+      background-color: #FFFFFF !important;
+      color: #f59e0b !important;
+      border: 3px solid #f59e0b !important;
+  }
+
 </style>
 {% endblock %}
 
@@ -852,6 +859,16 @@
         </button>
       </div> -->
 
+    
+      <!-- AÇÕES (NOVO) -->
+      <div class="actions" style="margin-top: 14px;">
+        <button type="button" class="btn ghost" onclick="closeChecklist()">Cancelar</button>
+        <button type="submit" id="checklistSubmitBtn" class="btn"
+                style="background:#22c55e; border-color:#22c55e; margin-left:10px;" disabled>
+          💾 Salvar e Fechar
+        </button>
+      </div>
+
     </form>
   </div>
 </div>
@@ -888,11 +905,16 @@
 
     // === CHECKLIST ===
     let checklistItems = [];
+      let checklistModeloAtual = '';
+      let checklistStartedAtIso = null;
+      let checklistRes = [];
+      let checklistNota = [];
+
     let checklistIndex = 0;
     let checklistTimer = null;
 
     const checklistItemsContainer = document.getElementById('checklistItems');
-    const checklistSubmitBtn = document.querySelector('#checklistForm #hipotSubmitBtn');
+    const checklistSubmitBtn = document.getElementById('checklistSubmitBtn');
 
     // Refs Hi-Pot
     const hipotModalBackdrop = document.getElementById('hipotModalBackdrop');
@@ -1100,51 +1122,71 @@
 
     // Selecionamos o container que contém as colunas (ou o document)
     document.addEventListener('click', (event) => {
-      // Verifica se o clique foi em um .kitem ou dentro de um
       const card = event.target.closest('.kitem');
-      
-      if (card) {
-        const serial = card.dataset.serial;
-        // Buscamos o span .sub dentro do card clicado
-        const elementoSub = card.querySelector('.sub');
-        
-        // Pegamos o modelo. Se elementoSub não existir, modelo será ""
-        const modelo = elementoSub ? elementoSub.dataset.modelo : "";
+      if (!card) return;
 
-        if (modelo) {
-          openChecklist(serial, modelo);
-        } else {
-          console.error("Erro: Atributo data-modelo não encontrado no span .sub");
-        }
+      // Só abre checklist quando o card está na coluna de CHECKLIST
+      const colEl = card.closest('.board-col');
+      const colId = (colEl?.dataset?.colId || '').toLowerCase();
+      if (!(colId === 'checklist' || colId === 'b8')) return;
+
+      const serial = (card.dataset.serial || '').trim();
+      const elementoSub = card.querySelector('.sub');
+      const modelo = (elementoSub?.dataset?.modelo || '').trim();
+
+      if (serial && modelo) {
+        openChecklist(serial, modelo);
+      } else {
+        console.error("Checklist: serial/modelo ausentes no card.", { serial, modelo });
       }
     });
 
     async function openChecklist(serial, modelo) {
-      const hipotSerialInput = document.getElementById('hipotSerialInput');
+      const backdrop = document.getElementById('checklistBackdrop');
+      const form = document.getElementById('checklistForm');
+      const serialInput = backdrop ? backdrop.querySelector('input[name="serial"]') : null; // (id duplicado no HTML)
+      const operadorInput = backdrop ? backdrop.querySelector('input[name="operadorId"]') : null;
       const checklistSerialDisplay = document.getElementById('checkListSerialDisplay');
       const checklistItemsContainer = document.getElementById('checklistItems');
-      const checklistBackdrop = document.getElementById('checklistBackdrop');
 
-      hipotSerialInput.value = serial;
-      checklistSerialDisplay.textContent = serial;
+      const s = (serial || '').trim();
+      const m = (modelo || '').trim();
+
+      if (!backdrop || !form || !checklistItemsContainer) {
+        console.error('Checklist: elementos do modal não encontrados.');
+        return;
+      }
+
+      checklistModeloAtual = m;
+      checklistStartedAtIso = new Date().toISOString();
+
+      if (serialInput) serialInput.value = s;
+      if (checklistSerialDisplay) checklistSerialDisplay.textContent = s;
+
+      // Operador: reaproveita último operador do Hi-Pot, se houver
+      try {
+        const lastOperator = localStorage.getItem('gp.hipot.operador');
+        if (operadorInput && !operadorInput.value) operadorInput.value = lastOperator || '';
+      } catch (e) {}
+
       checklistItemsContainer.innerHTML = 'Carregando itens...';
-      checklistBackdrop.style.display = 'flex';
+      backdrop.style.display = 'flex';
+
+      if (checklistSubmitBtn) checklistSubmitBtn.disabled = true;
 
       try {
-        // Chamada ao seu endpoint no Flask
-        const r = await fetch(`/api/gp/checklist/items?modelo=${modelo}`);
+        const r = await fetch(`/api/gp/checklist/items?modelo=${encodeURIComponent(m)}`, { cache: 'no-store' });
         if (!r.ok) throw new Error("Erro ao buscar itens");
-        
+
         const d = await r.json();
-        
-        // Verificação: o dado pode vir em d.items ou direto em d
         const itensParaRenderizar = d.items || d;
 
-        if (Array.isArray(itensParaRenderizar)) {
+        if (Array.isArray(itensParaRenderizar) && itensParaRenderizar.length) {
           renderChecklist(itensParaRenderizar);
         } else {
           checklistItemsContainer.innerHTML = 'Nenhum item encontrado para este modelo.';
         }
+
 
       } catch (e) {
         console.error("Erro no fetch:", e);
@@ -1152,100 +1194,215 @@
       }
     }
 
+  
+  // === CHECKLIST (novo fluxo: aprovado / reprovado / retrabalho + nota obrigatória) ===
   let listaItensGlobal = [];
-  let itensProcessados = new Set(); // Trava para não repetir cronômetro no mesmo item
+  let itensProcessados = new Set(); // trava do cronômetro por item
+
+  function _getChecklistRoot() {
+    return document.getElementById('checklistBackdrop');
+  }
+
+  function _getChecklistSerial() {
+    const root = _getChecklistRoot();
+    const el = root ? root.querySelector('input[name="serial"]') : null;
+    return (el?.value || '').trim();
+  }
+
+  function _getChecklistOperador() {
+    const root = _getChecklistRoot();
+    const el = root ? root.querySelector('input[name="operadorId"]') : null;
+    return (el?.value || '').trim();
+  }
+
+  function verificarBotaoSalvar() {
+    if (!checklistSubmitBtn) return;
+
+    // 1) todos respondidos
+    const allAnswered = checklistRes.length === listaItensGlobal.length &&
+      checklistRes.every(v => v === 'aprovado' || v === 'reprovado' || v === 'retrabalho');
+
+    if (!allAnswered) {
+      checklistSubmitBtn.disabled = true;
+      return;
+    }
+
+    // 2) nota obrigatória quando reprovado/retrabalho
+    for (let i = 0; i < checklistRes.length; i++) {
+      const r = checklistRes[i];
+      if ((r === 'reprovado' || r === 'retrabalho') && !(checklistNota[i] || '').trim()) {
+        checklistSubmitBtn.disabled = true;
+        return;
+      }
+    }
+
+    checklistSubmitBtn.disabled = false;
+  }
 
   function renderChecklist(itens) {
-      listaItensGlobal = itens;
-      itensProcessados.clear(); // Limpa a trava ao abrir novo checklist
-      const container = document.getElementById('checklistItems');
-      container.innerHTML = '';
+    listaItensGlobal = Array.isArray(itens) ? itens : [];
+    itensProcessados.clear();
 
-      itens.forEach((item, index) => {
-          const row = document.createElement('div');
-          row.id = `row_${index}`;
-          row.className = 'checklist-item-row' + (index > 0 ? ' item-aguardando' : '');
-          row.style = "margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 12px; border: 1px solid #333;";
-          
-          row.innerHTML = `
-              <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
-                  <span style="font-size: 15px; color: #fff; font-weight: 600;">${item.ordem}. ${item.descricao}</span>
-                  <span id="display_status_${index}" class="status-badge" style="color:#666; font-weight:900;">BLOQUEADO</span>
-              </div>
-              
-              <div style="display:flex; gap:10px;">
-                  <input type="radio" name="status_${item.id}" id="ok_${index}" value="aprovado" class="check-opt" style="display:none;">
-                  <label for="ok_${index}" id="l_ok_${index}" class="btn-checklist" style="flex:1; border: 2px solid #22c55e; color: #22c55e;">✅ APROVADO</label>
+    checklistItems = listaItensGlobal; // mantém compatibilidade com código antigo (se houver)
+    checklistRes = new Array(listaItensGlobal.length).fill(null);
+    checklistNota = new Array(listaItensGlobal.length).fill('');
 
-                  <input type="radio" name="status_${item.id}" id="fail_${index}" value="reprovado" class="check-opt" style="display:none;">
-                  <label for="fail_${index}" id="l_fail_${index}" class="btn-checklist" style="flex:1; border: 2px solid #ef4444; color: #ef4444;">❌ REPROVADO</label>
-              </div>
-          `;
-          container.appendChild(row);
+    const container = document.getElementById('checklistItems');
+    if (!container) return;
 
-          const radios = row.querySelectorAll('input[type="radio"]');
-          radios.forEach(radio => {
-              radio.addEventListener('change', () => {
-                  // Só chama o próximo se o atual foi finalizado
-                  ativarProximo(index + 1);
-              });
-          });
+    container.innerHTML = '';
+
+    listaItensGlobal.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.id = `row_${index}`;
+      row.className = 'checklist-item-row' + (index > 0 ? ' item-aguardando' : '');
+      row.style = "margin-bottom: 20px; padding: 15px; background: #1a1a1a; border-radius: 12px; border: 1px solid #333;";
+
+      const itemId = item.id ?? index;
+
+      row.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
+          <span style="font-size: 15px; color: #fff; font-weight: 600;">${item.ordem ?? (index + 1)}. ${item.descricao ?? ''}</span>
+          <span id="display_status_${index}" class="status-badge" style="color:#666; font-weight:900;">BLOQUEADO</span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-bottom: 12px;">
+          <input type="radio" name="status_${itemId}" id="ok_${index}" value="aprovado" style="display:none;">
+          <label for="ok_${index}" id="l_ok_${index}" class="btn-checklist" style="flex:1; border: 2px solid #22c55e; color: #22c55e;">✅ APROVADO</label>
+
+          <input type="radio" name="status_${itemId}" id="fail_${index}" value="reprovado" style="display:none;">
+          <label for="fail_${index}" id="l_fail_${index}" class="btn-checklist" style="flex:1; border: 2px solid #ef4444; color: #ef4444;">❌ REPROVADO</label>
+
+          <input type="radio" name="status_${itemId}" id="rework_${index}" value="retrabalho" style="display:none;">
+          <label for="rework_${index}" id="l_rework_${index}" class="btn-checklist" style="flex:1; border: 2px solid #f59e0b; color: #f59e0b;">🛠️ RETRABALHO</label>
+        </div>
+
+        <div id="nota_wrap_${index}" style="display:none; margin-top: 8px;">
+          <label for="nota_${index}" style="display:block; margin:0 0 6px; font-size:13px; color:#ddd;">
+            Ocorrência / Observação (obrigatório para REPROVADO/RETRABALHO):
+          </label>
+          <textarea id="nota_${index}"
+                    rows="3"
+                    style="width:100%; resize:vertical; padding:10px; border-radius:10px; border:1px solid #333; background:#0f172a; color:#fff;"
+                    placeholder="Descreva a ocorrência..."></textarea>
+        </div>
+      `;
+
+      container.appendChild(row);
+
+      const notaWrap = row.querySelector(`#nota_wrap_${index}`);
+      const notaEl = row.querySelector(`#nota_${index}`);
+      const radios = row.querySelectorAll(`input[type="radio"][name="status_${itemId}"]`);
+
+      function advanceIfReady() {
+        const r = (checklistRes[index] || '');
+        if (r === 'aprovado') {
+          ativarProximo(index + 1);
+          verificarBotaoSalvar();
+          return;
+        }
+        if (r === 'reprovado' || r === 'retrabalho') {
+          const txt = (notaEl?.value || '').trim();
+          if (txt.length > 0) {
+            checklistNota[index] = txt;
+            ativarProximo(index + 1);
+            verificarBotaoSalvar();
+          }
+        }
+      }
+
+      radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          const val = (radio.value || '').trim().toLowerCase();
+          checklistRes[index] = val;
+
+          if (val === 'aprovado') {
+            if (notaWrap) notaWrap.style.display = 'none';
+            checklistNota[index] = '';
+            advanceIfReady();
+            return;
+          }
+
+          // reprovado / retrabalho
+          if (notaWrap) notaWrap.style.display = 'block';
+          if (notaEl) {
+            notaEl.focus();
+          }
+          verificarBotaoSalvar();
+        });
       });
 
-      ativarProximo(0); 
+      if (notaEl) {
+        notaEl.addEventListener('input', () => {
+          checklistNota[index] = (notaEl.value || '').trim();
+          advanceIfReady();
+          verificarBotaoSalvar();
+        });
+      }
+    });
+
+    ativarProximo(0);
+    verificarBotaoSalvar();
   }
 
   function ativarProximo(index) {
-      // 1. Verifica se o item existe ou se já foi iniciado para evitar bug do contador duplo
-      if (index >= listaItensGlobal.length || itensProcessados.has(index)) {
-          verificarBotaoSalvar();
-          return;
-      }
+    // fim: apenas habilita salvar (não auto-salva)
+    if (index >= listaItensGlobal.length) {
+      verificarBotaoSalvar();
+      return;
+    }
 
-      itensProcessados.add(index); // Marca que este item já iniciou o processo
+    // trava do cronômetro do item
+    if (itensProcessados.has(index)) return;
+    itensProcessados.add(index);
 
-      const item = listaItensGlobal[index];
-      const row = document.getElementById(`row_${index}`);
-      const display = document.getElementById(`display_status_${index}`);
-      const bOk = document.getElementById(`l_ok_${index}`);
-      const bFail = document.getElementById(`l_fail_${index}`);
+    const item = listaItensGlobal[index];
+    const row = document.getElementById(`row_${index}`);
+    const display = document.getElementById(`display_status_${index}`);
+    const bOk = document.getElementById(`l_ok_${index}`);
+    const bFail = document.getElementById(`l_fail_${index}`);
+    const bRework = document.getElementById(`l_rework_${index}`);
 
-      row.classList.remove('item-aguardando');
-      row.style.opacity = "1";
+    if (!row || !display || !bOk || !bFail) return;
 
-      if (item.bloqueante && item.min_s > 0) {
-          let seg = item.min_s;
-          display.style.color = "#fccf7e";
-          
-          // Limpa qualquer intervalo que pudesse existir (segurança extra)
-          if (row.dataset.intervalId) clearInterval(row.dataset.intervalId);
+    row.classList.remove('item-aguardando');
+    row.style.opacity = "1";
 
-          const crono = setInterval(() => {
-              if (seg <= 0) {
-                  clearInterval(crono);
-                  display.textContent = "LIBERADO";
-                  display.style.color = "#22c55e";
-                  display.style.fontSize = "18px";
-                  bOk.classList.add('liberado');
-                  bFail.classList.add('liberado');
-              } else {
-                  display.textContent = `ESPERE ${seg}s`;
-                  seg--;
-              }
-          }, 1000);
-          
-          row.dataset.intervalId = crono; // Guarda o ID no elemento
-      } else {
+    if (item.bloqueante && item.min_s > 0) {
+      let seg = item.min_s;
+      display.style.color = "#fccf7e";
+
+      if (row.dataset.intervalId) clearInterval(Number(row.dataset.intervalId));
+
+      const crono = setInterval(() => {
+        if (seg <= 0) {
+          clearInterval(crono);
           display.textContent = "LIBERADO";
           display.style.color = "#22c55e";
+          display.style.fontSize = "18px";
           bOk.classList.add('liberado');
           bFail.classList.add('liberado');
-      }
+          if (bRework) bRework.classList.add('liberado');
+        } else {
+          display.textContent = `ESPERE ${seg}s`;
+          seg--;
+        }
+      }, 1000);
 
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.dataset.intervalId = String(crono);
+    } else {
+      display.textContent = "LIBERADO";
+      display.style.color = "#22c55e";
+      bOk.classList.add('liberado');
+      bFail.classList.add('liberado');
+      if (bRework) bRework.classList.add('liberado');
+    }
+
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  function liberarChecklistItem(index) {
+
+function liberarChecklistItem(index) {
       const item = checklistItems[index];
       const div = document.querySelector(`.check-item[data-index="${index}"]`);
       const input = div.querySelector('input');
@@ -1302,29 +1459,65 @@
     }
 
 
+    
     document.getElementById('checklistForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      const serial = _getChecklistSerial();
+      const operador = _getChecklistOperador();
+
+      if (!serial) {
+        showToast('Atenção', 'Serial não encontrado.', 'warn', 3000);
+        return;
+      }
+      if (!operador) {
+        showToast('Atenção', 'O ID do Operador é obrigatório.', 'warn', 3000);
+        try { _getChecklistRoot()?.querySelector('input[name="operadorId"]')?.focus(); } catch (e) {}
+        return;
+      }
+
+      verificarBotaoSalvar();
+      if (checklistSubmitBtn && checklistSubmitBtn.disabled) {
+        showToast('Checklist incompleto', 'Preencha todos os itens (e a ocorrência quando necessário).', 'warn', 3500);
+        return;
+      }
+
+       const itens = listaItensGlobal.map((item, idx) => ({
+        ordem: item.ordem ?? (idx + 1),
+        descricao: item.descricao || '',
+        tempo_alvo_s: Number(item.tempo_alvo_s || item.tempo_seg || item.min_s || 1),
+        resultado:
+          checklistRes[idx] === 'aprovado' ? 'ok' :
+          checklistRes[idx] === 'reprovado' ? 'nao' :
+          checklistRes[idx] === 'retrabalho' ? 'retrabalho' :
+          'ok',        
+          nota: (checklistNota[idx] || '').trim()
+      }));
+
       const payload = {
-        serial: hipotSerialInput.value,
-        operador: operadorIdInput.value,
-        respostas: checklistItems.map((item, idx) => {
-          const input = document.querySelector(`.check-item[data-index="${idx}"] input`);
-          return {
-            item_id: item.id,
-            valor: input.value
-          };
-        })
+        serial,
+        modelo: checklistModeloAtual,
+        operador,
+        started_at: checklistStartedAtIso,
+        finished_at: new Date().toISOString(),
+        status: itens.some(x => x.resultado === 'nao' || x.resultado === 'retrabalho') ? 'fail' : 'ok',
+        itens
       };
 
       try {
-        const r = await fetch('/producao/gp/checklist/api/submit', {
+        if (checklistSubmitBtn) {
+          checklistSubmitBtn.disabled = true;
+          checklistSubmitBtn.textContent = 'Salvando...';
+        }
+
+        const r = await fetch('/api/gp/checklist/exec', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
+
         if (d.ok) {
           showToast('Checklist salvo', 'Registro concluído.', 'success');
           closeChecklist();
@@ -1332,14 +1525,32 @@
         } else {
           showToast('Erro', d.error || 'Falha ao salvar.', 'error');
         }
+
       } catch {
         showToast('Erro de rede', 'Servidor indisponível.', 'error');
+      } finally {
+        if (checklistSubmitBtn) {
+          checklistSubmitBtn.textContent = '💾 Salvar e Fechar';
+          verificarBotaoSalvar();
+        }
       }
     });
 
 
 
+
     function closeChecklist() {
+      // limpa timers pendentes do checklist
+      try {
+        const rows = document.querySelectorAll('#checklistItems .checklist-item-row');
+        rows.forEach(r => {
+          if (r.dataset && r.dataset.intervalId) {
+            try { clearInterval(Number(r.dataset.intervalId)); } catch (e) {}
+            delete r.dataset.intervalId;
+          }
+        });
+      } catch (e) {}
+
       checklistBackdrop.style.display = 'none';
     }
 
@@ -1543,14 +1754,6 @@
             el.style.cursor = 'pointer';
             el.addEventListener('click', () => {
               openHipotModal(it.serial);
-            });
-
-          }
-          else if (colId === 'checklist' || colId === 'b8') {
-
-            el.style.cursor = 'pointer';
-            el.addEventListener('click', () => {
-              openChecklist(it.serial);
             });
 
           }
