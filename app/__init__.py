@@ -116,6 +116,27 @@ def create_app() -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
 
+
+
+        # ====================================================================
+    # [BLOCO] BLOCO_UTIL
+    # [NOME] ensure_db_tables
+    # [RESPONSABILIDADE] Criar tabelas automaticamente em ambiente Render, se não existirem
+    # ====================================================================
+    try:
+        is_render = bool(os.environ.get("RENDER")) or (
+            "onrender.com" in (os.environ.get("RENDER_EXTERNAL_URL") or "")
+        )
+        if is_render:
+            with app.app_context():
+                db.create_all()
+                app.logger.info("[BOOT] db.create_all() executado (Render).")
+    except Exception as e:
+        app.logger.warning("[BOOT] Falha ao criar tabelas automaticamente: %s", e)
+    # ====================================================================
+    # [FIM BLOCO] ensure_db_tables
+    # ====================================================================
+
     # --- CONFIGURAÇÃO DO LOGIN ---
     login_manager.init_app(app)
     login_manager.login_view = "login_bp.login"
