@@ -53,7 +53,7 @@ def upgrade():
                     "permitir_pular_item",
                     sa.Boolean(),
                     nullable=False,
-                    server_default=sa.text("0"),
+                    server_default=sa.text("false"),
                 ),
             )
 
@@ -79,7 +79,7 @@ def upgrade():
                     "bloqueante",
                     sa.Boolean(),
                     nullable=False,
-                    server_default=sa.text("0"),
+                    server_default=sa.text("false"),
                 ),
             )
         if not _has_column(insp, "gp_checklist_items", "exige_nota_se_nao"):
@@ -89,7 +89,7 @@ def upgrade():
                     "exige_nota_se_nao",
                     sa.Boolean(),
                     nullable=False,
-                    server_default=sa.text("0"),
+                    server_default=sa.text("false"),
                 ),
             )
         if not _has_column(insp, "gp_checklist_items", "habilitado"):
@@ -99,7 +99,7 @@ def upgrade():
                     "habilitado",
                     sa.Boolean(),
                     nullable=False,
-                    server_default=sa.text("1"),
+                    server_default=sa.text("true"),
                 ),
             )
 
@@ -144,7 +144,7 @@ def upgrade():
                     "pin_used",
                     sa.Boolean(),
                     nullable=False,
-                    server_default=sa.text("0"),
+                    server_default=sa.text("false"),
                 ),
             )
         if not _has_column(insp, "gp_checklist_exec_items", "pin_reason"):
