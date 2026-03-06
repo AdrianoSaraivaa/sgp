@@ -16,22 +16,54 @@ branch_labels = None
 depends_on = None
 
 
+def _has_table(insp, table_name):
+    try:
+        return table_name in insp.get_table_names()
+    except Exception:
+        return False
+
+
+def _has_column(insp, table_name, col_name):
+    try:
+        cols = [c["name"] for c in insp.get_columns(table_name)]
+        return col_name in cols
+    except Exception:
+        return False
+
+
 def upgrade():
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    if not _has_table(insp, 'gp_work_order'):
+        return
+
     with op.batch_alter_table('gp_work_order', schema=None) as batch_op:
-        # Corrigido para SQLite: precisa de server_default
-        batch_op.add_column(
-            sa.Column('hipot_flag', sa.Boolean(), nullable=False, server_default=sa.text('0'))
-        )
-        batch_op.add_column(
-            sa.Column('hipot_status', sa.String(length=10), nullable=False, server_default='')
-        )
-        batch_op.add_column(
-            sa.Column('hipot_last_at', sa.DateTime(), nullable=True)
-        )
+        if not _has_column(insp, 'gp_work_order', 'hipot_flag'):
+            batch_op.add_column(
+                sa.Column('hipot_flag', sa.Boolean(), nullable=False, server_default=sa.text('0'))
+            )
+        if not _has_column(insp, 'gp_work_order', 'hipot_status'):
+            batch_op.add_column(
+                sa.Column('hipot_status', sa.String(length=10), nullable=False, server_default='')
+            )
+        if not _has_column(insp, 'gp_work_order', 'hipot_last_at'):
+            batch_op.add_column(
+                sa.Column('hipot_last_at', sa.DateTime(), nullable=True)
+            )
 
 
 def downgrade():
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    if not _has_table(insp, 'gp_work_order'):
+        return
+
     with op.batch_alter_table('gp_work_order', schema=None) as batch_op:
-        batch_op.drop_column('hipot_last_at')
-        batch_op.drop_column('hipot_status')
-        batch_op.drop_column('hipot_flag')
+        if _has_column(insp, 'gp_work_order', 'hipot_last_at'):
+            batch_op.drop_column('hipot_last_at')
+        if _has_column(insp, 'gp_work_order', 'hipot_status'):
+            batch_op.drop_column('hipot_status')
+        if _has_column(insp, 'gp_work_order', 'hipot_flag'):
+            batch_op.drop_column('hipot_flag')
