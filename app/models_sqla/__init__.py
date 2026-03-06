@@ -56,7 +56,7 @@ class Usuario(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     # Campos adicionados para melhoria do sistema
     email = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255), nullable=False)
 
     # Controles de acesso
     is_active_user = db.Column(db.Boolean, default=True)  # Se False, usuário não loga
@@ -72,7 +72,6 @@ class Usuario(UserMixin, db.Model):
 # ====================================================================
 # [FIM BLOCO] Usuario
 # ====================================================================
-
 
 # ====================================================================
 # [BLOCO] BLOCO_UTIL
