@@ -1,6 +1,6 @@
 """add result/rework_flag/workstation to GPWorkStage, finished_at to GPWorkOrder
 
-Revision ID: add_fields_gpworkorder_gpworkstage
+Revision ID: a1f_gpwo_gws
 Revises: 67b7637239ef
 Create Date: 2025-09-26 18:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'add_fields_gpworkorder_gpworkstage'
+revision = 'a1f_gpwo_gws'
 down_revision = '67b7637239ef'
 branch_labels = None
 depends_on = None

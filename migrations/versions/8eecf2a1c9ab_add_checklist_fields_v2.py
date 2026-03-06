@@ -1,7 +1,7 @@
 """add checklist v2 fields and ncr table (safe / idempotent)
 
 Revision ID: 8eecf2a1c9ab
-Revises: add_fields_gpworkorder_gpworkstage
+Revises: a1f_gpwo_gws
 Create Date: 2025-09-29 18:00:00.000000
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "8eecf2a1c9ab"
-down_revision = "add_fields_gpworkorder_gpworkstage"
+down_revision = "a1f_gpwo_gws"
 branch_labels = None
 depends_on = None
 
