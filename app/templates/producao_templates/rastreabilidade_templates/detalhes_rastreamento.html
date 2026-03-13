@@ -38,78 +38,300 @@
   .timeline-item.active::before { background: #3b82f6; }
 
   /* --- ESTILOS DE IMPRESSÃO (CORRIGIDO) --- */
-  @media print {
-    /* 1. Esconde elementos globais do _base.html (Clima, MOTD, Menu, Footer) */
-    .appbar, .topline, .footer, .flash-container, nav, .btn, .no-print { 
-        display: none !important; 
+  /* --- ESTILOS DE IMPRESSÃO (VERSÃO OTIMIZADA PARA PAPEL A4) --- */
+      @media print {
+
+    /* ----------------------------------------------------------------
+    [1] Configuração física da página
+    ---------------------------------------------------------------- */
+    @page {
+      size: A4 portrait;
+      margin: 8mm;
     }
 
-    /* 2. Reseta o layout para garantir que nada seja cortado */
-    html, body, .app, .container, .card-trace {
-        background: #fff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        overflow: visible !important; /* CRUCIAL: Permite que o conteúdo flua para a próx página */
-        box-shadow: none !important;
-        display: block !important; /* Remove flex/grid que pode bugar a quebra de página */
+    /* ----------------------------------------------------------------
+    [2] Oculta elementos do layout global e botões
+    ---------------------------------------------------------------- */
+    .appbar,
+    .topline,
+    .footer,
+    .flash-container,
+    nav,
+    .btn,
+    .no-print {
+      display: none !important;
     }
 
-    /* 3. Estilização do Relatório no Papel */
+    /* ----------------------------------------------------------------
+    [3] Reset agressivo contra scale/zoom/flex/grid herdado
+    ---------------------------------------------------------------- */
+    html,
+    body,
+    .app,
+    .container,
+    .content,
+    main,
+    .card,
     .card-trace {
-        padding: 0 !important;
-        border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      border: none !important;
+      display: block !important;
+      position: static !important;
+      transform: none !important;
+      scale: 1 !important;
+      zoom: 1 !important;
+      filter: none !important;
     }
 
-    /* Cabeçalho do Relatório no Papel */
-    .print-header-only {
-        display: block !important;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #000;
-        padding-bottom: 10px;
-    }
-    .print-logo {
-        max-width: 150px;
-        margin-bottom: 10px;
-    }
-
-    /* Caixas de Seção */
-    .section-box {
-        border: 1px solid #ccc !important;
-        box-shadow: none !important;
-        margin-bottom: 15px !important;
-        break-inside: avoid; /* Evita que uma caixa seja cortada ao meio na virada da folha */
-        page-break-inside: avoid;
+    /* ----------------------------------------------------------------
+    [4] Base tipográfica do papel
+    ---------------------------------------------------------------- */
+    html,
+    body {
+      font-size: 14pt !important;
+      line-height: 1.35 !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
 
-    /* Cores e Fontes */
     * {
-        -webkit-print-color-adjust: exact !important;   /* Tenta forçar impressão de cores de fundo */
-        print-color-adjust: exact !important;
-        color: #000 !important; /* Texto preto para economizar tinta e legibilidade */
-    }
-    .section-title {
-        color: #000 !important;
-        border-bottom: 1px solid #ccc !important;
-    }
-    .muted { color: #444 !important; }
-    
-    /* Ajuste específico para timeline não quebrar feio */
-    .timeline-item {
-        break-inside: avoid;
-    }
-    
-    /* Forçar quebra de página antes do Histórico se necessário */
-    #bancadasBoxSection {
-        break-before: auto; /* Deixa o navegador decidir, mas evita corte interno */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color: #000 !important;
+      transform: none !important;
+      zoom: 1 !important;
+      box-sizing: border-box !important;
     }
 
-    /* Forçar abertura de detalhes na impressão */
-    details { display: block !important; }
-    details summary { display: none !important; }
-    details[open] summary { display: none !important; }
+    /* ----------------------------------------------------------------
+    [5] Área útil do relatório no papel
+    Faz o conteúdo ocupar praticamente toda a folha A4
+    ---------------------------------------------------------------- */
+    .card-trace {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [6] Breadcrumb não precisa no papel
+    ---------------------------------------------------------------- */
+    nav[aria-label="breadcrumb"] {
+      display: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [7] Cabeçalho principal do relatório impresso
+    ---------------------------------------------------------------- */
+    .print-header-only {
+      display: block !important;
+      margin: 0 0 12px 0 !important;
+      padding-bottom: 8px !important;
+      border-bottom: 2px solid #000 !important;
+      width: 100% !important;
+    }
+
+    .print-header-only h2 {
+      margin: 0 0 4px 0 !important;
+      font-size: 20pt !important;
+      line-height: 1.15 !important;
+    }
+
+    .print-logo {
+      max-width: 150px !important;
+      margin-bottom: 8px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [8] Cabeçalho visual da tela
+    ---------------------------------------------------------------- */
+    h2 {
+      font-size: 19pt !important;
+      margin: 0 0 4px 0 !important;
+      line-height: 1.15 !important;
+    }
+
+    #headMeta {
+      font-size: 11pt !important;
+      margin-top: 4px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [9] Seções do relatório
+    ---------------------------------------------------------------- */
+    .section-box {
+      width: 100% !important;
+      background: #fff !important;
+      border: 1px solid #bfbfbf !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      margin: 0 0 10px 0 !important;
+      padding: 10px 12px !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    .section-title {
+      margin: 0 0 8px 0 !important;
+      padding-bottom: 4px !important;
+      font-size: 13pt !important;
+      font-weight: 700 !important;
+      color: #000 !important;
+      border-bottom: 1px solid #bfbfbf !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [10] Conteúdo geral
+    ---------------------------------------------------------------- */
+    .kv-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 10px 14px !important;
+      width: 100% !important;
+    }
+
+    .kv-item,
+    #dadosGerais,
+    #hipotBox,
+    #bancadasBox,
+    #checklistBox,
+    .muted,
+    .exec-box,
+    .check-desc,
+    .check-meta {
+      font-size: 11pt !important;
+      line-height: 1.35 !important;
+    }
+
+    .kv-item strong {
+      font-size: 11pt !important;
+      margin-bottom: 2px !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [11] Chips
+    ---------------------------------------------------------------- */
+    .chip {
+      display: inline-block !important;
+      font-size: 10pt !important;
+      padding: 3px 8px !important;
+      border-radius: 12px !important;
+      border: 1px solid #888 !important;
+      font-weight: 700 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [12] Timeline
+    ---------------------------------------------------------------- */
+    .timeline-item {
+      position: relative !important;
+      padding-left: 14px !important;
+      margin-bottom: 8px !important;
+      border-left: 2px solid #999 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      font-size: 11pt !important;
+      width: 100% !important;
+    }
+
+    .timeline-item::before {
+      left: -4px !important;
+      top: 5px !important;
+      width: 6px !important;
+      height: 6px !important;
+      background: #666 !important;
+    }
+
+    .timeline-item.active {
+      border-left-color: #000 !important;
+    }
+
+    .timeline-item.active::before {
+      background: #000 !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [13] Checklist
+    ---------------------------------------------------------------- */
+    .check-item {
+      display: flex !important;
+      gap: 8px !important;
+      padding: 6px 0 !important;
+      border-bottom: 1px solid #ddd !important;
+      align-items: flex-start !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      width: 100% !important;
+    }
+
+    .check-item:last-child {
+      border-bottom: none !important;
+    }
+
+    .check-ordem {
+      width: 24px !important;
+      font-size: 10pt !important;
+      font-weight: 700 !important;
+      margin-top: 1px !important;
+      flex: 0 0 24px !important;
+    }
+
+    .check-content {
+      flex: 1 !important;
+    }
+
+    .check-status {
+      width: 110px !important;
+      text-align: right !important;
+      font-size: 10pt !important;
+      flex: 0 0 110px !important;
+    }
+
+    .exec-box {
+      border: 1px solid #bfbfbf !important;
+      border-radius: 0 !important;
+      padding: 8px !important;
+      margin-bottom: 8px !important;
+      background: #fff !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      width: 100% !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [14] Detalhes abertos no papel
+    ---------------------------------------------------------------- */
+    details {
+      display: block !important;
+    }
+
+    details summary {
+      display: none !important;
+    }
+
+    details[open] summary {
+      display: none !important;
+    }
+
+    /* ----------------------------------------------------------------
+    [15] Regra extra para o histórico de bancadas
+    ---------------------------------------------------------------- */
+    #bancadasBoxSection {
+      break-before: auto !important;
+      page-break-before: auto !important;
+    }
   }
 
   /* Classe auxiliar para logo que só aparece na impressão */

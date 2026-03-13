@@ -439,12 +439,9 @@ def rastreabilidade_api_search():
     if auth_redirect:
         return auth_redirect
 
-    serial = request.args.get("serial", "").strip()
-    page = _parse_int(request.args.get("page"), 1)
+    serial = (request.args.get("serial") or "").strip()
+    page = max(_parse_int(request.args.get("page"), 1), 1)
     page_size = _parse_page_size(request.args.get("page_size"))
-
-    if not serial:
-        return jsonify({"ok": False, "error": "Número de série não fornecido."}), 400
 
     if GPWorkOrder is None:
         return (
@@ -455,9 +452,19 @@ def rastreabilidade_api_search():
         )
 
     try:
-        query = db.session.query(GPWorkOrder).filter(
-            getattr(GPWorkOrder, "serial") == serial
-        )
+        query = db.session.query(GPWorkOrder)
+
+        if serial:
+            query = query.filter(getattr(GPWorkOrder, "serial") == serial)
+
+        order_col = getattr(GPWorkOrder, "updated_at", None)
+        if order_col is None:
+            order_col = getattr(GPWorkOrder, "created_at", None)
+        if order_col is None:
+            order_col = getattr(GPWorkOrder, "id")
+
+        query = query.order_by(order_col.desc())
+
         total_items = query.count()
         items = query.offset((page - 1) * page_size).limit(page_size).all()
 
@@ -465,11 +472,15 @@ def rastreabilidade_api_search():
         for item in items:
             results.append(
                 {
-                    "id": getattr(item, "id"),
-                    "serial": getattr(item, "serial"),
-                    "modelo": getattr(item, "modelo"),
+                    "id": getattr(item, "id", None),
+                    "serial": getattr(item, "serial", None),
+                    "modelo": getattr(item, "modelo", None),
+                    "status": getattr(item, "status", None),
+                    "current_bench": getattr(item, "current_bench", None),
                     "started_at": _fmt_dt_iso(getattr(item, "started_at", None)),
                     "finished_at": _fmt_dt_iso(getattr(item, "finished_at", None)),
+                    "created_at": _fmt_dt_iso(getattr(item, "created_at", None)),
+                    "updated_at": _fmt_dt_iso(getattr(item, "updated_at", None)),
                 }
             )
 
@@ -477,7 +488,7 @@ def rastreabilidade_api_search():
             {
                 "ok": True,
                 "data": {
-                    "serial": serial,
+                    "serial": serial or None,
                     "page": page,
                     "page_size": page_size,
                     "total_items": total_items,
